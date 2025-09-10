@@ -44,6 +44,9 @@ hs_err_pid*.log
 replay_pid*.log
 *.log
 
+# Test-only local secrets (do not commit)
+medcheckapi/src/test/resources/test-secrets.properties
+
 # Keep resource files but allow profile-specific overrides to be ignored
 application-*.yml
 application-*.yaml

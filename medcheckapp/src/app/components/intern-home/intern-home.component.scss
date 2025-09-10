@@ -1,0 +1,27 @@
+@use 'sass:color';
+
+.content-box {
+  max-width: 960px;
+  background: #fff;
+  padding: 3rem 3rem 2.5rem;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.08);
+  position: relative;
+}
+
+.profile-pic {
+  width: 120px;
+  height: 120px;
+  border-radius: 16px;
+  background: #2f3136;
+  color: #d6d6d6;
+}
+
+.time-display { font-size: 2.8rem; font-weight: 600; line-height: 1.1; }
+.hours-display { font-size: 1rem; font-weight: 600; }
+
+button.btn-warning { background-color: #ffd400; border: none; }
+button.btn-warning:hover { background-color: color.scale(#ffd400, $lightness: -10%); }
+
+.profile-row { margin-bottom: .75rem; }
+.status { font-size: .9rem; }

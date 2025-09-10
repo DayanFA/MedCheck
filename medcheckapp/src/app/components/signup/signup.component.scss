@@ -1,0 +1,43 @@
+// Background
+.signup-wrapper { background: #d5e5ff; }
+
+.signup-card { 
+  max-width: 1100px; 
+  border-radius: 14px; 
+}
+
+form .form-control, form .form-select { 
+  background: #e7f0ff; 
+  border: 1px solid #d0dded; 
+  font-size: .8rem; 
+  padding: .55rem .65rem; 
+}
+form .form-control.ng-invalid.ng-touched, form .form-select.ng-invalid.ng-touched { border-color:#dc3545; }
+form .form-control.ng-invalid.ng-touched:focus, form .form-select.ng-invalid.ng-touched:focus { box-shadow:0 0 0 .15rem rgba(220,53,69,.2); }
+form .form-control:focus, form .form-select:focus { 
+  background: #f4f8ff; 
+  box-shadow: 0 0 0 .15rem rgba(13,71,161,.15); 
+  border-color: #0d47a1; 
+}
+
+label.form-label.small { font-size: .7rem; font-weight: 600; letter-spacing: .5px; }
+
+button.btn-primary { background:#0d47a1; border-color:#0d47a1; }
+button.btn-primary:hover { background:#0b3c8a; border-color:#0b3c8a; }
+
+// Password toggles
+.pass-toggle { position:absolute; top: 30px; right: 4px; color:#495057; text-decoration:none; }
+.pass-toggle:hover { color:#0d47a1; }
+.pass-toggle:focus { box-shadow:none; }
+
+.alert ul li { line-height:1.2; }
+
+// Password strength bar
+.strength { height:5px; background:#e2e6eb; border-radius:3px; overflow:hidden; }
+.strength-bar { height:100%; transition:width .3s ease; background:#dc3545; }
+.strength-bar.fair { background:#ffc107; }
+.strength-bar.strong { background:#28a745; }
+
+@media (max-width: 767.98px){
+  .signup-card { max-width: 95%; }
+}

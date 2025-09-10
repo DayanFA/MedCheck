@@ -1,0 +1,48 @@
+@use 'sass:color';
+
+// Sidebar container
+.sidebar {
+  width: 250px;
+  background: #fff;
+  padding: 1.1rem 1.1rem .85rem;
+  box-shadow: 2px 0 6px rgba(0,0,0,.06);
+  border-right: 1px solid #e5e7eb;
+  height: 100%;
+  transition: width .25s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+// Collapsed state (applied by host element adding .collapsed class)
+:host(.collapsed) .sidebar { width: 78px; }
+:host(.collapsed) .sidebar .brand-text,
+:host(.collapsed) .sidebar .nav-link span { display: none; }
+:host(.collapsed) .sidebar .divider { margin: .25rem 0 .75rem; }
+
+// Branding
+.brand-logo { width: 54px; height: auto; object-fit: contain; }
+.divider { margin: .35rem 0 1rem; border-color: #e5e7eb; }
+
+// Nav links
+.nav-link {
+  color: #374151;
+  border-radius: .65rem;
+  padding: .6rem .85rem;
+  font-weight: 500;
+  font-size: .95rem;
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  transition: background .15s, color .15s;
+}
+.nav-link i { font-size: 1.15rem; }
+.nav-link:hover { background: #f3f4f6; }
+.nav-link.active { background: #e0ecff; color: #0d47a1; }
+.nav-link.active i { color: #0d47a1; }
+
+// Logout button
+button.btn-outline-secondary { border-radius: .65rem; font-weight: 500; }
+
+// Collapsed tweaks
+:host(.collapsed) .sidebar .nav-link { justify-content: center; padding: .65rem .5rem; }
+:host(.collapsed) .sidebar .nav-link i { margin: 0; }

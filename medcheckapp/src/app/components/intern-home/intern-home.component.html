@@ -1,0 +1,39 @@
+<div class="home-container p-0" *ngIf="!loading; else loadingTpl">
+  <div class="content-box mx-auto">
+    <div class="row g-4 align-items-start profile-row">
+      <div class="col-md-3 text-center">
+        <div class="profile-pic rounded d-flex align-items-center justify-content-center">
+          <i class="bi bi-person-fill fs-1"></i>
+        </div>
+      </div>
+      <div class="col-md-9 profile-details small">
+        <p class="mb-1"><strong>Nome:</strong> {{user.name}}</p>
+        <p class="mb-1"><strong>Matrícula:</strong> {{user.matricula}}</p>
+        <p class="mb-1"><strong>CPF:</strong> {{user.cpf}}</p>
+        <p class="mb-1"><strong>E-mail:</strong> {{user.email}}</p>
+      </div>
+    </div>
+    <hr class="my-4" />
+    <div class="row text-center mb-4">
+      <div class="col status small"><strong>Status:</strong> {{user.status}}</div>
+      <div class="col">
+        <div class="small fw-semibold">Hora Atual:</div>
+        <div class="time-display" id="currentTime">{{currentTime}}</div>
+      </div>
+      <div class="col">
+        <div class="small fw-semibold">Horas Realizadas:</div>
+        <div class="hours-display">{{user.performedHours}}</div>
+      </div>
+    </div>
+    <div class="text-center">
+      <button class="btn btn-warning fw-semibold px-4">Realizar Check-Out</button>
+    </div>
+  </div>
+</div>
+<ng-template #loadingTpl>
+  <div class="d-flex justify-content-center align-items-center py-5">
+    <div class="spinner-border text-primary" role="status" style="width:2.5rem;height:2.5rem;">
+      <span class="visually-hidden">Carregando...</span>
+    </div>
+  </div>
+</ng-template>

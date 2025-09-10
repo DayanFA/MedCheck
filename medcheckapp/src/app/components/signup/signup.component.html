@@ -1,0 +1,102 @@
+<div class="signup-wrapper d-flex align-items-center justify-content-center min-vh-100 py-4">
+  <div class="card signup-card shadow border-0 w-100 mx-3" role="main">
+    <div class="p-4 p-md-5">
+      <h2 class="h5 fw-semibold text-center mb-4">Cadastra-se</h2>
+      <form #f="ngForm" (ngSubmit)="onSubmit()" class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label small">Preencha o nome *</label>
+          <input type="text" class="form-control form-control-sm" [(ngModel)]="userData.name" name="name" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">Matricula</label>
+          <input type="text" class="form-control form-control-sm" [(ngModel)]="userData.matricula" name="matricula" placeholder="" appMask="matricula">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">Data de nascimento *</label>
+          <input type="date" class="form-control form-control-sm" [(ngModel)]="userData.dataNascimento" name="dataNascimento" (input)="onBirthDateInput()" [ngClass]="{'is-invalid': birthDateInvalid}" required>
+          <div *ngIf="birthDateInvalid" class="invalid-feedback d-block small">Data de nascimento inválida.</div>
+        </div>
+    <div class="col-md-6">
+          <label class="form-label small">Naturalidade *</label>
+          <select class="form-select form-select-sm" [(ngModel)]="userData.naturalidade" name="naturalidade" required>
+      <option value="" disabled selected>Selecione</option>
+      <option *ngFor="let e of estados" [value]="e">{{e}}</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">CPF *</label>
+          <input type="text" class="form-control form-control-sm" [(ngModel)]="userData.cpf" name="cpf" placeholder="000.000.000-00" appMask="cpf" (input)="onCpfInput()" [ngClass]="{'is-invalid': cpfInvalid}" required>
+          <div *ngIf="cpfInvalid" class="invalid-feedback d-block small">CPF inválido</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">E-mail Institucional *</label>
+          <input type="email" class="form-control form-control-sm" [(ngModel)]="userData.institutionalEmail" name="institutionalEmail" placeholder="usuario@dominio" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">Nacionalidade *</label>
+          <select class="form-select form-select-sm" [(ngModel)]="userData.nacionalidade" name="nacionalidade" required>
+            <option value="" disabled>Selecione</option>
+            <option *ngFor="let n of nacionalidades" [value]="n">{{n}}</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">Telefone para contato *</label>
+          <input type="text" class="form-control form-control-sm" [(ngModel)]="userData.telefone" name="telefone" placeholder="(00)00000-0000" appMask="phone" required>
+        </div>
+        <div class="col-md-6 position-relative">
+          <label class="form-label small">Senha *</label>
+          <input [type]="showPass ? 'text':'password'" minlength="6" class="form-control form-control-sm pe-5" [(ngModel)]="userData.password" name="password" (input)="onPasswordInput()" required>
+          <button type="button" class="btn btn-link btn-sm pass-toggle" (click)="toggleShowPass()" tabindex="-1" aria-label="Mostrar senha">
+            <i class="bi" [ngClass]="showPass ? 'bi-eye-slash':'bi-eye'"></i>
+          </button>
+          <div class="strength mt-1">
+            <div class="strength-bar" [style.width]="passwordStrength + '%'" [ngClass]="{
+              'weak': passwordStrength < 40,
+              'fair': passwordStrength >=40 && passwordStrength <70,
+              'strong': passwordStrength >=70
+            }"></div>
+          </div>
+        </div>
+        <div class="col-md-6 position-relative">
+          <label class="form-label small">Confirmar Senha *</label>
+          <input [type]="showConfirm ? 'text':'password'" minlength="6" class="form-control form-control-sm pe-5" [(ngModel)]="userData.confirmPassword" name="confirmPassword" required>
+          <button type="button" class="btn btn-link btn-sm pass-toggle" (click)="toggleShowConfirm()" tabindex="-1" aria-label="Mostrar confirmação de senha">
+            <i class="bi" [ngClass]="showConfirm ? 'bi-eye-slash':'bi-eye'"></i>
+          </button>
+        </div>
+  <div class="col-12" *ngIf="errors.length">
+          <div class="alert alert-danger py-2 px-3 mb-0 small">
+            <ul class="m-0 ps-3">
+              <li *ngFor="let e of errors">{{e}}</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-12 pt-2 text-center">
+          <button class="btn btn-primary px-5 d-inline-flex align-items-center gap-2" type="submit" [disabled]="f.invalid || passwordStrength < 70 || cpfInvalid || birthDateInvalid || loading">
+            <span *ngIf="!loading">Cadastrar-se</span>
+            <span *ngIf="loading" class="d-flex align-items-center gap-2"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Salvando...</span>
+          </button>
+          <div class="small text-muted mt-2" *ngIf="!loading && (passwordStrength < 70 || cpfInvalid || birthDateInvalid)">
+            <span *ngIf="passwordStrength < 70">Senha precisa ser forte (adicione maiúscula, número e símbolo).</span>
+            <span *ngIf="cpfInvalid"> Corrija o CPF.</span>
+            <span *ngIf="birthDateInvalid"> Data de nascimento inválida.</span>
+          </div>
+        </div>
+        <div class="col-12 text-center small mt-1">
+          <a routerLink="/login" class="text-decoration-none">Já tenho uma conta</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de sucesso -->
+<div *ngIf="successModal" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background:rgba(0,0,0,.45); z-index:1050;">
+  <div class="bg-white rounded shadow p-4" style="max-width:360px; width:100%;">
+    <h5 class="mb-3">Sucesso</h5>
+    <p class="mb-4 small">Usuário cadastrado com sucesso.</p>
+    <div class="text-end">
+      <button class="btn btn-primary btn-sm" (click)="confirmSuccess()">Ok</button>
+    </div>
+  </div>
+</div>

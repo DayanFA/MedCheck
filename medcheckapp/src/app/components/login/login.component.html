@@ -1,0 +1,40 @@
+<div class="login-wrapper d-flex align-items-center justify-content-center min-vh-100 py-4">
+  <div class="card login-card shadow border-0 w-100 mx-3" role="main">
+    <div class="row g-0 h-100">
+  <div class="col-md-6 d-flex align-items-center justify-content-center p-4 border-end logo-pane">
+        <img src="/assets/logo.png" alt="MedCheck Logo" class="img-fluid logo-img" loading="lazy">
+      </div>
+      <div class="col-md-6 d-flex flex-column p-4 p-md-5 form-pane">
+        <div class="mb-4">
+          <h2 class="h5 fw-bold mb-0 text-uppercase text-center text-md-start">Bem vindo ao MedCheck</h2>
+        </div>
+        <form (ngSubmit)="onSubmit()" class="needs-validation" novalidate>
+          <div class="mb-3">
+            <label for="cpf" class="form-label small fw-semibold">Cpf de usuário</label>
+            <input type="text" id="cpf" name="cpf" class="form-control" placeholder="000.000.000-00" autocomplete="username" [(ngModel)]="credentials.cpf" appMask="cpf" required>
+          </div>
+          <div class="mb-2 position-relative password-wrapper">
+            <label for="password" class="form-label small fw-semibold">Senha</label>
+            <input [type]="showPassword ? 'text' : 'password'" id="password" name="password" class="form-control pe-5" placeholder="Entre com sua senha" autocomplete="current-password" [(ngModel)]="credentials.password" required>
+            <button type="button" class="btn btn-sm btn-link password-toggle" (click)="togglePasswordVisibility()" tabindex="-1" aria-label="Mostrar ou ocultar senha">
+              <i class="bi" [ngClass]="showPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+            </button>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 options-line">
+            <div class="form-check m-0">
+                <input class="form-check-input" type="checkbox" id="remember" name="rememberMe" [(ngModel)]="rememberMe">
+                <label class="form-check-label small" for="remember">Lembrar de mim</label>
+            </div>
+            <div class="text-end small links-group">
+              <a routerLink="/signup" class="d-block link-primary text-decoration-none">Cadastrar</a>
+              <a routerLink="/forgot-password" class="d-block link-secondary text-decoration-none">Esqueci a Senha</a>
+            </div>
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="btn btn-primary btn-login">Login</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

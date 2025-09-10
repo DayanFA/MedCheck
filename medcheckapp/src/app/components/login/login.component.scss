@@ -1,0 +1,87 @@
+// Background similar to original (#e3f2fd like light blue)
+.login-wrapper {
+  background: #d5e5ff; // slightly softer
+}
+
+.login-card {
+  max-width: 1040px;
+  min-height: 520px;
+  border-radius: 14px;
+}
+
+.logo-pane {
+  background: #ffffff;
+  position: relative;
+}
+
+.logo-img {
+  max-width: 360px;
+  width: 100%;
+  height: auto;
+}
+
+.form-pane {
+  background: #ffffff;
+  position: relative;
+}
+
+/* Linha divisória decorativa entre as duas colunas (desktop) */
+@media (min-width: 992px) { /* lg */
+  .login-card .logo-pane::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.05), rgba(0,0,0,0.15), rgba(0,0,0,0.05));
+  }
+}
+
+/* Em telas pequenas remover borda horizontal já existente para evitar conflito */
+@media (max-width: 991.98px) {
+  .login-card .logo-pane::after { display: none; }
+}
+
+.form-control {
+  font-size: 0.9rem;
+  padding: 0.65rem 0.9rem;
+}
+
+.btn-login {
+  background-color: #0d47a1;
+  border-color: #0d47a1;
+  font-weight: 500;
+  letter-spacing: .5px;
+  &:hover { background-color: #0b3c8a; border-color: #0b3c8a; }
+}
+
+.links-group a { font-size: 0.7rem; }
+
+.options-line { font-size: 0.7rem; }
+
+@media (max-width: 991.98px) { // below lg
+  .login-card { max-width: 95%; }
+  .logo-pane { border-right: 0 !important; border-bottom: 1px solid #eee; }
+}
+
+@media (max-width: 575.98px) { // xs adjustments
+  .form-pane { padding: 2rem 1.25rem !important; }
+  .logo-img { max-width: 260px; }
+  h2, .h5 { text-align: center !important; }
+  .links-group { text-align: center !important; }
+  .options-line { flex-direction: column; align-items: flex-start; }
+}
+
+// Password toggle
+.password-wrapper { position: relative; }
+.password-toggle { 
+  position: absolute; 
+  top: 34px; 
+  right: 6px; 
+  text-decoration: none; 
+  color: #495057; 
+}
+.password-toggle:hover { color: #0d47a1; }
+.password-toggle:focus { box-shadow: none; }
+.password-toggle i { font-size: 1.05rem; }

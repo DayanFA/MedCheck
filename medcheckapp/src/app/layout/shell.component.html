@@ -1,0 +1,17 @@
+<div class="app-shell d-flex" [class.collapsed]="collapsed">
+  <app-sidebar [class.collapsed]="collapsed"></app-sidebar>
+  <div class="flex-grow-1 d-flex flex-column main-area">
+    <nav class="navbar navbar-light bg-white shadow-sm px-3 top-bar">
+      <button class="btn btn-outline-secondary me-3" (click)="toggleSidebar()" aria-label="Menu">
+        <i class="bi bi-list fs-4"></i>
+      </button>
+      <span class="fw-semibold" *ngIf="userName">Seja bem-vindo {{userName}}</span>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <div class="rounded-circle bg-secondary-subtle user-avatar" aria-label="Avatar"></div>
+      </div>
+    </nav>
+    <main class="p-4 content-wrapper flex-grow-1 overflow-auto">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>

@@ -1,0 +1,41 @@
+<aside class="sidebar d-flex flex-column">
+  <div class="d-flex align-items-center gap-2 mb-3 brand">
+    <img src="/assets/logo.png" alt="MedCheck Logo" class="brand-logo" />
+    <span class="fw-semibold fs-5 brand-text">MedCheck</span>
+  </div>
+  <hr class="divider" />
+  <nav class="flex-grow-1">
+    <ul class="nav nav-pills flex-column gap-1">
+      <li class="nav-item">
+        <a routerLink="/intern-home" routerLinkActive="active" class="nav-link d-flex align-items-center gap-2">
+          <i class="bi bi-house-door"></i><span>Home</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a routerLink="/check-in" routerLinkActive="active" class="nav-link d-flex align-items-center gap-2">
+          <i class="bi bi-person-check"></i><span>Check - In</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a routerLink="/calendario" routerLinkActive="active" class="nav-link d-flex align-items-center gap-2">
+          <i class="bi bi-calendar3"></i><span>Calendário</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a routerLink="/relatorio" routerLinkActive="active" class="nav-link d-flex align-items-center gap-2">
+          <i class="bi bi-file-earmark-text"></i><span>Relatório</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a routerLink="/configuracoes" routerLinkActive="active" class="nav-link d-flex align-items-center gap-2">
+          <i class="bi bi-gear"></i><span>Configurações</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+  <div class="mt-auto pt-3">
+    <button class="btn btn-outline-secondary w-100 d-flex align-items-center gap-2" (click)="logout()">
+      <i class="bi bi-box-arrow-right"></i><span>Sair</span>
+    </button>
+  </div>
+</aside>

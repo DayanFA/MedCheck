@@ -27,8 +27,8 @@ class PasswordResetServiceTest {
         u.setCpf("11122233344");
         u.setInstitutionalEmail("a@b.com");
         u.setName("Test User");
-    // Simula varredura no findAll() usado no serviço
-    Mockito.when(userRepository.findAll()).thenReturn(java.util.List.of(u));
+    // Simula busca por email usando método dedicado do repositório
+    Mockito.when(userRepository.findByInstitutionalEmailIgnoreCase("a@b.com")).thenReturn(java.util.Optional.of(u));
     PasswordEncoder encoder = Mockito.mock(PasswordEncoder.class);
 
     PasswordResetService svc = new PasswordResetService(userRepository, tokenRepo, mailSender, encoder);

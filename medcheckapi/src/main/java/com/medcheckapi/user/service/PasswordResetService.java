@@ -49,6 +49,10 @@ public class PasswordResetService {
     @Value("${spring.mail.password:}")
     private String smtpPass;
 
+    // Se SMTP auth estiver desativado, permitimos envio sem credenciais (útil para MailDev)
+    @Value("${spring.mail.properties.mail.smtp.auth:true}")
+    private boolean smtpAuth;
+
     public PasswordResetService(UserRepository userRepository,
                                 PasswordResetTokenRepository tokenRepository,
                                 JavaMailSender mailSender,
@@ -67,9 +71,7 @@ public class PasswordResetService {
 
     @Transactional
     public void createAndSendToken(String email) {
-        Optional<User> opt = userRepository.findAll().stream()
-                .filter(u -> email.equalsIgnoreCase(u.getInstitutionalEmail()))
-                .findFirst();
+    Optional<User> opt = userRepository.findByInstitutionalEmailIgnoreCase(email);
         if (opt.isEmpty()) {
             // Não revela inexistência
             return;
@@ -85,9 +87,9 @@ public class PasswordResetService {
         if (logLink) {
             log.info("[RESET_LINK] link={} expiresAt={} userEmail={}", link, token.getExpiresAt(), user.getInstitutionalEmail());
         }
-        // Se credenciais SMTP ausentes, apenas loga (já evitamos exception ruidosa em dev)
-        if (smtpUser == null || smtpUser.isBlank() || smtpPass == null || smtpPass.isBlank()) {
-            log.warn("[RESET_EMAIL] Credenciais SMTP ausentes (spring.mail.username/password). Email NAO enviado. Link acima pode ser usado para testes.");
+        // Caso SMTP exija autenticação mas faltem credenciais, não enviar
+        if (smtpAuth && (smtpUser == null || smtpUser.isBlank() || smtpPass == null || smtpPass.isBlank())) {
+            log.warn("[RESET_EMAIL] SMTP auth=true mas credenciais ausentes (spring.mail.username/password). Email NAO enviado. Link acima pode ser usado para testes.");
             return;
         }
         try {

@@ -12,6 +12,7 @@ setup-mail-and-run.bat
 test-email-reset.ps1
 test-password-reset-flow.bat
 test-send-reset-email.bat
+test-send-reset-email-local.bat
 
 ########################################
 # IDE / Editor settings

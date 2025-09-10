@@ -3,10 +3,10 @@
 ########################################
 .DS_Store
 Thumbs.db
-*.bat~
-*.ps1~
 
-# Local helper scripts (keep local, avoid publishing)
+########################################
+# Local helper scripts (do not commit)
+########################################
 run-backend.bat
 setup-mail-and-run.bat
 test-email-reset.ps1

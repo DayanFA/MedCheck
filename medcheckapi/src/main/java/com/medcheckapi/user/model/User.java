@@ -4,6 +4,12 @@ import jakarta.persistence.*;
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
+/**
+ * Core user entity. Added role support to distinguish ALUNO / PRECEPTOR / ADMIN / COORDENADOR
+ * and enable authorization & UI branching. Existing rows without role will default (handled in
+ * service / SQL seed). CPF kept unique and normalized (digits only).
+ */
+
 @Entity
 @Table(name = "users")
 public class User {
@@ -25,6 +31,10 @@ public class User {
     @Column(unique = true)
     private String institutionalEmail;
     private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private Role role = Role.ALUNO; // default
 
     // Getters and Setters
 
@@ -111,5 +121,13 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
     }
 }

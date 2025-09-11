@@ -18,6 +18,11 @@ export class ShellComponent implements OnInit {
   constructor(private userService: UserService, private auth: AuthService) {}
 
   ngOnInit(): void {
+    // Restaura estado do sidebar (persistência após F5)
+    try {
+      const saved = localStorage.getItem('sidebarCollapsed');
+      if (saved === '1') this.collapsed = true;
+    } catch { /* ignore storage errors */ }
     // Tenta pegar usuário real do AuthService (cache de login)
     const cached: any = (this.auth as any).getUser?.();
     if (cached && cached.name) {
@@ -28,5 +33,8 @@ export class ShellComponent implements OnInit {
       this.userName = (u.name || '').split(' ')[0];
     }
   }
-  toggleSidebar() { this.collapsed = !this.collapsed; }
+  toggleSidebar() {
+    this.collapsed = !this.collapsed;
+    try { localStorage.setItem('sidebarCollapsed', this.collapsed ? '1' : '0'); } catch {}
+  }
 }

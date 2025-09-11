@@ -1,0 +1,109 @@
+<div class="aluno-checkin-wrapper">
+  <div class="card p-4 unified-card">
+    <div class="row g-4">
+      <div class="col-12 col-xl-4">
+        <h6 class="mb-3">Status & Sessão</h6>
+        <div *ngIf="loadingStatus" class="small text-muted">Carregando status...</div>
+        <ng-container *ngIf="!loadingStatus && status">
+          <p class="mb-1"><strong>Situação:</strong>
+            <span [class.text-success]="status.inService" [class.text-danger]="!status.inService">
+              {{ status.inService ? 'Em Serviço' : 'Fora de Serviço' }}
+            </span>
+          </p>
+          <p class="mb-1"><strong>Horas Hoje:</strong> {{ status.dynamicWorked ? formatSecs(status.dynamicWorked) : formatSecs(status.workedSeconds || 0) }}</p>
+          <p class="mb-1" *ngIf="status.openSession"><strong>Início:</strong> {{ status.openSession.checkInTime | date:'dd/MM HH:mm' }}</p>
+        </ng-container>
+        <div class="mt-2 d-flex flex-wrap gap-2">
+          <button *ngIf="!status?.inService" class="btn btn-success btn-sm" (click)="submitCheckIn()" [disabled]="submitting">Iniciar</button>
+          <button *ngIf="status?.inService" class="btn btn-warning btn-sm" (click)="doCheckOut()" [disabled]="submitting">Encerrar</button>
+          <button class="btn btn-outline-secondary btn-sm" (click)="refreshStatus()" [disabled]="loadingStatus">Atualizar</button>
+        </div>
+        <div class="mt-2 small" [class.text-success]="message.includes('realizado')" [class.text-danger]="message.startsWith('Falha')">{{message}}</div>
+        <hr />
+        <h6 class="mb-3 d-flex align-items-center gap-3">Registrar Check-In
+          <button type="button" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 camera-btn" (click)="toggleScan()">
+            <i class="bi" [ngClass]="scanning ? 'bi-camera-video-off' : 'bi-camera'" style="font-size:1.4rem; color:#0d6efd;"></i>
+            <span class="fw-semibold text-primary">{{ scanning ? 'Parar' : 'Ler QR' }}</span>
+          </button>
+        </h6>
+        <div *ngIf="scanning" class="mb-3">
+          <div class="row g-2 align-items-end mb-2">
+            <div class="col-sm-6">
+              <label class="form-label small mb-1">Câmera</label>
+              <select class="form-select form-select-sm" [(ngModel)]="selectedDeviceId" (change)="onChangeDevice()">
+                <option *ngFor="let d of videoDevices" [value]="d.deviceId">{{ d.label || 'Câmera' }}</option>
+              </select>
+            </div>
+            <div class="col-sm-6 text-sm-end small text-muted" *ngIf="!videoDevices.length">Listando câmeras...</div>
+          </div>
+          <div class="qr-video-wrapper mb-2">
+            <video #qrVideo class="qr-video rounded border" playsinline muted autoplay></video>
+          </div>
+          <div class="small text-muted">Aponte para o QR do preceptor para preencher automaticamente.</div>
+          <hr />
+        </div>
+        <div class="row g-2 align-items-end">
+          <div class="col-6">
+            <label class="form-label small">ID Preceptor</label>
+            <input type="number" class="form-control form-control-sm" [(ngModel)]="preceptorId" />
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Código</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="code" />
+          </div>
+          <div class="col-12 d-grid">
+            <button class="btn btn-primary btn-sm" (click)="submitCheckIn()" [disabled]="submitting || status?.inService">Check-In</button>
+          </div>
+        </div>
+        <!-- Texto antigo removido conforme solicitação -->
+      </div>
+      <div class="col-12 col-xl-8">
+        <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <h6 class="mb-0">Histórico</h6>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-secondary" (click)="loadHistory('today')">Hoje</button>
+              <button class="btn btn-outline-secondary" (click)="loadHistory('3d')">3 dias</button>
+              <button class="btn btn-outline-secondary" (click)="loadHistory('3w')">3 semanas</button>
+              <button class="btn btn-outline-secondary" (click)="loadHistory('all')">Tudo</button>
+            </div>
+          </div>
+          <form class="d-flex align-items-end gap-2 flex-wrap" (submit)="$event.preventDefault(); applyDateFilter();">
+            <div>
+              <label class="form-label small mb-1">Início</label>
+              <input type="date" class="form-control form-control-sm" [(ngModel)]="startDate" name="startDate" />
+            </div>
+            <div>
+              <label class="form-label small mb-1">Fim</label>
+              <input type="date" class="form-control form-control-sm" [(ngModel)]="endDate" name="endDate" />
+            </div>
+            <div class="pb-1">
+              <button class="btn btn-primary btn-sm" type="submit">Filtrar</button>
+            </div>
+          </form>
+        </div>
+        <div class="small text-muted mb-2" *ngIf="filterMessage">{{filterMessage}}</div>
+        <div *ngIf="loadingHistory" class="small text-muted">Carregando...</div>
+        <div *ngIf="!loadingHistory && !history.length" class="small text-muted">Sem registros.</div>
+        <div class="table-responsive">
+          <table *ngIf="!loadingHistory && history.length" class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Entrada</th>
+                <th>Saída</th>
+                <th>Duração</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let h of history">
+                <td>{{h.checkInTime | date:'dd/MM HH:mm'}}</td>
+                <td>{{h.checkOutTime ? (h.checkOutTime | date:'dd/MM HH:mm') : '-'}}</td>
+                <td>{{h.worked || '-'}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -21,14 +21,22 @@ public class ChatApplication {
     @Bean
     public CommandLineRunner init(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         return args -> {
-            if (userRepository.findByCpf("00000000000").isEmpty()) {
+            System.out.println("[INIT] Users count at startup: " + userRepository.count());
+            userRepository.findAll().forEach(u -> System.out.println("[INIT] user cpf=" + u.getCpf() + " email=" + u.getInstitutionalEmail() + " role=" + u.getRole()));
+            // Nenhuma padronização forçada agora; confiamos no seed do schema.sql
+            boolean cpfMissing = userRepository.findByCpf("00000000000").isEmpty();
+            boolean emailMissing = userRepository.findByInstitutionalEmailIgnoreCase("admin@medcheck.com").isEmpty();
+            if (cpfMissing && emailMissing) {
                 User adminUser = new User();
                 adminUser.setName("Admin");
                 adminUser.setCpf("00000000000");
-                adminUser.setPassword(passwordEncoder.encode("admin"));
+                adminUser.setPassword(passwordEncoder.encode("Senha123!"));
                 adminUser.setInstitutionalEmail("admin@medcheck.com");
+                adminUser.setRole(com.medcheckapi.user.model.Role.ADMIN);
                 userRepository.save(adminUser);
-                System.out.println("Created admin user with CPF 00000000000 and password admin");
+                System.out.println("Created extra admin user (CPF 00000000000) with password Senha123!");
+            } else {
+                System.out.println("Admin seed skipped (already exists)");
             }
         };
     }

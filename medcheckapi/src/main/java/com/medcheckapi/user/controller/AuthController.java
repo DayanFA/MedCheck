@@ -81,10 +81,13 @@ public class AuthController {
         resp.put("token", jwt);
         String cpf = authentication.getName();
         userRepository.findByCpf(cpf).ifPresent(u -> {
+            // Incluímos o id para diferenciar de CPF no frontend (preceptorId real)
+            resp.put("id", u.getId());
             resp.put("name", u.getName());
             resp.put("matricula", u.getMatricula());
             resp.put("cpf", u.getCpf());
             resp.put("email", u.getInstitutionalEmail());
+            resp.put("role", u.getRole().name());
         });
         return ResponseEntity.ok(resp);
     }
@@ -174,13 +177,15 @@ public class AuthController {
         }
         User u = opt.get();
         java.util.Map<String,Object> resp = new java.util.HashMap<>();
-        resp.put("name", u.getName());
-        resp.put("cpf", u.getCpf());
-        resp.put("matricula", u.getMatricula());
-        resp.put("email", u.getInstitutionalEmail());
+    resp.put("id", u.getId());
+    resp.put("name", u.getName());
+    resp.put("cpf", u.getCpf());
+    resp.put("matricula", u.getMatricula());
+    resp.put("email", u.getInstitutionalEmail());
         resp.put("naturalidade", u.getNaturalidade());
         resp.put("nacionalidade", u.getNacionalidade());
         resp.put("phone", u.getPhone());
+        resp.put("role", u.getRole().name());
         return ResponseEntity.ok(resp);
     }
 

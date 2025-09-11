@@ -16,6 +16,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   currentTime = '';
   private intervalId?: number;
   firstName = '';
+  inService = false; // derived from open session
+  performing = false;
 
   loading = true;
   constructor(private userService: UserService, private auth: AuthService, private router: Router) {}
@@ -31,6 +33,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         status: 'Em serviço',
         performedHours: '00:00:00'
       };
+      this.inService = this.user.status === 'Em serviço';
       this.firstName = (this.user.name || '').split(' ')[0];
       this.loading = false;
     } else {
@@ -44,6 +47,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             status: 'Em serviço',
             performedHours: '00:00:00'
           };
+          this.inService = this.user.status === 'Em serviço';
           if (!this.user.name) {
             this.router.navigate(['/login']);
             return;
@@ -65,6 +69,13 @@ export class HomeComponent implements OnInit, OnDestroy {
   private updateTime() {
     const now = new Date();
     this.currentTime = now.toLocaleTimeString('pt-BR', { hour12: false });
+  }
+
+  onPrimaryAction() {
+    // Agora sempre redireciona para a página de Check-In, conforme solicitado.
+    if (this.performing) return;
+    this.performing = true;
+    this.router.navigate(['/checkin']).finally(() => this.performing = false);
   }
 }
 

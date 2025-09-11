@@ -7,27 +7,32 @@
   <nav class="flex-grow-1">
     <ul class="nav nav-pills flex-column gap-1">
       <li class="nav-item">
-        <a routerLink="/intern-home" routerLinkActive="active" class="nav-link d-flex align-items-center gap-2">
+        <a routerLink="/home" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/home'">
           <i class="bi bi-house-door"></i><span>Home</span>
         </a>
       </li>
-      <li class="nav-item">
-        <a routerLink="/check-in" routerLinkActive="active" class="nav-link d-flex align-items-center gap-2">
-          <i class="bi bi-person-check"></i><span>Check - In</span>
+      <li class="nav-item" *ngIf="role === 'ALUNO'">
+        <a routerLink="/checkin" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/checkin'">
+          <i class="bi bi-person-check"></i><span>Check-In</span>
+        </a>
+      </li>
+      <li class="nav-item" *ngIf="role === 'PRECEPTOR' || role === 'ADMIN'">
+        <a routerLink="/preceptor/codigo" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/preceptor/codigo'">
+          <i class="bi bi-qr-code"></i><span>Código</span>
         </a>
       </li>
       <li class="nav-item">
-        <a routerLink="/calendario" routerLinkActive="active" class="nav-link d-flex align-items-center gap-2">
+        <a routerLink="/calendario" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/calendario'">
           <i class="bi bi-calendar3"></i><span>Calendário</span>
         </a>
       </li>
       <li class="nav-item">
-        <a routerLink="/relatorio" routerLinkActive="active" class="nav-link d-flex align-items-center gap-2">
+        <a routerLink="/relatorio" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/relatorio'">
           <i class="bi bi-file-earmark-text"></i><span>Relatório</span>
         </a>
       </li>
       <li class="nav-item">
-        <a routerLink="/configuracoes" routerLinkActive="active" class="nav-link d-flex align-items-center gap-2">
+        <a routerLink="/configuracoes" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/configuracoes'">
           <i class="bi bi-gear"></i><span>Configurações</span>
         </a>
       </li>
@@ -35,7 +40,7 @@
   </nav>
   <div class="mt-auto pt-3">
     <button class="btn btn-outline-secondary w-100 d-flex align-items-center gap-2" (click)="logout()">
-      <i class="bi bi-box-arrow-right"></i><span>Sair</span>
+      <i class="bi bi-box-arrow-right"></i><span *ngIf="!collapsed">Sair</span>
     </button>
   </div>
 </aside>

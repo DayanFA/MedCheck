@@ -62,6 +62,11 @@ export class AuthService {
     } catch {}
   }
 
+  getRole(): string | null {
+    const u = this.getUser();
+    return u?.role || null;
+  }
+
   getUser(): any {
     if (typeof window === 'undefined') return null;
     try {

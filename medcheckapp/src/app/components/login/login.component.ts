@@ -48,10 +48,12 @@ export class LoginComponent {
         }
         if (token) this.authService.setToken(token, this.rememberMe);
         const userPayload = {
+          id: response.id, // novo id numérico vindo do backend
           name: response.name,
           matricula: response.matricula,
           cpf: response.cpf,
-          email: response.email
+          email: response.email,
+          role: response.role
         };
         if (response.name) this.authService.setUser(userPayload, this.rememberMe);
         this.toast.show('success', 'Login realizado.');

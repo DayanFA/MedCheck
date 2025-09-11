@@ -1,0 +1,27 @@
+<div class="checkin-wrapper">
+  <h5 class="mb-3">Check-In do Aluno</h5>
+  <div class="card p-3 mb-4">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small">ID do Preceptor</label>
+        <input type="number" class="form-control" [(ngModel)]="preceptorId" placeholder="Ex: 2" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small">Código</label>
+        <input type="text" class="form-control" [(ngModel)]="code" placeholder="ABC123" />
+      </div>
+      <div class="col-md-4 d-grid">
+        <button class="btn btn-primary" (click)="submit()">Validar & Check-In</button>
+      </div>
+    </div>
+    <div class="small mt-2 text-muted">Informe o código exibido pelo preceptor (ou escaneie QR futuramente).</div>
+    <div class="mt-2 fw-semibold" [class.text-danger]="message.startsWith('Falha')" [class.text-success]="message.includes('realizado')">{{message}}</div>
+  </div>
+
+  <h6>Histórico de Hoje</h6>
+  <div *ngIf="loadingHistory" class="text-muted small">Carregando...</div>
+  <ul class="list-unstyled small" *ngIf="!loadingHistory && history.length; else emptyHistory">
+    <li *ngFor="let h of history">Check-In: {{h.checkInTime}} <span *ngIf="h.checkOutTime"> | Check-Out: {{h.checkOutTime}}</span> <span *ngIf="h.worked"> ({{h.worked}})</span></li>
+  </ul>
+  <ng-template #emptyHistory><div class="small text-muted">Sem registros.</div></ng-template>
+</div>

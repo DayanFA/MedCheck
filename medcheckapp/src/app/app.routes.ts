@@ -6,6 +6,10 @@ import { ForgotPasswordComponent } from './components/forgot-password/forgot-pas
 import { ResetPasswordComponent } from './components/reset-password/reset-password.component';
 import { authGuard } from './services/auth.guard';
 import { ShellComponent } from './layout/shell.component';
+import { CheckInComponent } from './components/checkin/checkin.component';
+import { AlunoCheckinComponent } from './components/aluno-checkin/aluno-checkin.component';
+import { PreceptorCodeComponent } from './components/preceptor-code/preceptor-code.component';
+import { roleGuard } from './services/role.guard';
 
 export const routes: Routes = [
     { path: '', redirectTo: '/login', pathMatch: 'full' },
@@ -18,7 +22,9 @@ export const routes: Routes = [
         component: ShellComponent,
         canActivate: [authGuard],
         children: [
-            { path: 'home', component: HomeComponent }
+            { path: 'home', component: HomeComponent },
+            { path: 'checkin', component: AlunoCheckinComponent, canActivate: [roleGuard], data: { roles: ['ALUNO'] } },
+            { path: 'preceptor/codigo', component: PreceptorCodeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } }
             // futuras rotas autenticadas aqui
         ]
     },

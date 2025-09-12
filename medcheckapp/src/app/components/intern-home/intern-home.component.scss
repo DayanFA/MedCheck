@@ -25,3 +25,21 @@ button.btn-warning:hover { background-color: color.scale(#ffd400, $lightness: -1
 
 .profile-row { margin-bottom: .75rem; }
 .status { font-size: .9rem; }
+
+// Modal estilos (reutilizado padrão do aluno)
+.checkout-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4rem 1rem 2rem;
+  z-index: 1050;
+}
+.checkout-modal {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.25);
+}

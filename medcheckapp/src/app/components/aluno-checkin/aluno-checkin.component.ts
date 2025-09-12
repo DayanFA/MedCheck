@@ -17,6 +17,9 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   code = '';
   status: any = null;
   history: any[] = [];
+  // Paginação
+  pageSize = 10;
+  currentPage = 1;
   loadingStatus = false;
   loadingHistory = false;
   submitting = false;
@@ -38,12 +41,24 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   private barcodeDetector: any = null; // fallback nativo
   private browserReady = typeof window !== 'undefined' && typeof document !== 'undefined';
   private jsqrLoadingPromise: Promise<void> | null = null; // evita múltiplos loads
+  showCheckoutConfirm = false;
+  // Baseline retornado pela API (segundos já contabilizados até o último refresh)
+  private baselineWorkedSeconds = 0;
+  private baselineCaptureTs = 0; // timestamp em ms de quando baseline foi definido
+  private todayDate = new Date().toISOString().substring(0,10);
+  private cacheKey = 'mc_worked_cache_home'; // será ajustado após primeira resposta de status (CPF não está aqui diretamente)
+
+  get workedToday(): string {
+    if (!this.status && (this as any)._initialWorkedDisplay) return (this as any)._initialWorkedDisplay;
+    return this.formatSecs(this.computeTotalWorked());
+  }
 
   // Futuro: integrar decodificação real de QR (ex: jsQR). Por enquanto, placeholder para mostrar câmera.
 
   constructor(private check: CheckInService) {}
 
   ngOnInit(): void {
+    this.loadWorkedCache();
     this.refreshStatus();
     this.loadHistory('today');
     this.timerId = setInterval(()=> this.tick(), 1000);
@@ -58,14 +73,8 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   tick() {
-    if (this.status?.inService && this.status?.openSession?.checkInTime) {
-      // recompute workedSeconds dynamically (optimistic updating)
-      const start = new Date(this.status.openSession.checkInTime).getTime();
-      const now = Date.now();
-      const secsExtra = Math.floor((now - start)/1000);
-      const base = this.status.baseWorkedSeconds || 0;
-      this.status.dynamicWorked = base + secsExtra;
-    }
+    // O getter workedToday recalcula baseado em baseline + elapsed.
+    // No changes needed in tick method as it is now handled by workedToday.
   }
 
   formatSecs(s: number): string { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60; return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`; }
@@ -73,9 +82,55 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   refreshStatus() {
     this.loadingStatus = true;
     this.check.status().subscribe({
-      next: st => { this.status = st; this.status.baseWorkedSeconds = st.workedSeconds || 0; this.loadingStatus=false; },
+      next: st => {
+        this.status = st;
+        const nowTs = Date.now();
+        const localTotal = this.computeTotalWorked();
+        const serverTotal = st.workedSeconds || 0;
+        let chosen: number;
+        if (!st.inService) {
+          chosen = serverTotal; // nenhuma sessão aberta: confia totalmente no backend
+        } else {
+          chosen = Math.max(serverTotal, localTotal);
+          if (serverTotal + 300 < localTotal) { // diferença grande sugere reinício
+            chosen = serverTotal;
+          }
+        }
+        this.baselineWorkedSeconds = chosen;
+        this.baselineCaptureTs = nowTs;
+        this.loadingStatus=false;
+        this.persistWorkedCache(chosen, nowTs);
+      },
       error: _ => this.loadingStatus=false
     });
+  }
+  
+  private computeTotalWorked(): number {
+    let total = this.baselineWorkedSeconds;
+    if (this.status?.inService) {
+      const elapsed = Math.floor((Date.now() - this.baselineCaptureTs)/1000);
+      total += elapsed;
+    }
+    if (total % 15 === 0) this.persistWorkedCache(total, Date.now());
+    return total;
+  }
+
+  private loadWorkedCache() {
+    try {
+      const raw = localStorage.getItem(this.cacheKey);
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      if (obj.date !== this.todayDate) return;
+      if (typeof obj.secs === 'number' && typeof obj.ts === 'number') {
+        this.baselineWorkedSeconds = obj.secs;
+        this.baselineCaptureTs = obj.ts;
+        (this as any)._initialWorkedDisplay = this.formatSecs(this.computeTotalWorked());
+      }
+    } catch {}
+  }
+
+  private persistWorkedCache(totalSecs: number, ts: number) {
+    try { localStorage.setItem(this.cacheKey, JSON.stringify({ secs: totalSecs, ts, date: this.todayDate })); } catch {}
   }
 
   submitCheckIn() {
@@ -88,12 +143,17 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  doCheckOut() {
+  openCheckoutConfirm() {
+    if (!this.status?.inService) return; // nada a confirmar
+    this.showCheckoutConfirm = true;
+  }
+  cancelCheckout() { this.showCheckoutConfirm = false; }
+  confirmCheckout() {
     if (this.submitting) return;
-    this.submitting=true; this.message='Encerrando...';
+    this.submitting = true; this.message = 'Encerrando...';
     this.check.checkOut().subscribe({
-      next: _ => { this.message='Check-Out realizado'; this.refreshStatus(); this.loadHistory('today'); this.submitting=false; },
-      error: err => { this.message = err?.error?.error || 'Falha no Check-Out'; this.submitting=false; }
+      next: _ => { this.message='Check-Out realizado'; this.showCheckoutConfirm=false; this.refreshStatus(); this.loadHistory('today'); this.submitting=false; },
+      error: err => { this.message = err?.error?.error || 'Falha no Check-Out'; this.showCheckoutConfirm=false; this.submitting=false; }
     });
   }
 
@@ -114,7 +174,12 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
       sStr = customStart!; eStr = customEnd!;
     }
     this.check.sessions(sStr, eStr).subscribe({
-      next: list => { this.history = list; this.loadingHistory=false; this.filterMessage = `Período: ${sStr} a ${eStr} (${list.length} registro(s))`; },
+      next: list => {
+        this.history = list;
+        this.currentPage = 1; // reset página a cada novo carregamento
+        this.loadingHistory=false;
+        this.filterMessage = `Período: ${sStr} a ${eStr} (${list.length} registro(s))`;
+      },
       error: _ => { this.loadingHistory=false; this.filterMessage='Falha ao buscar histórico'; }
     });
   }
@@ -125,6 +190,17 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
     this.filterMessage = 'Filtrando...';
     this.loadHistory(null, this.startDate, this.endDate);
   }
+
+  // Helpers de paginação
+  get totalPages(): number { return Math.max(1, Math.ceil(this.history.length / this.pageSize)); }
+  get pagedHistory(): any[] {
+    const start = (this.currentPage - 1) * this.pageSize;
+    return this.history.slice(start, start + this.pageSize);
+  }
+  get pages(): number[] { return Array.from({ length: this.totalPages }, (_, i) => i + 1); }
+  setPage(p: number) { if (p < 1 || p > this.totalPages) return; this.currentPage = p; }
+  nextPage() { if (this.currentPage < this.totalPages) this.currentPage++; }
+  prevPage() { if (this.currentPage > 1) this.currentPage--; }
 
   async toggleScan() {
     if (this.scanning) {

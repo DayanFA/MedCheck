@@ -20,4 +20,6 @@
     background:#000; 
   }
   .camera-btn { border-width:2px; }
+  .checkout-modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1050; display:flex; align-items:center; justify-content:center; padding:1rem; }
+  .checkout-modal { max-width:380px; width:100%; box-shadow:0 8px 28px rgba(0,0,0,.2); border-radius:14px; }
 }

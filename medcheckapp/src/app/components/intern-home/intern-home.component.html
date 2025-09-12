@@ -15,20 +15,45 @@
     </div>
     <hr class="my-4" />
     <div class="row text-center mb-4">
-      <div class="col status small"><strong>Status:</strong> {{user.status}}</div>
+      <div class="col status small">
+        <strong>Status:</strong>
+        <span [class.text-success]="inService" [class.text-danger]="!inService">
+          {{ inService ? 'Em Serviço' : 'Fora de Serviço' }}
+        </span>
+        <div class="small mt-1" *ngIf="inService && sessionStart">Início: {{ sessionStart | date:'HH:mm' }}</div>
+      </div>
       <div class="col">
         <div class="small fw-semibold">Hora Atual:</div>
         <div class="time-display" id="currentTime">{{currentTime}}</div>
       </div>
       <div class="col">
-        <div class="small fw-semibold">Horas Realizadas:</div>
-        <div class="hours-display">{{user.performedHours}}</div>
+        <div class="small fw-semibold">Horas (Hoje):</div>
+        <div class="hours-display">{{workedToday}}</div>
       </div>
     </div>
-    <div class="text-center">
-      <button (click)="onPrimaryAction()" class="btn btn-success fw-semibold px-4" [disabled]="performing">
-        {{ performing ? 'Abrindo...' : 'Ir para Check-In' }}
+    <div class="text-center position-relative">
+      <button (click)="onPrimaryAction()"
+              class="btn fw-semibold px-4"
+              [ngClass]="inService ? 'btn-warning' : 'btn-primary'"
+              [disabled]="performing || submitting">
+        <ng-container *ngIf="!inService; else checkoutLabel">
+          {{ performing ? 'Abrindo...' : 'Fazer Check-In' }}
+        </ng-container>
+        <ng-template #checkoutLabel>
+          {{ submitting ? 'Encerrando...' : 'Fazer Check-Out' }}
+        </ng-template>
       </button>
+    </div>
+    <div *ngIf="showCheckoutConfirm" class="checkout-modal-backdrop">
+      <div class="checkout-modal card p-3 p-sm-4">
+        <h6 class="fw-semibold mb-3">Confirmar Check-Out</h6>
+        <p class="small mb-2">Você realmente deseja encerrar seu turno agora?</p>
+        <p class="small mb-3">Horas de hoje até o momento: <strong>{{ workedToday }}</strong></p>
+        <div class="d-flex flex-wrap gap-2 justify-content-end">
+          <button class="btn btn-outline-secondary btn-sm" (click)="showCheckoutConfirm=false" [disabled]="submitting">Cancelar</button>
+          <button class="btn btn-warning btn-sm" (click)="confirmCheckout()" [disabled]="submitting">Confirmar</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

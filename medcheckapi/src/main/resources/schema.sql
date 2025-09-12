@@ -78,6 +78,8 @@ CREATE TABLE check_codes (
   code VARCHAR(12) NOT NULL,
   generated_at TIMESTAMP NOT NULL,
   expires_at TIMESTAMP NOT NULL,
+  usage_count INT NOT NULL DEFAULT 0,
+  last_accessed_at TIMESTAMP NULL,
   CONSTRAINT fk_cc_preceptor FOREIGN KEY (preceptor_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_checkcode_preceptor_time (preceptor_id, generated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

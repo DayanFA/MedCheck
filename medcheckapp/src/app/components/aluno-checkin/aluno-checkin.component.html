@@ -2,24 +2,9 @@
   <div class="card p-4 unified-card">
     <div class="row g-4">
       <div class="col-12 col-xl-4">
-        <h6 class="mb-3">Status & Sessão</h6>
-        <div *ngIf="loadingStatus" class="small text-muted">Carregando status...</div>
-        <ng-container *ngIf="!loadingStatus && status">
-          <p class="mb-1"><strong>Situação:</strong>
-            <span [class.text-success]="status.inService" [class.text-danger]="!status.inService">
-              {{ status.inService ? 'Em Serviço' : 'Fora de Serviço' }}
-            </span>
-          </p>
-          <p class="mb-1"><strong>Horas Hoje:</strong> {{ status.dynamicWorked ? formatSecs(status.dynamicWorked) : formatSecs(status.workedSeconds || 0) }}</p>
-          <p class="mb-1" *ngIf="status.openSession"><strong>Início:</strong> {{ status.openSession.checkInTime | date:'dd/MM HH:mm' }}</p>
-        </ng-container>
-        <div class="mt-2 d-flex flex-wrap gap-2">
-          <button *ngIf="!status?.inService" class="btn btn-success btn-sm" (click)="submitCheckIn()" [disabled]="submitting">Iniciar</button>
-          <button *ngIf="status?.inService" class="btn btn-warning btn-sm" (click)="doCheckOut()" [disabled]="submitting">Encerrar</button>
-          <button class="btn btn-outline-secondary btn-sm" (click)="refreshStatus()" [disabled]="loadingStatus">Atualizar</button>
-        </div>
-        <div class="mt-2 small" [class.text-success]="message.includes('realizado')" [class.text-danger]="message.startsWith('Falha')">{{message}}</div>
-        <hr />
+        <!-- Seção de status movida para Home -->
+        <!-- Barra de botões removida (Iniciar/Atualizar) conforme solicitação -->
+  <div class="mt-2 small" [class.text-success]="message.includes('realizado')" [class.text-danger]="message.startsWith('Falha')">{{message}}</div>
         <h6 class="mb-3 d-flex align-items-center gap-3">Registrar Check-In
           <button type="button" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 camera-btn" (click)="toggleScan()">
             <i class="bi" [ngClass]="scanning ? 'bi-camera-video-off' : 'bi-camera'" style="font-size:1.4rem; color:#0d6efd;"></i>
@@ -40,7 +25,6 @@
             <video #qrVideo class="qr-video rounded border" playsinline muted autoplay></video>
           </div>
           <div class="small text-muted">Aponte para o QR do preceptor para preencher automaticamente.</div>
-          <hr />
         </div>
         <div class="row g-2 align-items-end">
           <div class="col-6">
@@ -53,6 +37,20 @@
           </div>
           <div class="col-12 d-grid">
             <button class="btn btn-primary btn-sm" (click)="submitCheckIn()" [disabled]="submitting || status?.inService">Check-In</button>
+          </div>
+          <div class="col-12 d-grid mt-2" *ngIf="status?.inService">
+            <button class="btn btn-warning btn-sm" (click)="openCheckoutConfirm()" [disabled]="submitting">Realizar Check-Out</button>
+          </div>
+          <div *ngIf="showCheckoutConfirm" class="checkout-modal-backdrop">
+            <div class="checkout-modal card p-3 p-sm-4">
+              <h6 class="fw-semibold mb-3">Confirmar Check-Out</h6>
+              <p class="small mb-2">Você realmente deseja encerrar seu turno agora?</p>
+              <p class="small mb-3">Horas de hoje até o momento: <strong>{{ workedToday }}</strong></p>
+              <div class="d-flex flex-wrap gap-2 justify-content-end">
+                <button class="btn btn-outline-secondary btn-sm" (click)="cancelCheckout()" [disabled]="submitting">Cancelar</button>
+                <button class="btn btn-warning btn-sm" (click)="confirmCheckout()" [disabled]="submitting">Confirmar</button>
+              </div>
+            </div>
           </div>
         </div>
         <!-- Texto antigo removido conforme solicitação -->
@@ -95,13 +93,26 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let h of history">
+              <tr *ngFor="let h of pagedHistory">
                 <td>{{h.checkInTime | date:'dd/MM HH:mm'}}</td>
                 <td>{{h.checkOutTime ? (h.checkOutTime | date:'dd/MM HH:mm') : '-'}}</td>
                 <td>{{h.worked || '-'}}</td>
               </tr>
             </tbody>
           </table>
+          <nav *ngIf="!loadingHistory && totalPages > 1" class="mt-2">
+            <ul class="pagination pagination-sm mb-0 flex-wrap">
+              <li class="page-item" [class.disabled]="currentPage === 1">
+                <button class="page-link" (click)="prevPage()" [disabled]="currentPage===1">«</button>
+              </li>
+              <li class="page-item" *ngFor="let p of pages" [class.active]="p===currentPage">
+                <button class="page-link" (click)="setPage(p)">{{p}}</button>
+              </li>
+              <li class="page-item" [class.disabled]="currentPage === totalPages">
+                <button class="page-link" (click)="nextPage()" [disabled]="currentPage===totalPages">»</button>
+              </li>
+            </ul>
+          </nav>
         </div>
       </div>
     </div>

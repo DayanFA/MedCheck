@@ -9,12 +9,18 @@ import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.TimeZone;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(scanBasePackages = "com.medcheckapi")
+@EnableScheduling
 @EnableJpaRepositories(basePackages = "com.medcheckapi.user.repository")
 @EntityScan(basePackages = "com.medcheckapi.user.model")
 public class ChatApplication {
     public static void main(String[] args) {
+        // Força timezone padrão da JVM em UTC para evitar deslocamentos (ex: -05:00) em cálculos de duração
+    // Timezone padrão solicitado: UTC-5
+    TimeZone.setDefault(TimeZone.getTimeZone("GMT-5"));
         SpringApplication.run(ChatApplication.class, args);
     }
 

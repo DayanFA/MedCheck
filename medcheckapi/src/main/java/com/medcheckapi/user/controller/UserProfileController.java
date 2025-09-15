@@ -1,6 +1,8 @@
 package com.medcheckapi.user.controller;
 
 import com.medcheckapi.user.model.User;
+import com.medcheckapi.user.model.Discipline;
+import com.medcheckapi.user.repository.DisciplineRepository;
 import com.medcheckapi.user.repository.UserRepository;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -11,14 +13,16 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/users/me")
 public class UserProfileController {
 	private final UserRepository userRepository;
+	private final DisciplineRepository disciplineRepository;
 
-	public UserProfileController(UserRepository userRepository) { this.userRepository = userRepository; }
+	public UserProfileController(UserRepository userRepository, DisciplineRepository disciplineRepository) { this.userRepository = userRepository; this.disciplineRepository = disciplineRepository; }
 
 	private User currentUser(org.springframework.security.core.userdetails.User principal) {
 		return userRepository.findByCpf(principal.getUsername()).orElseThrow();
@@ -27,13 +31,18 @@ public class UserProfileController {
 	@GetMapping
 	public ResponseEntity<?> me(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
 		User u = currentUser(principal);
+		List<Discipline> preceptorDiscs = disciplineRepository.findByPreceptors_Id(u.getId());
 		return ResponseEntity.ok(Map.of(
 				"id", u.getId(),
 				"name", u.getName(),
 				"cpf", u.getCpf(),
 				"phone", Optional.ofNullable(u.getPhone()).orElse(""),
 				"role", u.getRole().name(),
-				"hasAvatar", u.getAvatar() != null && u.getAvatar().length > 0
+				"hasAvatar", u.getAvatar() != null && u.getAvatar().length > 0,
+				"currentDisciplineId", u.getCurrentDiscipline() == null ? null : u.getCurrentDiscipline().getId(),
+				"currentDisciplineName", u.getCurrentDiscipline() == null ? null : u.getCurrentDiscipline().getName(),
+				"currentDisciplineCode", u.getCurrentDiscipline() == null ? null : u.getCurrentDiscipline().getCode(),
+				"preceptorDisciplines", preceptorDiscs
 		));
 	}
 
@@ -50,6 +59,29 @@ public class UserProfileController {
 		}
 		userRepository.save(u);
 		return ResponseEntity.ok(Map.of("ok", true));
+	}
+
+	@GetMapping("/disciplines")
+	public ResponseEntity<?> listAvailableDisciplines(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
+		// Para o aluno escolher; aqui listamos todas as disciplinas que têm ao menos um preceptor vinculado
+		return ResponseEntity.ok(disciplineRepository.findAll());
+	}
+
+	@PutMapping("/discipline")
+	public ResponseEntity<?> setCurrentDiscipline(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+												  @RequestBody Map<String, Long> body) {
+		User u = currentUser(principal);
+		Long id = body.get("disciplineId");
+		if (id == null) { u.setCurrentDiscipline(null); userRepository.save(u); return ResponseEntity.ok(Map.of("ok", true)); }
+		Discipline d = disciplineRepository.findById(id).orElseThrow();
+		u.setCurrentDiscipline(d);
+		userRepository.save(u);
+		return ResponseEntity.ok(Map.of(
+			"ok", true,
+			"currentDisciplineId", d.getId(),
+			"currentDisciplineName", d.getName(),
+			"currentDisciplineCode", d.getCode()
+		));
 	}
 
 	@GetMapping("/photo")

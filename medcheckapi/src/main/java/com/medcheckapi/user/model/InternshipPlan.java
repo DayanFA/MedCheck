@@ -16,6 +16,10 @@ public class InternshipPlan {
     @JoinColumn(name = "aluno_id")
     private User aluno;
 
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "discipline_id")
+    private Discipline discipline;
+
     @Column(nullable = false)
     private LocalDate date;
 
@@ -41,6 +45,8 @@ public class InternshipPlan {
     public void setId(Long id) { this.id = id; }
     public User getAluno() { return aluno; }
     public void setAluno(User aluno) { this.aluno = aluno; }
+    public Discipline getDiscipline() { return discipline; }
+    public void setDiscipline(Discipline discipline) { this.discipline = discipline; }
     public LocalDate getDate() { return date; }
     public void setDate(LocalDate date) { this.date = date; }
     public LocalTime getStartTime() { return startTime; }

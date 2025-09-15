@@ -1,0 +1,44 @@
+<div class="content-box p-3 p-md-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h5 class="m-0">Usuários</h5>
+    <button class="btn btn-outline-secondary btn-sm" (click)="load()" [disabled]="loading">
+      <i class="bi bi-arrow-clockwise"></i> Atualizar
+    </button>
+  </div>
+  <div class="alert alert-info py-2" *ngIf="msg">{{msg}}</div>
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" style="width:2rem;height:2rem"></div>
+  </div>
+  <div *ngIf="!loading">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>CPF</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let u of users">
+            <td>{{u.name}}</td>
+            <td>{{ u.cpf | cpf }}</td>
+            <td>{{u.email}}</td>
+            <td>
+            <select class="form-select form-select-sm w-auto" [ngModel]="u.role" (ngModelChange)="changeRole(u, $event)">
+                <option *ngFor="let r of roles" [value]="r">{{r}}</option>
+              </select>
+            </td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-danger" (click)="deleteUser(u)"><i class="bi bi-trash"></i></button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

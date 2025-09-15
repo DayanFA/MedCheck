@@ -5,12 +5,13 @@ import { UserService, CurrentUser } from '../../services/user.service';
 import { AuthService } from '../../services/auth.service';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './intern-home.component.html',
   styleUrl: './intern-home.component.scss'
 })
@@ -38,6 +39,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   loading = true;
   avatarUrl = '';
   private avatarObjectUrl: string | null = null;
+  // Disciplina atual do aluno
+  disciplines: any[] = [];
+  selectedDisciplineId: number | null = null;
   constructor(private userService: UserService, private auth: AuthService, private router: Router, private check: CheckInService, private http: HttpClient, @Inject(PLATFORM_ID) private platformId: Object) {}
 
   ngOnInit(): void {
@@ -53,6 +57,10 @@ export class HomeComponent implements OnInit, OnDestroy {
         status: 'Em serviço',
         performedHours: '00:00:00'
       };
+      // Se cache já tiver disciplina, seta no seletor
+      if (cached.currentDisciplineId != null) {
+        this.selectedDisciplineId = cached.currentDisciplineId;
+      }
       this.updateCacheKeyWithUser();
       // Recarrega cache (agora com chave específica do usuário)
       this.loadWorkedCache();
@@ -60,6 +68,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.firstName = (this.user.name || '').split(' ')[0];
   if (isPlatformBrowser(this.platformId)) this.loadAvatar();
       this.loading = false;
+      // IMPORTANTE: carrega lista de disciplinas quando usuário vem do cache
+      this.loadDisciplinesAndSelection();
     } else {
       this.auth.me().subscribe({
         next: data => {
@@ -71,6 +81,18 @@ export class HomeComponent implements OnInit, OnDestroy {
             status: 'Em serviço',
             performedHours: '00:00:00'
           };
+          // tenta aplicar disciplina atual vinda do backend (se /auth/me expuser)
+          try { this.selectedDisciplineId = (data as any)?.currentDisciplineId ?? this.selectedDisciplineId; } catch {}
+            // Persistimos no cache também (para manter após F5)
+            try {
+              const cachedPrev = (this.auth as any).getUser?.() || {};
+              const remember = this.auth.isRemembered();
+              const merged = {
+                ...cachedPrev,
+                ...data
+              };
+              this.auth.setUser(merged, remember);
+            } catch {}
           this.inService = this.user.status === 'Em serviço';
           if (!this.user.name) {
             this.router.navigate(['/login']);
@@ -81,6 +103,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.loading = false;
           this.updateCacheKeyWithUser();
           this.loadWorkedCache();
+          this.loadDisciplinesAndSelection();
         },
         error: _ => this.router.navigate(['/login'])
       });
@@ -226,6 +249,56 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
     this.avatarObjectUrl = null;
     this.avatarUrl = '';
+  }
+
+  // Formata CPF como 000.000.000-00 no front
+  formatCpf(v: string | null | undefined): string {
+    if (!v) return '';
+    const digits = String(v).replace(/\D/g, '').slice(0, 11);
+    if (digits.length !== 11) return String(v);
+    return digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  }
+
+  private loadDisciplinesAndSelection() {
+    if (!isPlatformBrowser(this.platformId)) { return; }
+    this.http.get('/api/users/me/disciplines').subscribe({
+      next: (list: any) => {
+        this.disciplines = Array.isArray(list) ? list : [];
+        const cached = (this.auth as any).getUser?.();
+        if (this.selectedDisciplineId == null) {
+          this.selectedDisciplineId = cached?.currentDisciplineId || null;
+        }
+      },
+      error: err => { console.error('Falha ao carregar disciplinas', err); this.disciplines = []; }
+    });
+  }
+
+  onChangeDiscipline() {
+    const body = this.selectedDisciplineId ? { disciplineId: this.selectedDisciplineId } : { disciplineId: null } as any;
+    this.http.put('/api/users/me/discipline', body).subscribe({
+      next: (res: any) => {
+        // Atualiza usuário em cache para refletir a disciplina atual (id, code, name)
+        try {
+          const cached = (this.auth as any).getUser?.() || {};
+          const updated = {
+            ...cached,
+            currentDisciplineId: res?.currentDisciplineId ?? null,
+            currentDisciplineName: res?.currentDisciplineName ?? null,
+            currentDisciplineCode: res?.currentDisciplineCode ?? null
+          };
+          // mantemos preferência de persistência (localStorage se token estiver lá)
+          const remember = !!window.localStorage.getItem('token');
+          this.auth.setUser(updated, remember);
+          window.dispatchEvent(new StorageEvent('storage', { key: 'mc_user', newValue: JSON.stringify(updated) }));
+        } catch {}
+        // Recarrega status e deixa histórico/calendário serem filtrados por backend
+        this.loadStatus();
+      },
+      error: _ => {}
+    });
   }
 }
 

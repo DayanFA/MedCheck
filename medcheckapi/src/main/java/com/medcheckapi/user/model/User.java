@@ -42,6 +42,10 @@ public class User {
     private byte[] avatar;
     private String avatarContentType;
 
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "current_discipline_id")
+    private Discipline currentDiscipline;
+
     // Getters and Setters
 
     public Long getId() {
@@ -152,4 +156,7 @@ public class User {
     public void setAvatarContentType(String avatarContentType) {
         this.avatarContentType = avatarContentType;
     }
+
+    public Discipline getCurrentDiscipline() { return currentDiscipline; }
+    public void setCurrentDiscipline(Discipline currentDiscipline) { this.currentDiscipline = currentDiscipline; }
 }

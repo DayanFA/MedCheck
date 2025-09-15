@@ -50,7 +50,9 @@ public class CalendarController {
         }
         String note = body.getOrDefault("note", null);
         InternshipPlan p = id == null ? new InternshipPlan() : planRepo.findById(id).orElse(new InternshipPlan());
-        p.setAluno(me); p.setDate(date); p.setStartTime(start); p.setEndTime(end); p.setLocation(location); p.setNote(note);
+    p.setAluno(me); p.setDate(date); p.setStartTime(start); p.setEndTime(end); p.setLocation(location); p.setNote(note);
+    // Disciplina atual do aluno vincula o plano
+    p.setDiscipline(me.getCurrentDiscipline());
         p = planRepo.save(p);
         return ResponseEntity.ok(Map.of("plan", Map.of(
                 "id", p.getId(),
@@ -94,10 +96,11 @@ public class CalendarController {
         if (body.containsKey("planId")) {
             try { Long pid = Long.valueOf(body.get("planId")); planRepo.findById(pid).ifPresent(j::setPlan);} catch (Exception ignored) { j.setPlan(null); }
         }
-        j.setType(body.getOrDefault("type", "GENERAL"));
+    j.setType(body.getOrDefault("type", "GENERAL"));
         j.setReason(body.getOrDefault("reason", ""));
         // always reset to PENDING on edit by aluno
         j.setStatus("PENDING");
+    j.setDiscipline(me.getCurrentDiscipline());
         j = justRepo.save(j);
         return ResponseEntity.ok(Map.of(
                 "id", j.getId(),

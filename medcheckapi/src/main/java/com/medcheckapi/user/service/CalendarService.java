@@ -24,9 +24,16 @@ public class CalendarService {
         LocalDate start = ym.atDay(1);
         LocalDate end = ym.atEndOfMonth();
 
-        List<InternshipPlan> plans = planRepo.findByAlunoAndDateBetweenOrderByDateAsc(aluno, start, end);
-        List<InternshipJustification> justs = justRepo.findByAlunoAndDateBetweenOrderByDateAsc(aluno, start, end);
-        List<CheckSession> sessions = sessionRepo.findByAlunoAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, start.atStartOfDay(), end.atTime(23,59,59));
+        Discipline current = aluno.getCurrentDiscipline();
+        List<InternshipPlan> plans = planRepo.findByAlunoAndDateBetweenOrderByDateAsc(aluno, start, end)
+            .stream().filter(p -> current == null || (p.getDiscipline() != null && p.getDiscipline().getId().equals(current.getId())))
+            .toList();
+        List<InternshipJustification> justs = justRepo.findByAlunoAndDateBetweenOrderByDateAsc(aluno, start, end)
+            .stream().filter(j -> current == null || (j.getDiscipline() != null && j.getDiscipline().getId().equals(current.getId())))
+            .toList();
+        List<CheckSession> sessions = (current == null)
+            ? sessionRepo.findByAlunoAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, start.atStartOfDay(), end.atTime(23,59,59))
+            : sessionRepo.findByAlunoAndDisciplineAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, current, start.atStartOfDay(), end.atTime(23,59,59));
 
         Map<LocalDate, Long> plannedByDay = plans.stream().collect(Collectors.groupingBy(InternshipPlan::getDate, Collectors.summingLong(InternshipPlan::getPlannedSeconds)));
         Map<LocalDate, Long> workedByDay = computeWorkedByDay(sessions, start, end);

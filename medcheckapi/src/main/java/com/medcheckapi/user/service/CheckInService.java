@@ -18,13 +18,15 @@ public class CheckInService {
     private final CheckSessionRepository sessionRepo;
     private final UserRepository userRepo;
     private final SecureRandom random = new SecureRandom();
+    private final DisciplineRepository disciplineRepo;
     // Duração fixa de validade do código (em segundos). Requisito: apenas 1 minuto.
     private static final int CODE_VALIDITY_SECONDS = 60;
 
-    public CheckInService(CheckCodeRepository codeRepo, CheckSessionRepository sessionRepo, UserRepository userRepo) {
+    public CheckInService(CheckCodeRepository codeRepo, CheckSessionRepository sessionRepo, UserRepository userRepo, DisciplineRepository disciplineRepo) {
         this.codeRepo = codeRepo;
         this.sessionRepo = sessionRepo;
         this.userRepo = userRepo;
+        this.disciplineRepo = disciplineRepo;
     }
 
     private String generateCode() {
@@ -68,9 +70,21 @@ public class CheckInService {
 
     @Transactional
     public Map<String,Object> performCheckIn(Long alunoId, Long preceptorId, String code) {
-        User aluno = userRepo.findById(alunoId).orElseThrow();
+    User aluno = userRepo.findById(alunoId).orElseThrow();
         User preceptor = userRepo.findById(preceptorId).orElseThrow();
         if (aluno.getRole() != Role.ALUNO) throw new IllegalStateException("Usuário não é aluno");
+    // Disciplina atual do aluno é obrigatória para validar o fluxo
+    Discipline selected = aluno.getCurrentDiscipline();
+    if (selected == null) throw new IllegalStateException("Selecione uma disciplina na Home antes de realizar o Check-In");
+    // Preceptor deve pertencer à disciplina selecionada
+    boolean belongs = disciplineRepo.findByPreceptors_Id(preceptor.getId())
+        .stream().anyMatch(d -> Objects.equals(d.getId(), selected.getId()));
+        if (!belongs) {
+            // Descobre disciplinas do preceptor para mensagem (pode haver mais de uma)
+            List<Discipline> preceptorDiscs = disciplineRepo.findByPreceptors_Id(preceptor.getId());
+            String names = preceptorDiscs.isEmpty() ? "outra disciplina" : preceptorDiscs.stream().map(Discipline::getName).distinct().limit(3).reduce((a,b) -> a + ", " + b).orElse("");
+            throw new IllegalStateException("Preceptor pertence a outro Internato {" + names + "}");
+        }
     LocalDateTime now = fixedNow();
         // code validation (case-insensitive)
     CheckCode usedCode = codeRepo.findFirstByPreceptorAndCodeIgnoreCaseAndExpiresAtGreaterThanOrderByGeneratedAtDesc(preceptor, code, now)
@@ -85,6 +99,7 @@ public class CheckInService {
         cs.setAluno(aluno);
         cs.setPreceptor(preceptor);
         cs.setCheckInTime(now);
+        cs.setDiscipline(selected);
         cs.setValidated(true);
         sessionRepo.save(cs);
         return sessionToMap(cs);
@@ -103,7 +118,10 @@ public class CheckInService {
         User aluno = userRepo.findById(alunoId).orElseThrow();
         LocalDateTime from = start.atStartOfDay();
         LocalDateTime to = end.atTime(23,59,59);
-    List<CheckSession> list = sessionRepo.findByAlunoAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, from, to);
+        Discipline selected = aluno.getCurrentDiscipline();
+        List<CheckSession> list = selected == null
+                ? sessionRepo.findByAlunoAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, from, to)
+                : sessionRepo.findByAlunoAndDisciplineAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, selected, from, to);
         List<Map<String,Object>> out = new ArrayList<>();
         list.forEach(cs -> out.add(sessionToMap(cs)));
         return out;

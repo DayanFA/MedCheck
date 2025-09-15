@@ -26,6 +26,21 @@
           <i class="bi bi-calendar3"></i><span>Calendário</span>
         </a>
       </li>
+      <li class="nav-item" *ngIf="role === 'ADMIN'">
+        <a routerLink="/admin/usuarios" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/admin/usuarios'">
+          <i class="bi bi-people"></i><span>Administrar Usuários</span>
+        </a>
+      </li>
+      <li class="nav-item" *ngIf="role === 'ADMIN'">
+        <a routerLink="/admin/disciplinas" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/admin/disciplinas'">
+          <i class="bi bi-journal-text"></i><span>Disciplinas</span>
+        </a>
+      </li>
+      <li class="nav-item" *ngIf="role === 'COORDENADOR' || role === 'ADMIN'">
+        <a routerLink="/coordenacao/disciplinas" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/coordenacao/disciplinas'">
+          <i class="bi bi-people"></i><span>Coordenação</span>
+        </a>
+      </li>
       <li class="nav-item">
         <a routerLink="/relatorio" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/relatorio'">
           <i class="bi bi-file-earmark-text"></i><span>Relatório</span>

@@ -20,6 +20,10 @@ public class InternshipJustification {
     @JoinColumn(name = "plan_id")
     private InternshipPlan plan;
 
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "discipline_id")
+    private Discipline discipline;
+
     @Column(nullable = false)
     private LocalDate date;
 
@@ -50,6 +54,8 @@ public class InternshipJustification {
     public void setAluno(User aluno) { this.aluno = aluno; }
     public InternshipPlan getPlan() { return plan; }
     public void setPlan(InternshipPlan plan) { this.plan = plan; }
+    public Discipline getDiscipline() { return discipline; }
+    public void setDiscipline(Discipline discipline) { this.discipline = discipline; }
     public LocalDate getDate() { return date; }
     public void setDate(LocalDate date) { this.date = date; }
     public String getType() { return type; }

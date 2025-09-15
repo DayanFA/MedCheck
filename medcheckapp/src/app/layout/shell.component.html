@@ -7,6 +7,9 @@
       </button>
       <span class="fw-semibold" *ngIf="userName">Seja bem-vindo {{userName}}</span>
       <div class="ms-auto d-flex align-items-center gap-2">
+        <span *ngIf="currentDisciplineLabel" class="badge text-bg-light border fw-normal px-2 py-1">
+          {{ currentDisciplineLabel }}
+        </span>
         <div class="rounded-circle bg-secondary-subtle user-avatar d-flex align-items-center justify-content-center overflow-hidden" aria-label="Avatar">
           <img *ngIf="avatarUrl" [src]="avatarUrl" alt="Avatar" class="w-100 h-100 object-fit-cover rounded-circle" />
           <i *ngIf="!avatarUrl" class="bi bi-person text-muted"></i>

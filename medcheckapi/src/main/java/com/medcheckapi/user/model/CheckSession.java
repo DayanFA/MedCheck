@@ -21,6 +21,10 @@ public class CheckSession {
     @JoinColumn(name = "preceptor_id")
     private User preceptor;
 
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "discipline_id")
+    private Discipline discipline;
+
     @Column(name = "check_in_time", nullable = false)
     private LocalDateTime checkInTime;
 
@@ -36,6 +40,8 @@ public class CheckSession {
     public void setAluno(User aluno) { this.aluno = aluno; }
     public User getPreceptor() { return preceptor; }
     public void setPreceptor(User preceptor) { this.preceptor = preceptor; }
+    public Discipline getDiscipline() { return discipline; }
+    public void setDiscipline(Discipline discipline) { this.discipline = discipline; }
     public LocalDateTime getCheckInTime() { return checkInTime; }
     public void setCheckInTime(LocalDateTime checkInTime) { this.checkInTime = checkInTime; }
     public LocalDateTime getCheckOutTime() { return checkOutTime; }

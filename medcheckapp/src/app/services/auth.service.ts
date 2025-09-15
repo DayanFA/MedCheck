@@ -59,6 +59,8 @@ export class AuthService {
         window.sessionStorage?.setItem(this.userKey, str);
         window.localStorage?.removeItem(this.userKey);
       }
+      // Notifica ouvintes (ex.: header) sobre mudança do usuário
+      window.dispatchEvent(new CustomEvent('mc:user-updated', { detail: user }));
     } catch {}
   }
 
@@ -85,6 +87,11 @@ export class AuthService {
     try {
       return window.localStorage?.getItem(this.tokenKey) || window.sessionStorage?.getItem(this.tokenKey);
     } catch { return null; }
+  }
+
+  isRemembered(): boolean {
+    if (typeof window === 'undefined') return false;
+    try { return !!window.localStorage?.getItem(this.tokenKey); } catch { return false; }
   }
 
   clearToken() {

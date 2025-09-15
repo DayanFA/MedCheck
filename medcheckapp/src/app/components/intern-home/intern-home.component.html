@@ -10,8 +10,8 @@
       <div class="col-md-9 profile-details small">
         <p class="mb-1"><strong>Nome:</strong> {{user.name}}</p>
         <p class="mb-1"><strong>Matrícula:</strong> {{user.matricula}}</p>
-        <p class="mb-1"><strong>CPF:</strong> {{user.cpf}}</p>
-        <p class="mb-1"><strong>E-mail:</strong> {{user.email}}</p>
+  <p class="mb-1"><strong>CPF:</strong> {{ formatCpf(user.cpf) }}</p>
+  <p class="mb-1"><strong>E-mail:</strong> {{user.email}}</p>
       </div>
     </div>
     <hr class="my-4" />
@@ -30,6 +30,19 @@
       <div class="col">
         <div class="small fw-semibold">Horas (Hoje):</div>
         <div class="hours-display">{{workedToday}}</div>
+      </div>
+    </div>
+    <div class="row mb-3" *ngIf="role==='ALUNO'">
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Internato Atual</label>
+        <select class="form-select form-select-sm" [(ngModel)]="selectedDisciplineId" (ngModelChange)="onChangeDiscipline()">
+          <option [ngValue]="null">Selecione...</option>
+          <option *ngFor="let d of disciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
+        </select>
+        <div class="form-text">O histórico, calendário e validação de check-in serão filtrados por esta disciplina.</div>
+        <div *ngIf="disciplines.length === 0" class="text-warning small mt-1">
+          Nenhum internato disponível. Verifique com o coordenador ou tente novamente mais tarde.
+        </div>
       </div>
     </div>
     <div class="text-center position-relative">

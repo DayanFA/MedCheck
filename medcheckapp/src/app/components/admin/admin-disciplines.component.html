@@ -1,0 +1,34 @@
+<div class="content-box p-3 p-md-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h5 class="m-0">Disciplinas</h5>
+    <button class="btn btn-outline-secondary btn-sm" (click)="load()" [disabled]="loading">
+      <i class="bi bi-arrow-clockwise"></i> Atualizar
+    </button>
+  </div>
+  <div class="alert alert-info py-2" *ngIf="msg">{{msg}}</div>
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" style="width:2rem;height:2rem"></div>
+  </div>
+  <div *ngIf="!loading">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Nome</th>
+            <th>Horas</th>
+            <th>Ciclo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let d of data">
+            <td>{{d.code}}</td>
+            <td>{{d.name}}</td>
+            <td>{{d.hours}}</td>
+            <td>{{d.ciclo}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

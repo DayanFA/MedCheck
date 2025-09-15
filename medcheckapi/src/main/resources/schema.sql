@@ -24,6 +24,8 @@ DROP TABLE IF EXISTS internship_plans;
 DROP TABLE IF EXISTS check_codes;
 DROP TABLE IF EXISTS check_sessions;
 DROP TABLE IF EXISTS password_reset_tokens;
+DROP TABLE IF EXISTS discipline_preceptors;
+DROP TABLE IF EXISTS disciplines;
 DROP TABLE IF EXISTS users;
 
 -- ============================================================================
@@ -42,7 +44,8 @@ CREATE TABLE users (
   password VARCHAR(120) NOT NULL,
   avatar LONGBLOB NULL,
   avatar_content_type VARCHAR(100) NULL,
-  role VARCHAR(20) NOT NULL DEFAULT 'ALUNO'
+  role VARCHAR(20) NOT NULL DEFAULT 'ALUNO',
+  current_discipline_id BIGINT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
@@ -65,11 +68,13 @@ CREATE TABLE check_sessions (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   aluno_id BIGINT NOT NULL,
   preceptor_id BIGINT NOT NULL,
+  discipline_id BIGINT NULL,
   check_in_time TIMESTAMP NOT NULL,
   check_out_time TIMESTAMP NULL,
   validated BOOLEAN NOT NULL DEFAULT TRUE,
   CONSTRAINT fk_cs_aluno FOREIGN KEY (aluno_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_cs_preceptor FOREIGN KEY (preceptor_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_cs_discipline FOREIGN KEY (discipline_id) REFERENCES disciplines(id) ON DELETE SET NULL,
   INDEX idx_cs_aluno_time (aluno_id, check_in_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -94,6 +99,7 @@ CREATE TABLE check_codes (
 CREATE TABLE internship_plans (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   aluno_id BIGINT NOT NULL,
+  discipline_id BIGINT NULL,
   date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
@@ -102,6 +108,7 @@ CREATE TABLE internship_plans (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL,
   CONSTRAINT fk_ip_aluno FOREIGN KEY (aluno_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ip_discipline FOREIGN KEY (discipline_id) REFERENCES disciplines(id) ON DELETE SET NULL,
   INDEX idx_ip_user_date (aluno_id, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -112,6 +119,7 @@ CREATE TABLE internship_justifications (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   aluno_id BIGINT NOT NULL,
   plan_id BIGINT NULL,
+  discipline_id BIGINT NULL,
   date DATE NOT NULL,
   type VARCHAR(30) NOT NULL,
   reason TEXT NOT NULL,
@@ -123,8 +131,36 @@ CREATE TABLE internship_justifications (
   CONSTRAINT fk_ij_aluno FOREIGN KEY (aluno_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_ij_plan FOREIGN KEY (plan_id) REFERENCES internship_plans(id) ON DELETE SET NULL,
   CONSTRAINT fk_ij_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ij_discipline FOREIGN KEY (discipline_id) REFERENCES disciplines(id) ON DELETE SET NULL,
   INDEX idx_ij_user_date (aluno_id, date),
   CONSTRAINT uq_ij_user_date UNIQUE (aluno_id, date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABELA: disciplines
+-- ============================================================================
+CREATE TABLE disciplines (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  code VARCHAR(16) NOT NULL UNIQUE,
+  name VARCHAR(200) NOT NULL,
+  hours INT NOT NULL,
+  ciclo INT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Adiciona FK após criação de disciplines (ordem de criação compatível)
+ALTER TABLE users
+  ADD CONSTRAINT fk_user_current_discipline FOREIGN KEY (current_discipline_id) REFERENCES disciplines(id) ON DELETE SET NULL;
+
+-- ============================================================================
+-- RELAÇÃO: discipline_preceptors (muitos-para-muitos)
+-- Cada disciplina pode ter vários preceptores e cada preceptor pode estar em várias disciplinas
+-- ============================================================================
+CREATE TABLE discipline_preceptors (
+  discipline_id BIGINT NOT NULL,
+  preceptor_id BIGINT NOT NULL,
+  PRIMARY KEY (discipline_id, preceptor_id),
+  CONSTRAINT fk_dp_discipline FOREIGN KEY (discipline_id) REFERENCES disciplines(id) ON DELETE CASCADE,
+  CONSTRAINT fk_dp_preceptor FOREIGN KEY (preceptor_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
@@ -148,6 +184,28 @@ INSERT INTO check_sessions (aluno_id, preceptor_id, check_in_time, check_out_tim
  (1,2, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY) + INTERVAL 5 HOUR, TRUE);
 -- (Exemplo de sessão aberta - descomente para testar estado "ATIVO")
 -- INSERT INTO check_sessions (aluno_id, preceptor_id, check_in_time, validated) VALUES (1,2, NOW() - INTERVAL 1 HOUR, TRUE);
+
+-- ============================================================================
+-- SEEDS (Disciplinas)
+-- ============================================================================
+INSERT INTO disciplines (code, name, hours, ciclo) VALUES
+ ('CCSD459','Internato em Medicina de Família e Comunidade',420,1),
+ ('CCSD460','Internato em Cirurgia Geral',420,1),
+ ('CCSD461','Internato em Ginecologia e Obstetrícia',420,1),
+ ('CCSD462','Internato em Pediatria',420,1),
+ ('CCSD463','Internato em Clínica Médica',420,1),
+ ('CCSD464','Internato Rural em Saúde Coletiva',240,2),
+ ('CCSD465','Internato em Geriatria e Gerontologia',240,2),
+ ('CCSD466','Internato em Saúde Mental',240,2),
+ ('CCSD467','Internato em Medicina Tropical',240,2),
+ ('CCSD468','Internato em Urgências e Emergências',240,2);
+
+-- ============================================================================
+-- SEEDS (Vínculos Preceptores-Disciplinas)
+-- Vincula o Preceptor Teste (id=2) a duas disciplinas para facilitar testes
+-- ============================================================================
+INSERT INTO discipline_preceptors (discipline_id, preceptor_id)
+SELECT d.id, 2 FROM disciplines d WHERE d.code IN ('CCSD459','CCSD463');
 
 SET foreign_key_checks = 1;
 SET unique_checks = 1;

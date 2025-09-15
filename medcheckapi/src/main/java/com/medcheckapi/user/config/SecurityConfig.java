@@ -15,6 +15,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 
 @Configuration
 @EnableWebSecurity
@@ -37,13 +40,17 @@ public class SecurityConfig {
     
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http.csrf(csrf -> csrf.disable());
-    http.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-    http.authorizeHttpRequests(auth -> auth
-        .requestMatchers("/api/auth/**", "/ws/**", "/api/ping", "/h2-console/**").permitAll()
-        .anyRequest().authenticated());
-    http.headers(headers -> headers.frameOptions(frame -> frame.disable())); // allow H2 console frames
-    // Authentication provider: rely on auto-configured auth manager with our userDetailsService + encoder
+        http.csrf(csrf -> csrf.disable());
+        http.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+        http.authorizeHttpRequests(auth -> auth
+                // Allow unauthenticated access to auth endpoints, health/ping, H2 console, CORS preflight, and error dispatches
+                .requestMatchers("/api/auth/**", "/ws/**", "/api/ping", "/h2-console/**", "/error").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .anyRequest().authenticated());
+        http.headers(headers -> headers.frameOptions(frame -> frame.disable())); // allow H2 console frames
+
+        // Uniform 401 for unauthenticated requests instead of 403 on pre-auth entry point
+        http.exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
 
         http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 

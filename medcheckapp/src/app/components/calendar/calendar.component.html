@@ -1,0 +1,163 @@
+<div class="calendar-page" *ngIf="data() as data">
+  <div class="content-box mx-auto">
+  <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn btn-primary btn-sm" (click)="nextMonth(-1)"><i class="bi bi-chevron-left"></i></button>
+      <h3 class="m-0">{{ year() }} - {{ month() | number:'2.0-0' }}</h3>
+      <button class="btn btn-primary btn-sm" (click)="nextMonth(1)"><i class="bi bi-chevron-right"></i></button>
+    </div>
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <div class="dropdown">
+        <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-calendar-date"></i> Selecionar data
+        </button>
+        <div class="dropdown-menu p-2" style="min-width: 280px;">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
+            <input class="form-control" type="date"
+                   [ngModel]="selectedDate() || (year() + '-' + (month() | number:'2.0-0') + '-01')"
+                   (ngModelChange)="pickDate($event)" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ms-auto small text-muted">
+      <span class="me-2"><span class="legend legend-blue"></span> Futuro</span>
+      <span class="me-2"><span class="legend legend-red"></span> Faltou</span>
+      <span class="me-2"><span class="legend legend-yellow"></span> Incompleto</span>
+      <span class="me-2"><span class="legend legend-green"></span> Cumprido</span>
+      <span><span class="legend legend-orange"></span> Justificado</span>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-7">
+      <div class="grid">
+        <div class="grid-header">Seg</div>
+        <div class="grid-header">Ter</div>
+        <div class="grid-header">Qua</div>
+        <div class="grid-header">Qui</div>
+        <div class="grid-header">Sex</div>
+        <div class="grid-header">Sáb</div>
+        <div class="grid-header">Dom</div>
+
+        <ng-container *ngFor="let week of weeks()">
+          <ng-container *ngFor="let cell of week">
+            <div class="cell" [class.empty]="!cell.date" [class.border-primary]="cell.date===selectedDate()" (click)="cell.date && openPlan(cell.date)">
+              <div class="day-number">{{ cell.day }}</div>
+              <div class="dot" [ngClass]="statusClass(cell.d)"></div>
+              <div class="mini" *ngIf="cell.d">{{ (cell.d.workedSeconds/3600) | number:'1.0-2' }}/{{ (cell.d.plannedSeconds/3600) | number:'1.0-2' }}h</div>
+            </div>
+          </ng-container>
+        </ng-container>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-5">
+      <div class="card mb-3" *ngIf="formDate()">
+        <div class="card-header">
+          <strong>Plano para {{ formDate() }}</strong>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">Início</label>
+              <input class="form-control" type="time" [ngModel]="formStart()" (ngModelChange)="formStart.set($event)" />
+            </div>
+            <div class="col-6">
+              <label class="form-label">Fim</label>
+              <input class="form-control" type="time" [ngModel]="formEnd()" (ngModelChange)="formEnd.set($event)" />
+            </div>
+            <div class="col-12">
+              <label class="form-label">Local <span class="text-danger">*</span></label>
+              <input class="form-control" placeholder="Ex: Clínica X" required [ngModel]="formLocation()" (ngModelChange)="formLocation.set($event)" />
+            </div>
+            <div class="col-12">
+              <label class="form-label">Observação (opcional)</label>
+              <textarea class="form-control" rows="2" placeholder="Detalhes relevantes" [ngModel]="formNote()" (ngModelChange)="formNote.set($event)" (input)="autoGrow($event)"></textarea>
+            </div>
+          </div>
+          
+        </div>
+        <div class="card-footer text-end">
+          <button class="btn btn-primary" [disabled]="!formLocation() || !formLocation().trim()" (click)="savePlan()">Salvar Plano</button>
+        </div>
+      </div>
+
+      <div class="card mb-3" *ngIf="selectedDate()">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <strong>Planos do dia {{ selectedDate() }}</strong>
+          <button class="btn btn-sm btn-primary" (click)="refreshDay()">Atualizar</button>
+        </div>
+        <div class="card-body">
+          <div *ngIf="!(plansForDay()?.length)">Sem planos.</div>
+          <ul class="list-group" *ngIf="plansForDay()?.length">
+            <li class="list-group-item" *ngFor="let p of plansForDay()">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <div><i class="bi bi-clock"></i> {{ p.startTime }} - {{ p.endTime }}</div>
+                  <div class="text-muted small" *ngIf="p.location"><i class="bi bi-geo-alt"></i> {{ p.location }}</div>
+                </div>
+                <span class="badge text-bg-light">{{ (p.plannedSeconds/3600) | number:'1.0-2' }}h</span>
+              </div>
+              <div class="text-muted small mt-1" *ngIf="p.note">{{ p.note }}</div>
+              <div class="mt-2 d-flex gap-2">
+                <button class="btn btn-sm btn-primary" (click)="editPlan(p)">Editar</button>
+                <button class="btn btn-sm btn-primary" (click)="deletePlan(p.id)">Excluir</button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Justificativa do dia: aparece junto aos planos/histórico e somente se houver pelo menos 1 plano -->
+      <div class="card mb-3" *ngIf="selectedDate() && plansForDay()?.length">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <strong>Justificativa do dia {{ selectedDate() }}</strong>
+          <span *ngIf="existingJust() as ej" class="badge" [ngClass]="{
+              'text-bg-warning': ej.status==='PENDING',
+              'text-bg-success': ej.status==='APPROVED',
+              'text-bg-danger': ej.status==='REJECTED'
+            }">{{ ej.status==='PENDING' ? 'PENDENTE' : (ej.status==='APPROVED' ? 'APROVADO' : (ej.status==='REJEITADO' ? 'REJEITADO' : ej.status)) }}</span>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">Tipo</label>
+              <select class="form-select" [disabled]="existingJust() && existingJust()?.status!=='PENDING'" [ngModel]="justType()" (ngModelChange)="justType.set($event)">
+                <option value="GENERAL">Geral</option>
+                <option value="ABSENCE">Falta</option>
+                <option value="OUT_OF_SCHEDULE">Fora do horário</option>
+                <option value="INSUFFICIENT_HOURS">Horas insuficientes</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Motivo</label>
+              <textarea class="form-control" [readonly]="existingJust() && existingJust()?.status!=='PENDING'" rows="3" placeholder="Descreva o ocorrido" [ngModel]="justReason()" (ngModelChange)="justReason.set($event)" (input)="autoGrow($event)"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer d-flex gap-2 justify-content-end">
+          <button class="btn btn-primary" [disabled]="existingJust() && existingJust()?.status!=='PENDING'" (click)="saveJustify()">Salvar Justificativa</button>
+          <button class="btn btn-primary" *ngIf="existingJust() as ej" [disabled]="ej.status!=='PENDING'" (click)="deleteJustify(ej)">Excluir Justificativa</button>
+        </div>
+      </div>
+
+      <div class="card" *ngIf="selectedDate()">
+        <div class="card-header"><strong>Histórico do dia {{ selectedDate() }}</strong></div>
+        <div class="card-body">
+          <div *ngIf="!(sessionsForDay()?.length)">Sem registros.</div>
+          <ul class="list-group" *ngIf="sessionsForDay()?.length">
+            <li class="list-group-item" *ngFor="let s of sessionsForDay()">
+              <div><strong>Check-In:</strong> {{ s.checkInTime | date:'HH:mm' }}
+                <span *ngIf="s.checkOutTime"> | <strong>Check-Out:</strong> {{ s.checkOutTime | date:'HH:mm' }}</span>
+              </div>
+              <div class="text-muted small" *ngIf="s.worked">Trabalhado: {{ s.worked }}</div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>

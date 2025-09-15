@@ -19,6 +19,8 @@ USE medcheck;
 -- ============================================================================
 -- DROPS (limpeza)
 -- ============================================================================
+DROP TABLE IF EXISTS internship_justifications;
+DROP TABLE IF EXISTS internship_plans;
 DROP TABLE IF EXISTS check_codes;
 DROP TABLE IF EXISTS check_sessions;
 DROP TABLE IF EXISTS password_reset_tokens;
@@ -82,6 +84,45 @@ CREATE TABLE check_codes (
   last_accessed_at TIMESTAMP NULL,
   CONSTRAINT fk_cc_preceptor FOREIGN KEY (preceptor_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_checkcode_preceptor_time (preceptor_id, generated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABELA: internship_plans (planejamento do internato do aluno)
+-- ============================================================================
+CREATE TABLE internship_plans (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  aluno_id BIGINT NOT NULL,
+  date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  location VARCHAR(160) NOT NULL,
+  note TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL,
+  CONSTRAINT fk_ip_aluno FOREIGN KEY (aluno_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_ip_user_date (aluno_id, date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABELA: internship_justifications (justificativas do aluno por dia)
+-- ============================================================================
+CREATE TABLE internship_justifications (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  aluno_id BIGINT NOT NULL,
+  plan_id BIGINT NULL,
+  date DATE NOT NULL,
+  type VARCHAR(30) NOT NULL,
+  reason TEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  reviewed_by BIGINT NULL,
+  reviewed_at TIMESTAMP NULL,
+  review_note TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_ij_aluno FOREIGN KEY (aluno_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ij_plan FOREIGN KEY (plan_id) REFERENCES internship_plans(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ij_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_ij_user_date (aluno_id, date),
+  CONSTRAINT uq_ij_user_date UNIQUE (aluno_id, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================

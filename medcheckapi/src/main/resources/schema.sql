@@ -40,6 +40,8 @@ CREATE TABLE users (
   phone VARCHAR(40) NULL,
   institutional_email VARCHAR(160) NOT NULL UNIQUE,
   password VARCHAR(120) NOT NULL,
+  avatar LONGBLOB NULL,
+  avatar_content_type VARCHAR(100) NULL,
   role VARCHAR(20) NOT NULL DEFAULT 'ALUNO'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

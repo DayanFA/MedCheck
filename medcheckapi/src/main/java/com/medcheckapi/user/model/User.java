@@ -36,6 +36,12 @@ public class User {
     @Column(length = 20)
     private Role role = Role.ALUNO; // default
 
+    // Optional profile avatar stored in DB for simplicity
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    private byte[] avatar;
+    private String avatarContentType;
+
     // Getters and Setters
 
     public Long getId() {
@@ -129,5 +135,21 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public byte[] getAvatar() {
+        return avatar;
+    }
+
+    public void setAvatar(byte[] avatar) {
+        this.avatar = avatar;
+    }
+
+    public String getAvatarContentType() {
+        return avatarContentType;
+    }
+
+    public void setAvatarContentType(String avatarContentType) {
+        this.avatarContentType = avatarContentType;
     }
 }

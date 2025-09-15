@@ -11,6 +11,7 @@ import { AlunoCheckinComponent } from './components/aluno-checkin/aluno-checkin.
 import { PreceptorCodeComponent } from './components/preceptor-code/preceptor-code.component';
 import { roleGuard } from './services/role.guard';
 import { UserCalendarComponent } from './components/calendar/calendar.component';
+import { SettingsComponent } from './components/settings/settings.component';
 
 export const routes: Routes = [
     { path: '', redirectTo: '/login', pathMatch: 'full' },
@@ -27,6 +28,7 @@ export const routes: Routes = [
             { path: 'checkin', component: AlunoCheckinComponent, canActivate: [roleGuard], data: { roles: ['ALUNO'] } },
             { path: 'preceptor/codigo', component: PreceptorCodeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
             { path: 'calendario', component: UserCalendarComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN'] } }
+            ,{ path: 'configuracoes', component: SettingsComponent }
             // futuras rotas autenticadas aqui
         ]
     },

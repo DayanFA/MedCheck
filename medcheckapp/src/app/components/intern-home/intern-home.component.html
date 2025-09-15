@@ -2,8 +2,9 @@
   <div class="content-box mx-auto">
     <div class="row g-4 align-items-start profile-row">
       <div class="col-md-3 text-center">
-        <div class="profile-pic rounded d-flex align-items-center justify-content-center">
-          <i class="bi bi-person-fill fs-1"></i>
+        <div class="profile-pic rounded d-flex align-items-center justify-content-center overflow-hidden">
+          <img *ngIf="avatarUrl" [src]="avatarUrl" alt="Foto de perfil" class="w-100 h-100 object-fit-cover" />
+          <i *ngIf="!avatarUrl" class="bi bi-person-fill fs-1"></i>
         </div>
       </div>
       <div class="col-md-9 profile-details small">

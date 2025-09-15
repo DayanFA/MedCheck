@@ -1,9 +1,11 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { CheckInService } from '../../services/checkin.service';
 import { UserService, CurrentUser } from '../../services/user.service';
 import { AuthService } from '../../services/auth.service';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 
 @Component({
   selector: 'app-home',
@@ -34,12 +36,14 @@ export class HomeComponent implements OnInit, OnDestroy {
   private cacheKey = 'mc_worked_cache_home'; // será sobrescrito com CPF depois do user carregar
 
   loading = true;
-  constructor(private userService: UserService, private auth: AuthService, private router: Router, private check: CheckInService) {}
+  avatarUrl = '';
+  private avatarObjectUrl: string | null = null;
+  constructor(private userService: UserService, private auth: AuthService, private router: Router, private check: CheckInService, private http: HttpClient, @Inject(PLATFORM_ID) private platformId: Object) {}
 
   ngOnInit(): void {
     // Restaura baseline persistido (secs + ts) para evitar reset visual
     this.loadWorkedCache();
-    const cached = (this.auth as any).getUser?.();
+  const cached = (this.auth as any).getUser?.();
     if (cached && cached.name) {
       this.user = {
         name: cached.name,
@@ -54,6 +58,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.loadWorkedCache();
       this.inService = this.user.status === 'Em serviço';
       this.firstName = (this.user.name || '').split(' ')[0];
+  if (isPlatformBrowser(this.platformId)) this.loadAvatar();
       this.loading = false;
     } else {
       this.auth.me().subscribe({
@@ -72,6 +77,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             return;
           }
           this.firstName = (this.user.name || '').split(' ')[0];
+          if (isPlatformBrowser(this.platformId)) this.loadAvatar();
           this.loading = false;
           this.updateCacheKeyWithUser();
           this.loadWorkedCache();
@@ -88,6 +94,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
   if (this.intervalId) window.clearInterval(this.intervalId);
   if (this.statusInterval) clearInterval(this.statusInterval);
+  this.clearAvatarUrl();
   }
 
   private updateTime() {
@@ -195,6 +202,31 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
   }
   cancelCheckout(){ if (this.submitting) return; this.showCheckoutConfirm=false; }
+
+  private headers(): HttpHeaders | undefined {
+    const token = this.auth.getToken();
+    return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined as any;
+  }
+
+  private loadAvatar() {
+    this.http.get('/api/users/me/photo', { headers: this.headers(), responseType: 'blob' }).subscribe({
+      next: blob => {
+        this.clearAvatarUrl();
+        const url = URL.createObjectURL(blob);
+        this.avatarObjectUrl = url;
+        this.avatarUrl = url;
+      },
+      error: _ => { this.clearAvatarUrl(); }
+    });
+  }
+
+  private clearAvatarUrl() {
+    if (this.avatarObjectUrl) {
+      try { URL.revokeObjectURL(this.avatarObjectUrl); } catch {}
+    }
+    this.avatarObjectUrl = null;
+    this.avatarUrl = '';
+  }
 }
 
 // Backwards compatibility alias (remove later if unused)

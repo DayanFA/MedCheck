@@ -7,7 +7,10 @@
       </button>
       <span class="fw-semibold" *ngIf="userName">Seja bem-vindo {{userName}}</span>
       <div class="ms-auto d-flex align-items-center gap-2">
-        <div class="rounded-circle bg-secondary-subtle user-avatar" aria-label="Avatar"></div>
+        <div class="rounded-circle bg-secondary-subtle user-avatar d-flex align-items-center justify-content-center overflow-hidden" aria-label="Avatar">
+          <img *ngIf="avatarUrl" [src]="avatarUrl" alt="Avatar" class="w-100 h-100 object-fit-cover rounded-circle" />
+          <i *ngIf="!avatarUrl" class="bi bi-person text-muted"></i>
+        </div>
       </div>
     </nav>
     <main class="p-4 content-wrapper flex-grow-1 overflow-auto">

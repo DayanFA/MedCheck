@@ -1,7 +1,7 @@
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild, Inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { CheckInService } from '../../services/checkin.service';
-import QRCode from 'qrcode';
+import * as QRCode from 'qrcode';
 import { AuthService } from '../../services/auth.service';
 
 @Component({

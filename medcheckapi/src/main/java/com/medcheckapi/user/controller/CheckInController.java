@@ -3,6 +3,8 @@ package com.medcheckapi.user.controller;
 import com.medcheckapi.user.model.User;
 import com.medcheckapi.user.repository.UserRepository;
 import com.medcheckapi.user.service.CheckInService;
+import com.medcheckapi.user.repository.DisciplineRepository;
+import com.medcheckapi.user.model.Discipline;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -16,9 +18,10 @@ public class CheckInController {
 
     private final CheckInService checkInService;
     private final UserRepository userRepository;
+    private final DisciplineRepository disciplineRepository;
 
-    public CheckInController(CheckInService checkInService, UserRepository userRepository) {
-        this.checkInService = checkInService; this.userRepository = userRepository; }
+    public CheckInController(CheckInService checkInService, UserRepository userRepository, DisciplineRepository disciplineRepository) {
+        this.checkInService = checkInService; this.userRepository = userRepository; this.disciplineRepository = disciplineRepository; }
 
     private User currentUser(org.springframework.security.core.userdetails.User principal) {
         return userRepository.findByCpf(principal.getUsername()).orElseThrow();
@@ -29,6 +32,25 @@ public class CheckInController {
     public ResponseEntity<?> currentCode(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
         User me = currentUser(principal);
         return ResponseEntity.ok(checkInService.getOrCreateCurrentCode(me.getId()));
+    }
+
+    // PRECEPTOR: list disciplines linked to authenticated preceptor (via discipline_preceptors)
+    @GetMapping("/my-disciplines")
+    public ResponseEntity<?> myDisciplines(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
+        User me = currentUser(principal);
+        List<Discipline> list = disciplineRepository.findByPreceptors_Id(me.getId());
+        // Return minimal fields to avoid exposing preceptors set
+        List<Map<String,Object>> dto = new ArrayList<>();
+        for (Discipline d : list) {
+            Map<String,Object> m = new HashMap<>();
+            m.put("id", d.getId());
+            m.put("code", d.getCode());
+            m.put("name", d.getName());
+            m.put("hours", d.getHours());
+            m.put("ciclo", d.getCiclo());
+            dto.add(m);
+        }
+        return ResponseEntity.ok(dto);
     }
 
     // ALUNO: perform check-in using code and preceptor id

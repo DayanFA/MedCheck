@@ -122,7 +122,8 @@ export class ShellComponent implements OnInit, OnDestroy {
       return;
     }
     if (u?.role === 'PRECEPTOR') {
-      this.currentDisciplineLabel = 'Sem internato vinculado';
+      // Não exibir badge quando não houver vínculo
+      this.currentDisciplineLabel = '';
       return;
     }
     this.currentDisciplineLabel = '';

@@ -17,4 +17,5 @@ export class CheckInService {
   checkOut(): Observable<any> { return this.http.post(`${this.base}/out`, {}, { headers: this.authHeaders() }); }
   sessions(start: string, end: string): Observable<any> { return this.http.get(`${this.base}/sessions`, { headers: this.authHeaders(), params: new HttpParams().set('start', start).set('end', end) }); }
   status(): Observable<any> { return this.http.get(`${this.base}/status`, { headers: this.authHeaders() }); }
+  myDisciplines(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/my-disciplines`, { headers: this.authHeaders() }); }
 }

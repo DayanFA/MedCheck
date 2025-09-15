@@ -34,7 +34,19 @@ import { AuthService } from '../../services/auth.service';
         <div class="small text-muted mb-4">
           Próximo Código Em: <strong [class.text-danger]="secondsLeft <= 10">{{ formatRemaining(secondsLeft) }}</strong>
         </div>
-        <!-- Botões e linha de payload removidos conforme solicitação -->
+        <!-- Lista de disciplinas vinculadas -->
+        <div class="w-100 mt-2" style="max-width:640px;">
+          <div class="text-start fw-semibold mb-2">Suas disciplinas vinculadas</div>
+          <div *ngIf="discLoading" class="small text-muted">Carregando disciplinas...</div>
+          <div *ngIf="discError && !discLoading" class="alert alert-warning py-1 px-2 small">{{discError}}</div>
+          <ul *ngIf="!discLoading && disciplines?.length" class="list-group small">
+            <li class="list-group-item d-flex justify-content-between align-items-center" *ngFor="let d of disciplines">
+              <span class="text-truncate">{{ d.name }}</span>
+              <span class="badge bg-primary-subtle text-primary">{{ d.code }}</span>
+            </li>
+          </ul>
+          <div *ngIf="!discLoading && !disciplines?.length && !discError" class="small text-muted">Nenhum vínculo encontrado.</div>
+        </div>
       </div>
     </div>
   </div>
@@ -69,6 +81,9 @@ export class PreceptorCodeComponent implements OnInit, OnDestroy {
   fetching = false; // exposto para template (botão disabled)
   private expiresAtTs: number = 0;
   private userLoading = false;
+  disciplines: Array<{id:number; code:string; name:string; hours:number; ciclo:number}> = [];
+  discLoading = false;
+  discError = '';
   constructor(private check: CheckInService, private auth: AuthService, @Inject(PLATFORM_ID) platformId: Object) {
     this.isBrowser = isPlatformBrowser(platformId);
   }
@@ -82,6 +97,7 @@ export class PreceptorCodeComponent implements OnInit, OnDestroy {
       this.ensureUserLoaded();
     }
     this.fetch();
+    this.fetchDisciplines();
     if (this.isBrowser) {
       document.addEventListener('visibilitychange', this.handleVisibility);
       window.addEventListener('focus', this.handleVisibility);
@@ -93,6 +109,15 @@ export class PreceptorCodeComponent implements OnInit, OnDestroy {
       document.removeEventListener('visibilitychange', this.handleVisibility);
       window.removeEventListener('focus', this.handleVisibility);
     }
+  }
+  private fetchDisciplines() {
+    this.discError = '';
+    this.disciplines = [];
+    this.discLoading = true;
+    this.check.myDisciplines().subscribe({
+      next: list => { this.disciplines = list || []; this.discLoading = false; },
+      error: _ => { this.discError = 'Falha ao carregar disciplinas'; this.discLoading = false; }
+    });
   }
   private handleVisibility = () => {
     if (document.visibilityState === 'visible') {

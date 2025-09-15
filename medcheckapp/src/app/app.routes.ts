@@ -10,6 +10,7 @@ import { CheckInComponent } from './components/checkin/checkin.component';
 import { AlunoCheckinComponent } from './components/aluno-checkin/aluno-checkin.component';
 import { PreceptorCodeComponent } from './components/preceptor-code/preceptor-code.component';
 import { roleGuard } from './services/role.guard';
+import { PreceptorHomeComponent } from './components/preceptor-home/preceptor-home.component';
 import { UserCalendarComponent } from './components/calendar/calendar.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { AdminUsersComponent } from './components/admin/admin-users.component';
@@ -30,6 +31,7 @@ export const routes: Routes = [
             { path: 'home', component: HomeComponent },
             { path: 'checkin', component: AlunoCheckinComponent, canActivate: [roleGuard], data: { roles: ['ALUNO'] } },
             { path: 'preceptor/codigo', component: PreceptorCodeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
+            { path: 'preceptor/home', component: PreceptorHomeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
             { path: 'calendario', component: UserCalendarComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN'] } }
             ,{ path: 'configuracoes', component: SettingsComponent }
             ,{ path: 'admin/usuarios', component: AdminUsersComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } }

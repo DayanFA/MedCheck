@@ -174,6 +174,24 @@ INSERT INTO users (name,birth_date,matricula,cpf,naturalidade,nacionalidade,phon
  ('Administrador','1985-02-02','ADM001','08284001055','Rio Branco','Brasil','68900000003','admin@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ADMIN'),
  ('Coordenador Teste','1990-03-03','COO001','32247668089','Rio Branco','Brasil','68900000004','coordenador@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','COORDENADOR');
 
+-- Alunos adicionais para testes (>10 no total)
+INSERT INTO users (name,birth_date,matricula,cpf,naturalidade,nacionalidade,phone,institutional_email,password,role) VALUES
+ ('Aluno Teste 02','2000-02-01','202300002','11111111019','Rio Branco','Brasil','68900000010','aluno02@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 03','2000-03-01','202300003','11111111027','Rio Branco','Brasil','68900000011','aluno03@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 04','2000-04-01','202300004','11111111035','Rio Branco','Brasil','68900000012','aluno04@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 05','2000-05-01','202300005','11111111043','Rio Branco','Brasil','68900000013','aluno05@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 06','2000-06-01','202300006','11111111051','Rio Branco','Brasil','68900000014','aluno06@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 07','2000-07-01','202300007','11111111060','Rio Branco','Brasil','68900000015','aluno07@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 08','2000-08-01','202300008','11111111078','Rio Branco','Brasil','68900000016','aluno08@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 09','2000-09-01','202300009','11111111086','Rio Branco','Brasil','68900000017','aluno09@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 10','2000-10-01','202300010','11111111094','Rio Branco','Brasil','68900000018','aluno10@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 11','2000-11-01','202300011','11111111108','Rio Branco','Brasil','68900000019','aluno11@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 12','2000-12-01','202300012','11111111116','Rio Branco','Brasil','68900000020','aluno12@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 13','2001-01-01','202300013','11111111124','Rio Branco','Brasil','68900000021','aluno13@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 14','2001-02-01','202300014','11111111132','Rio Branco','Brasil','68900000022','aluno14@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 15','2001-03-01','202300015','11111111140','Rio Branco','Brasil','68900000023','aluno15@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO'),
+ ('Aluno Teste 16','2001-04-01','202300016','11111111159','Rio Branco','Brasil','68900000024','aluno16@teste.com','$2a$10$nTAo/it/5z.s3kEBe3765.ZC3kjWnPluNs3Mfe3LaKfdZIqyCxc.C','ALUNO');
+
 -- ============================================================================
 -- SEEDS (Sessões históricas) - Exemplo
 -- aluno_id = 1 (Aluno Teste), preceptor_id = 2 (Preceptor Teste)
@@ -184,6 +202,25 @@ INSERT INTO check_sessions (aluno_id, preceptor_id, check_in_time, check_out_tim
  (1,2, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY) + INTERVAL 5 HOUR, TRUE);
 -- (Exemplo de sessão aberta - descomente para testar estado "ATIVO")
 -- INSERT INTO check_sessions (aluno_id, preceptor_id, check_in_time, validated) VALUES (1,2, NOW() - INTERVAL 1 HOUR, TRUE);
+
+-- Vincula os novos alunos à mesma disciplina do preceptor (CCSD463)
+SET @disc_clin_med = (SELECT id FROM disciplines WHERE code = 'CCSD463');
+INSERT INTO check_sessions (aluno_id, preceptor_id, discipline_id, check_in_time, check_out_time, validated) VALUES
+ ((SELECT id FROM users WHERE institutional_email='aluno02@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 10 DAY, NOW() - INTERVAL 10 DAY + INTERVAL 5 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno03@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 9 DAY, NOW() - INTERVAL 9 DAY + INTERVAL 4 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno04@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 8 DAY, NOW() - INTERVAL 8 DAY + INTERVAL 6 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno05@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 7 DAY, NOW() - INTERVAL 7 DAY + INTERVAL 5 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno06@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 6 DAY, NOW() - INTERVAL 6 DAY + INTERVAL 6 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno07@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 5 DAY, NOW() - INTERVAL 5 DAY + INTERVAL 5 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno08@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 4 DAY, NOW() - INTERVAL 4 DAY + INTERVAL 6 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno09@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 3 DAY + INTERVAL 5 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno10@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 2 DAY, NOW() - INTERVAL 2 DAY + INTERVAL 6 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno11@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 12 DAY, NOW() - INTERVAL 12 DAY + INTERVAL 6 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno12@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 15 DAY, NOW() - INTERVAL 15 DAY + INTERVAL 5 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno13@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 20 DAY, NOW() - INTERVAL 20 DAY + INTERVAL 4 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno14@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 25 DAY, NOW() - INTERVAL 25 DAY + INTERVAL 6 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno15@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 18 DAY, NOW() - INTERVAL 18 DAY + INTERVAL 5 HOUR, TRUE),
+ ((SELECT id FROM users WHERE institutional_email='aluno16@teste.com'), 2, @disc_clin_med, NOW() - INTERVAL 1 DAY, NULL, TRUE);
 
 -- ============================================================================
 -- SEEDS (Disciplinas)

@@ -7,7 +7,7 @@
   <nav class="flex-grow-1">
     <ul class="nav nav-pills flex-column gap-1">
       <li class="nav-item">
-        <a routerLink="/home" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/home'">
+        <a [routerLink]="role === 'PRECEPTOR' || role === 'ADMIN' ? '/preceptor/home' : '/home'" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/home' || activePath === '/preceptor/home'">
           <i class="bi bi-house-door"></i><span>Home</span>
         </a>
       </li>

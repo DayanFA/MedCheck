@@ -25,11 +25,13 @@ export class ShellComponent implements OnInit, OnDestroy {
       try {
         const u = JSON.parse(e.newValue);
         this.applyDisciplineFromUser(u);
+        // Reload avatar when user cache changes (e.g., after updating profile photo)
+        this.loadAvatar();
       } catch {}
     }
   };
   private userUpdatedListener = (e: any) => {
-    try { this.applyDisciplineFromUser(e?.detail); } catch {}
+    try { this.applyDisciplineFromUser(e?.detail); this.loadAvatar(); } catch {}
   };
   constructor(private userService: UserService, private auth: AuthService, private http: HttpClient, @Inject(PLATFORM_ID) private platformId: Object) {}
 
@@ -78,7 +80,9 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   private loadAvatar() {
-    this.http.get('/api/users/me/photo', { headers: this.headers(), responseType: 'blob' }).subscribe({
+    // Cache-bust to ensure we fetch the latest avatar after updates
+    const ts = Date.now();
+    this.http.get(`/api/users/me/photo?t=${ts}` as string, { headers: this.headers(), responseType: 'blob' }).subscribe({
       next: blob => {
         this.clearAvatarUrl();
         const url = URL.createObjectURL(blob);

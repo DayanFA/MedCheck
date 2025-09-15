@@ -58,9 +58,13 @@ export class LoginComponent {
         if (response.name) this.authService.setUser(userPayload, this.rememberMe);
         this.toast.show('success', 'Login realizado.');
         // pequena pausa para garantir storage
-        setTimeout(()=> this.router.navigate(['/home']).then(ok => {
-          if (!ok) console.warn('[LOGIN] Navegação para /home falhou');
-        }), 50);
+        setTimeout(()=> {
+          const role = (response.role || userPayload.role || '').toUpperCase();
+          const target = role === 'PRECEPTOR' || role === 'ADMIN' ? '/preceptor/home' : '/home';
+          this.router.navigate([target]).then(ok => {
+            if (!ok) console.warn('[LOGIN] Navegação para', target, 'falhou');
+          });
+        }, 50);
         this.loading = false;
       },
       error: err => {

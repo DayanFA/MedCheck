@@ -5,6 +5,7 @@ import { PreceptorService } from '../../services/preceptor.service';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-preceptor-home',
@@ -67,7 +68,7 @@ import { ToastService } from '../../services/toast.service';
     <div class="container pb-4">
       <div class="row g-4">
         <div class="col-12 col-lg-6" *ngFor="let a of items">
-          <div class="student-card card border-0 shadow-sm p-3 h-100">
+          <div class="student-card card border-0 shadow-sm p-3 h-100 clickable" (click)="openCalendar(a)">
             <div class="row g-3 align-items-center">
               <div class="col-auto">
                 <div aria-label="Avatar" class="rounded-circle bg-secondary-subtle user-avatar d-flex align-items-center justify-content-center overflow-hidden">
@@ -96,7 +97,7 @@ import { ToastService } from '../../services/toast.service';
                 <span class="status badge px-3 py-2 w-100 w-sm-auto d-inline-block text-center" [class.in-service]="a.inService" [class.off-service]="!a.inService">
                   {{ a.inService ? 'Em Serviço' : 'Fora de Serviço' }}
                 </span>
-                <button class="btn btn-success btn-sm w-100 w-sm-auto" type="button" (click)="avaliar(a)">Avaliar</button>
+                <button class="btn btn-success btn-sm w-100 w-sm-auto" type="button" (click)="$event.stopPropagation(); avaliar(a)">Avaliar</button>
               </div>
             </div>
           </div>
@@ -123,7 +124,9 @@ import { ToastService } from '../../services/toast.service';
     .topbar .search-group{min-width: 260px; max-width: 540px; background:#fff;border-radius:8px; border:1px solid #e9ecef;}
     .topbar .search-group .form-control{height:40px;}
     .year-select{width: 120px;}
-    .student-card{border-radius:14px; background:#f8f9fc;}
+  .student-card{border-radius:14px; background:#f8f9fc;}
+  .student-card.clickable{cursor:pointer; transition:transform .06s ease, box-shadow .1s ease;}
+  .student-card.clickable:hover{transform: translateY(-1px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.12)!important;}
   .user-avatar{width:64px;height:64px;}
   .user-avatar i{font-size:2rem;}
     .status{border-radius:16px;}
@@ -154,7 +157,7 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
 
   private avatarObjectUrls: string[] = [];
 
-  constructor(private svc: PreceptorService, private http: HttpClient, private auth: AuthService, private toast: ToastService) {}
+  constructor(private svc: PreceptorService, private http: HttpClient, private auth: AuthService, private toast: ToastService, private router: Router) {}
 
   ngOnInit(): void { this.load(); }
 
@@ -245,5 +248,10 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
   avaliar(a: any){
     const nome = a?.name || 'Interno';
     this.toast.show('info', `Avaliação de ${nome} em breve.`);
+  }
+
+  openCalendar(a: any){
+    if (!a?.id) return;
+    this.router.navigate(['/calendario'], { queryParams: { alunoId: a.id } });
   }
 }

@@ -24,10 +24,12 @@ export class CalendarServiceApi {
   private http = inject(HttpClient);
   private auth = inject(AuthService);
 
-  getMonth(year: number, month: number) {
+  getMonth(year: number, month: number, alunoId?: number) {
     const token = this.auth.getToken();
     const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
-    return this.http.get<{ year:number; month:number; days: CalendarDay[]; plans: any[]; justifications: any[] }>(`/api/calendar/month`, { params: { year, month } as any, headers });
+    const params: any = { year, month };
+    if (alunoId) params.alunoId = alunoId;
+    return this.http.get<{ year:number; month:number; days: CalendarDay[]; plans: any[]; justifications: any[] }>(`/api/calendar/month`, { params, headers });
   }
 
   upsertPlan(plan: InternshipPlanDto) {
@@ -60,9 +62,17 @@ export class CalendarServiceApi {
     return this.http.delete<{ deleted: boolean }>(`/api/calendar/justify`, { headers, params: { date: dateIso } as any });
   }
 
-  getSessions(startIso: string, endIso: string) {
+  getSessions(startIso: string, endIso: string, alunoId?: number) {
     const token = this.auth.getToken();
     const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
-    return this.http.get<any[]>(`/api/check/sessions`, { params: { start: startIso, end: endIso } as any, headers });
+    const params: any = { start: startIso, end: endIso };
+    if (alunoId) params.alunoId = alunoId;
+    return this.http.get<any[]>(`/api/check/sessions`, { params, headers });
+  }
+
+  reviewJustification(payload: { alunoId: number; date: string; action: 'APPROVED'|'REJECTED'; note?: string; }) {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.post(`/api/calendar/justify/review`, payload, { headers });
   }
 }

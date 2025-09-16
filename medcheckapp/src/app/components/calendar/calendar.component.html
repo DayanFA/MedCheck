@@ -45,7 +45,10 @@
           <ng-container *ngFor="let cell of week">
             <div class="cell" [class.empty]="!cell.date" [class.border-primary]="cell.date===selectedDate()" (click)="cell.date && openPlan(cell.date)">
               <div class="day-number">{{ cell.day }}</div>
-              <div class="dot" [ngClass]="statusClass(cell.d)"></div>
+              <div class="dot-wrap">
+                <div class="dot" [ngClass]="statusClass(cell.d)"></div>
+                <span class="verdict-bang" *ngIf="cell.d?.justificationStatus && cell.d.justificationStatus!=='PENDING'">!</span>
+              </div>
               <div class="mini" *ngIf="cell.d">{{ (cell.d.workedSeconds/3600) | number:'1.0-2' }}/{{ (cell.d.plannedSeconds/3600) | number:'1.0-2' }}h</div>
             </div>
           </ng-container>
@@ -54,7 +57,8 @@
     </div>
 
     <div class="col-12 col-lg-5">
-      <div class="card mb-3" *ngIf="formDate()">
+      <!-- Plano: alunos podem editar; preceptor não vê este formulário -->
+      <div class="card mb-3" *ngIf="formDate() && !alunoId()">
         <div class="card-header">
           <strong>Plano para {{ formDate() }}</strong>
         </div>
@@ -62,24 +66,24 @@
           <div class="row g-3">
             <div class="col-6">
               <label class="form-label">Início</label>
-              <input class="form-control" type="time" [ngModel]="formStart()" (ngModelChange)="formStart.set($event)" />
+              <input class="form-control" type="time" [readonly]="alunoId()" [ngModel]="formStart()" (ngModelChange)="formStart.set($event)" />
             </div>
             <div class="col-6">
               <label class="form-label">Fim</label>
-              <input class="form-control" type="time" [ngModel]="formEnd()" (ngModelChange)="formEnd.set($event)" />
+              <input class="form-control" type="time" [readonly]="alunoId()" [ngModel]="formEnd()" (ngModelChange)="formEnd.set($event)" />
             </div>
             <div class="col-12">
               <label class="form-label">Local <span class="text-danger">*</span></label>
-              <input class="form-control" placeholder="Ex: Clínica X" required [ngModel]="formLocation()" (ngModelChange)="formLocation.set($event)" />
+              <input class="form-control" placeholder="Ex: Clínica X" [readonly]="alunoId()" required [ngModel]="formLocation()" (ngModelChange)="formLocation.set($event)" />
             </div>
             <div class="col-12">
               <label class="form-label">Observação (opcional)</label>
-              <textarea class="form-control" rows="2" placeholder="Detalhes relevantes" [ngModel]="formNote()" (ngModelChange)="formNote.set($event)" (input)="autoGrow($event)"></textarea>
+              <textarea class="form-control" rows="2" placeholder="Detalhes relevantes" [readonly]="alunoId()" [ngModel]="formNote()" (ngModelChange)="formNote.set($event)" (input)="autoGrow($event)"></textarea>
             </div>
           </div>
           
         </div>
-        <div class="card-footer text-end">
+        <div class="card-footer text-end" *ngIf="!alunoId()">
           <button class="btn btn-primary" [disabled]="!formLocation() || !formLocation().trim()" (click)="savePlan()">Salvar Plano</button>
         </div>
       </div>
@@ -100,31 +104,34 @@
                 </div>
                 <span class="badge text-bg-light">{{ (p.plannedSeconds/3600) | number:'1.0-2' }}h</span>
               </div>
-              <div class="text-muted small mt-1" *ngIf="p.note">{{ p.note }}</div>
+              <!-- Observação do plano: apenas para aluno -->
+              <div class="text-muted small mt-1" *ngIf="p.note && !alunoId()">{{ p.note }}</div>
               <div class="mt-2 d-flex gap-2">
-                <button class="btn btn-sm btn-primary" (click)="editPlan(p)">Editar</button>
-                <button class="btn btn-sm btn-primary" (click)="deletePlan(p.id)">Excluir</button>
+                <button class="btn btn-sm btn-primary" *ngIf="!alunoId()" (click)="editPlan(p)">Editar</button>
+                <button class="btn btn-sm btn-primary" *ngIf="!alunoId()" (click)="deletePlan(p.id)">Excluir</button>
               </div>
             </li>
           </ul>
         </div>
       </div>
 
-      <!-- Justificativa do dia: aparece junto aos planos/histórico e somente se houver pelo menos 1 plano -->
-      <div class="card mb-3" *ngIf="selectedDate() && plansForDay()?.length">
+      <!-- Justificativa do dia:
+           - Aluno: aparece se houver pelo menos 1 plano (padrão atual)
+           - Preceptor: aparece apenas se existir justificativa para o dia -->
+      <div class="card mb-3" *ngIf="selectedDate() && ((!alunoId() && plansForDay()?.length) || (alunoId() && existingJust()))">
         <div class="card-header d-flex align-items-center justify-content-between">
           <strong>Justificativa do dia {{ selectedDate() }}</strong>
           <span *ngIf="existingJust() as ej" class="badge" [ngClass]="{
               'text-bg-warning': ej.status==='PENDING',
               'text-bg-success': ej.status==='APPROVED',
               'text-bg-danger': ej.status==='REJECTED'
-            }">{{ ej.status==='PENDING' ? 'PENDENTE' : (ej.status==='APPROVED' ? 'APROVADO' : (ej.status==='REJEITADO' ? 'REJEITADO' : ej.status)) }}</span>
+            }">{{ ej.status==='PENDING' ? 'PENDENTE' : (ej.status==='APPROVED' ? 'APROVADO' : (ej.status==='REJECTED' ? 'REPROVADO' : ej.status)) }}</span>
         </div>
         <div class="card-body">
           <div class="row g-3">
             <div class="col-6">
               <label class="form-label">Tipo</label>
-              <select class="form-select" [disabled]="existingJust() && existingJust()?.status!=='PENDING'" [ngModel]="justType()" (ngModelChange)="justType.set($event)">
+              <select class="form-select" [disabled]="alunoId() || (existingJust() && existingJust()?.status!=='PENDING')" [ngModel]="justType()" (ngModelChange)="justType.set($event)">
                 <option value="GENERAL">Geral</option>
                 <option value="ABSENCE">Falta</option>
                 <option value="OUT_OF_SCHEDULE">Fora do horário</option>
@@ -133,13 +140,28 @@
             </div>
             <div class="col-12">
               <label class="form-label">Motivo</label>
-              <textarea class="form-control" [readonly]="existingJust() && existingJust()?.status!=='PENDING'" rows="3" placeholder="Descreva o ocorrido" [ngModel]="justReason()" (ngModelChange)="justReason.set($event)" (input)="autoGrow($event)"></textarea>
+              <textarea class="form-control" [readonly]="alunoId() || (existingJust() && existingJust()?.status!=='PENDING')" rows="3" placeholder="Descreva o ocorrido" [ngModel]="justReason()" (ngModelChange)="justReason.set($event)" (input)="autoGrow($event)"></textarea>
+            </div>
+            <!-- Aluno visualiza a resposta do preceptor quando existir -->
+            <div class="col-12" *ngIf="!alunoId() && (existingJust()?.reviewNote)">
+              <div class="alert alert-info py-2 px-3 mb-0">
+                <strong>Resposta do preceptor:</strong>
+                <div class="mt-1">{{ existingJust()?.reviewNote }}</div>
+              </div>
             </div>
           </div>
         </div>
         <div class="card-footer d-flex gap-2 justify-content-end">
-          <button class="btn btn-primary" [disabled]="existingJust() && existingJust()?.status!=='PENDING'" (click)="saveJustify()">Salvar Justificativa</button>
-          <button class="btn btn-primary" *ngIf="existingJust() as ej" [disabled]="ej.status!=='PENDING'" (click)="deleteJustify(ej)">Excluir Justificativa</button>
+          <!-- Aluno: pode criar/editar/excluir enquanto PENDING -->
+          <ng-container *ngIf="!alunoId(); else preceptorButtons">
+            <button class="btn btn-primary" [disabled]="existingJust() && existingJust()?.status!=='PENDING'" (click)="saveJustify()">Salvar Justificativa</button>
+            <button class="btn btn-primary" *ngIf="existingJust() as ej" [disabled]="ej.status!=='PENDING'" (click)="deleteJustify(ej)">Excluir Justificativa</button>
+          </ng-container>
+          <!-- Preceptor: apenas aprovar/reprovar quando PENDING -->
+          <ng-template #preceptorButtons>
+            <button class="btn btn-success" *ngIf="existingJust() as ej" [disabled]="ej.status!=='PENDING'" (click)="openReviewModal('APPROVED')">Aprovar</button>
+            <button class="btn btn-danger" *ngIf="existingJust() as ej" [disabled]="ej.status!=='PENDING'" (click)="openReviewModal('REJECTED')">Reprovar</button>
+          </ng-template>
         </div>
       </div>
 
@@ -159,5 +181,32 @@
       </div>
     </div>
   </div>
+  </div>
+</div>
+
+<!-- Modal de Revisão (Bootstrap) -->
+<div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Avaliar justificativa</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Data: <strong>{{ selectedDate() }}</strong></p>
+        <div class="mb-2" *ngIf="existingJust() as ej">
+          <span class="badge text-bg-warning" *ngIf="ej.status==='PENDING'">PENDENTE</span>
+          <span class="badge text-bg-success" *ngIf="ej.status==='APPROVED'">APROVADO</span>
+          <span class="badge text-bg-danger" *ngIf="ej.status==='REJECTED'">REPROVADO</span>
+        </div>
+        <label class="form-label">Resposta ao aluno (opcional)</label>
+        <textarea class="form-control" rows="3" placeholder="Mensagem ao aluno" [ngModel]="reviewNote()" (ngModelChange)="reviewNote.set($event)"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success" *ngIf="selectedAction()==='APPROVED'" (click)="confirmReview()">Confirmar Aprovação</button>
+        <button type="button" class="btn btn-danger" *ngIf="selectedAction()==='REJECTED'" (click)="confirmReview()">Confirmar Reprovação</button>
+      </div>
+    </div>
   </div>
 </div>

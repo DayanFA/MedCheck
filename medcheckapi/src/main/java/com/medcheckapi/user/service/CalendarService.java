@@ -66,8 +66,8 @@ public class CalendarService {
     }
 
     private String computeStatus(LocalDate day, LocalDate today, long planned, long worked, List<InternshipJustification> justs) {
-        boolean hasPendingJust = justs.stream().anyMatch(j -> "PENDING".equalsIgnoreCase(j.getStatus()));
-        if (hasPendingJust) return "ORANGE";
+    boolean hasAnyJust = !justs.isEmpty();
+    if (hasAnyJust) return "ORANGE"; // mantém laranja em qualquer justificativa (pendente, aprovada ou reprovada)
         if (planned <= 0) return "NONE";
         if (day.isAfter(today)) return "BLUE"; // futuro planejado
         if (worked <= 0 && day.isBefore(today)) return "RED"; // passou e não fez nada
@@ -94,6 +94,7 @@ public class CalendarService {
         m.put("type", j.getType());
         m.put("reason", j.getReason());
         m.put("status", j.getStatus());
+        m.put("reviewNote", j.getReviewNote());
         m.put("planId", j.getPlan() == null ? null : j.getPlan().getId());
         return m;
     }

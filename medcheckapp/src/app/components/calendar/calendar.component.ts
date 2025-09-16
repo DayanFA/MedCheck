@@ -2,6 +2,7 @@ import { Component, effect, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CalendarServiceApi, CalendarDay, InternshipPlanDto } from '../../services/calendar.service';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-calendar',
@@ -12,9 +13,11 @@ import { CalendarServiceApi, CalendarDay, InternshipPlanDto } from '../../servic
 })
 export class UserCalendarComponent {
   private api = inject(CalendarServiceApi);
+  private route = inject(ActivatedRoute);
   today = new Date();
   year = signal(this.today.getFullYear());
   month = signal(this.today.getMonth() + 1); // 1-12
+  alunoId = signal<number|undefined>(undefined);
   data = signal<{ days: CalendarDay[]; plans:any[]; justifications:any[] }|null>(null);
   loading = signal(false);
   // day history
@@ -39,6 +42,9 @@ export class UserCalendarComponent {
   justReason = signal<string>('');
   justPlanId = signal<number|undefined>(undefined);
   justType = signal<string>('GENERAL');
+  // preceptor review note (optional response to student)
+  reviewNote = signal<string>('');
+  selectedAction = signal<'APPROVED'|'REJECTED'|undefined>(undefined);
   existingJust = computed(() => {
     const d = this.selectedDate();
     const js = this.data()?.justifications || [];
@@ -63,7 +69,12 @@ export class UserCalendarComponent {
   });
 
   constructor() {
-    this.load();
+    this.route.queryParamMap.subscribe(mp => {
+      const idStr = mp.get('alunoId');
+      const idNum = idStr ? Number(idStr) : undefined;
+      this.alunoId.set(idNum && Number.isFinite(idNum) ? idNum : undefined);
+      this.load();
+    });
   }
 
   pickDate(dateIso: string) {
@@ -79,7 +90,7 @@ export class UserCalendarComponent {
       this.month.set(m);
       // Load month, then open the day after data arrives
       this.loading.set(true);
-      this.api.getMonth(y, m).subscribe(res => {
+      this.api.getMonth(y, m, this.alunoId()).subscribe(res => {
         this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications });
         this.loading.set(false);
         this.openPlan(dateIso);
@@ -99,7 +110,7 @@ export class UserCalendarComponent {
 
   load() {
     this.loading.set(true);
-    this.api.getMonth(this.year(), this.month()).subscribe(res => {
+    this.api.getMonth(this.year(), this.month(), this.alunoId()).subscribe(res => {
       this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications });
       this.loading.set(false);
     }, _ => this.loading.set(false));
@@ -130,12 +141,13 @@ export class UserCalendarComponent {
     // reset panels state to avoid needing a second click
     this.sessionsForDay.set(null);
     this.justDate.set(dateIso);
+    this.reviewNote.set('');
     this.formStart.set('08:00');
     this.formEnd.set('12:00');
     this.formLocation.set('');
     this.formNote.set('');
     // load day sessions
-    this.loadDaySessions(dateIso);
+  this.loadDaySessions(dateIso);
     // preload justification state if exists
     const ej = this.existingJust();
     if (ej) {
@@ -234,9 +246,67 @@ export class UserCalendarComponent {
     }
   }
 
+  review(action: 'APPROVED'|'REJECTED') {
+    const alunoId = this.alunoId();
+    const dateIso = this.selectedDate();
+    if (!alunoId || !dateIso) return;
+    const msg = action === 'APPROVED' ? 'Confirmar aprovação desta justificativa?' : 'Confirmar reprovação desta justificativa?';
+    const ok = typeof window !== 'undefined' ? window.confirm(msg) : true;
+    if (!ok) return;
+    const note = (this.reviewNote() || '').trim() || undefined;
+    this.api.reviewJustification({ alunoId, date: dateIso, action, note }).subscribe({
+      next: () => this.load(),
+      error: () => this.load(),
+    });
+  }
+
+  // Modal de revisão (Bootstrap)
+  openReviewModal(action: 'APPROVED'|'REJECTED') {
+    this.selectedAction.set(action);
+    // reset note (optional)
+    // this.reviewNote.set(''); // manter preenchido entre aberturas se desejar
+    try {
+      const anyWin = window as any;
+      const modalEl = document.getElementById('reviewModal');
+      if (modalEl && anyWin.bootstrap && anyWin.bootstrap.Modal) {
+        const instance = anyWin.bootstrap.Modal.getOrCreateInstance(modalEl);
+        instance.show();
+      }
+    } catch {}
+  }
+
+  confirmReview() {
+    const action = this.selectedAction();
+    const alunoId = this.alunoId();
+    const dateIso = this.selectedDate();
+    if (!action || !alunoId || !dateIso) return;
+    const note = (this.reviewNote() || '').trim() || undefined;
+    this.api.reviewJustification({ alunoId, date: dateIso, action, note }).subscribe({
+      next: () => {
+        this.hideReviewModal();
+        this.load();
+      },
+      error: () => {
+        this.hideReviewModal();
+        this.load();
+      },
+    });
+  }
+
+  private hideReviewModal() {
+    try {
+      const anyWin = window as any;
+      const modalEl = document.getElementById('reviewModal');
+      if (modalEl && anyWin.bootstrap && anyWin.bootstrap.Modal) {
+        const instance = anyWin.bootstrap.Modal.getOrCreateInstance(modalEl);
+        instance.hide();
+      }
+    } catch {}
+  }
+
   private loadDaySessions(dateIso: string) {
     // backend expects start/end as YYYY-MM-DD
-    this.api.getSessions(dateIso, dateIso).subscribe(list => {
+    this.api.getSessions(dateIso, dateIso, this.alunoId() || undefined).subscribe(list => {
       this.sessionsForDay.set(list);
     });
   }

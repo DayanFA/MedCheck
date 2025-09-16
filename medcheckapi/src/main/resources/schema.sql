@@ -244,6 +244,60 @@ INSERT INTO disciplines (code, name, hours, ciclo) VALUES
 INSERT INTO discipline_preceptors (discipline_id, preceptor_id)
 SELECT d.id, 2 FROM disciplines d WHERE d.code IN ('CCSD459','CCSD463');
 
+-- ============================================================================
+-- - Planos: 08:00-12:00 em todos os dias úteis do mês atual; 14:00-18:00 apenas nos dias pares
+-- - Justificativas: PENDING no dia 15; APPROVED no dia 05 do mês atual
+-- ============================================================================
+-- Geração de datas do mês atual sem CTE (compatível com variações do MySQL 8)
+-- Cria uma tabela derivada de números de 0..30 e soma ao primeiro dia do mês atual
+-- para obter todas as datas do mês corrente.
+INSERT INTO internship_plans (aluno_id, discipline_id, `date`, start_time, end_time, location, note)
+SELECT u.id, NULL, cal.d AS `date`, '08:00', '12:00', 'UBS Central', 'Plano (seed) manhã'
+FROM users u
+JOIN (
+  SELECT DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL n.n DAY) AS d
+  FROM (
+    SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+    UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
+    UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14
+    UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19
+    UNION ALL SELECT 20 UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24
+    UNION ALL SELECT 25 UNION ALL SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29
+    UNION ALL SELECT 30
+  ) n
+  WHERE n.n <= DAY(LAST_DAY(CURDATE())) - 1
+) cal ON DAYOFWEEK(cal.d) BETWEEN 2 AND 6 -- 2=Mon .. 6=Fri
+WHERE u.role = 'ALUNO';
+
+-- Inserir planos (tarde) apenas em dias pares (sem CTE)
+INSERT INTO internship_plans (aluno_id, discipline_id, `date`, start_time, end_time, location, note)
+SELECT u.id, NULL, cal.d AS `date`, '14:00', '18:00', 'UBS Central', 'Plano (seed) tarde'
+FROM users u
+JOIN (
+  SELECT DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL n.n DAY) AS d
+  FROM (
+    SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+    UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
+    UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14
+    UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19
+    UNION ALL SELECT 20 UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24
+    UNION ALL SELECT 25 UNION ALL SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29
+    UNION ALL SELECT 30
+  ) n
+  WHERE n.n <= DAY(LAST_DAY(CURDATE())) - 1
+) cal ON DAYOFWEEK(cal.d) BETWEEN 2 AND 6 AND MOD(DAYOFMONTH(cal.d), 2) = 0
+WHERE u.role = 'ALUNO';
+
+-- Justificativas PENDING no dia 15 (marca ORANGE)
+INSERT INTO internship_justifications (aluno_id, `date`, type, reason, status)
+SELECT u.id, DATE_FORMAT(CURDATE(), '%Y-%m-15'), 'GENERAL', 'Compromisso pessoal (seed)', 'PENDING'
+FROM users u WHERE u.role = 'ALUNO';
+
+-- Justificativas APPROVED no dia 05
+INSERT INTO internship_justifications (aluno_id, `date`, type, reason, status, reviewed_by, reviewed_at)
+SELECT u.id, DATE_FORMAT(CURDATE(), '%Y-%m-05'), 'HEALTH', 'Atestado médico (seed)', 'APPROVED', 3, NOW()
+FROM users u WHERE u.role = 'ALUNO';
+
 SET foreign_key_checks = 1;
 SET unique_checks = 1;
 -- FIM DO SCRIPT ÚNICO

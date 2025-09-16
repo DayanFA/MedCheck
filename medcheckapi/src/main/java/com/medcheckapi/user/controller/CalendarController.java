@@ -4,12 +4,14 @@ import com.medcheckapi.user.model.*;
 import com.medcheckapi.user.repository.UserRepository;
 import com.medcheckapi.user.repository.InternshipPlanRepository;
 import com.medcheckapi.user.repository.InternshipJustificationRepository;
+import com.medcheckapi.user.repository.DisciplineRepository;
 import com.medcheckapi.user.service.CalendarService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Map;
 
@@ -20,9 +22,10 @@ public class CalendarController {
     private final CalendarService calendarService;
     private final InternshipPlanRepository planRepo;
     private final InternshipJustificationRepository justRepo;
+    private final DisciplineRepository discRepo;
 
-    public CalendarController(UserRepository userRepo, CalendarService calendarService, InternshipPlanRepository planRepo, InternshipJustificationRepository justRepo) {
-        this.userRepo = userRepo; this.calendarService = calendarService; this.planRepo = planRepo; this.justRepo = justRepo;
+    public CalendarController(UserRepository userRepo, CalendarService calendarService, InternshipPlanRepository planRepo, InternshipJustificationRepository justRepo, DisciplineRepository discRepo) {
+        this.userRepo = userRepo; this.calendarService = calendarService; this.planRepo = planRepo; this.justRepo = justRepo; this.discRepo = discRepo;
     }
 
     private User currentUser(org.springframework.security.core.userdetails.User principal) {
@@ -31,9 +34,14 @@ public class CalendarController {
 
     @GetMapping("/month")
     public ResponseEntity<?> month(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
-                                   @RequestParam int year, @RequestParam int month) {
+                                   @RequestParam int year, @RequestParam int month,
+                                   @RequestParam(required = false) Long alunoId) {
         User me = currentUser(principal);
-        return ResponseEntity.ok(calendarService.monthView(me, year, month));
+        User target = me;
+        if (alunoId != null && (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN)) {
+            target = userRepo.findById(alunoId).orElse(me);
+        }
+        return ResponseEntity.ok(calendarService.monthView(target, year, month));
     }
 
     @PostMapping("/plan")
@@ -141,5 +149,56 @@ public class CalendarController {
             justRepo.delete(j);
             return ResponseEntity.ok(Map.of("deleted", true));
         }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // PRECEPTOR/ADMIN: revisar (aprovar/reprovar) justificativa PENDING de um aluno
+    @PostMapping("/justify/review")
+    public ResponseEntity<?> reviewJustification(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                                 @RequestBody Map<String, String> body) {
+        User me = currentUser(principal);
+        if (me.getRole() != Role.PRECEPTOR && me.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Sem permissão"));
+        }
+        try {
+            Long alunoId = Long.valueOf(body.getOrDefault("alunoId", "0"));
+            String dateStr = body.get("date");
+            String action = String.valueOf(body.get("action")).toUpperCase(); // APPROVED or REJECTED
+            String note = body.getOrDefault("note", "");
+            if (!"APPROVED".equals(action) && !"REJECTED".equals(action)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Ação inválida"));
+            }
+            User aluno = userRepo.findById(alunoId).orElseThrow();
+            LocalDate date = LocalDate.parse(dateStr);
+            InternshipJustification j = justRepo.findFirstByAlunoAndDate(aluno, date).orElse(null);
+            if (j == null) return ResponseEntity.notFound().build();
+            if (!"PENDING".equalsIgnoreCase(j.getStatus())) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Justificativa já revisada"));
+            }
+            // Verifica vínculo do preceptor com a disciplina da justificativa (ou disciplina atual do aluno como fallback)
+            if (me.getRole() == Role.PRECEPTOR) {
+                Discipline target = j.getDiscipline() != null ? j.getDiscipline() : aluno.getCurrentDiscipline();
+                if (target != null) {
+                    boolean belongs = discRepo.findByPreceptors_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(target.getId()));
+                    if (!belongs) {
+                        return ResponseEntity.status(403).body(Map.of("error", "Preceptor não vinculado à disciplina"));
+                    }
+                    if (j.getDiscipline() == null) j.setDiscipline(target);
+                }
+                // Se não há disciplina definida (nem na justificativa, nem no aluno), segue sem bloquear
+            }
+            j.setStatus(action);
+            j.setReviewedBy(me);
+            j.setReviewedAt(LocalDateTime.now());
+            j.setReviewNote(note);
+            justRepo.save(j);
+            return ResponseEntity.ok(Map.of(
+                    "id", j.getId(),
+                    "date", j.getDate().toString(),
+                    "status", j.getStatus(),
+                    "reviewedBy", me.getId()
+            ));
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
     }
 }

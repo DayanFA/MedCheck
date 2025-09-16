@@ -13,6 +13,8 @@
 .cell.empty { background: transparent; border: none; cursor: default; }
 .day-number { position: absolute; top: .25rem; left: .35rem; font-weight: 600; color: #333; }
 .dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; }
+.dot-wrap { position: relative; display: inline-block; }
+.verdict-bang { position: absolute; top: -8px; right: -8px; background: #212529; color: #fff; font-weight: 700; font-size: 12px; line-height: 16px; width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px #fff; }
 .status-blue { background: #d8e9ff; border-color: #2f7bf6; }
 .status-red { background: #ffd8d8; border-color: #ff3b3b; }
 .status-yellow { background: #fff4cc; border-color: #ffcc00; }

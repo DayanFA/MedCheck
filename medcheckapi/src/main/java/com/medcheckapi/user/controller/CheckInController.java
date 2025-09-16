@@ -79,11 +79,16 @@ public class CheckInController {
     // ALUNO: list sessions for date range (filters: 3Dias, 3Semanas, Tudo handled client side)
     @GetMapping("/sessions")
     public ResponseEntity<?> sessions(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
-                                      @RequestParam String start, @RequestParam String end) {
+                                      @RequestParam String start, @RequestParam String end,
+                                      @RequestParam(required = false) Long alunoId) {
         User me = currentUser(principal);
         LocalDate s = LocalDate.parse(start);
         LocalDate e = LocalDate.parse(end);
-        return ResponseEntity.ok(checkInService.listSessionsForAluno(me.getId(), s, e));
+        Long targetId = me.getId();
+        if (alunoId != null && (me.getRole() == com.medcheckapi.user.model.Role.PRECEPTOR || me.getRole() == com.medcheckapi.user.model.Role.ADMIN)) {
+            targetId = alunoId;
+        }
+        return ResponseEntity.ok(checkInService.listSessionsForAluno(targetId, s, e));
     }
 
     // ALUNO: status (open or not + worked seconds today)

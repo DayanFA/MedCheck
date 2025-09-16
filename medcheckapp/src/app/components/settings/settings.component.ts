@@ -23,14 +23,10 @@ export class SettingsComponent implements OnDestroy {
   msg = '';
   photoUrl = '';
   private photoObjectUrl: string | null = null;
+  private hasAvatar = false;
 
   ngOnInit() {
     this.loadMe();
-    // Tenta carregar a foto sempre no browser; se não houver, fica no ícone
-    if (isPlatformBrowser(this.platformId)) {
-      // atraso mínimo para garantir token em storage
-      setTimeout(() => this.loadPhoto(), 0);
-    }
   }
 
   ngOnDestroy(): void {
@@ -47,14 +43,22 @@ export class SettingsComponent implements OnDestroy {
     this.auth.me().subscribe({
       next: (me: any) => {
         this.phone = this.formatPhoneNumber(me?.phone || '');
+        this.hasAvatar = !!me?.hasAvatar;
         this.loading = false;
+        // Carrega a foto apenas se existir, evitando 404 desnecessário
+        if (isPlatformBrowser(this.platformId) && this.hasAvatar) {
+          this.loadPhoto();
+        } else if (!this.hasAvatar) {
+          this.clearPhotoUrl();
+        }
       },
       error: _ => { this.loading = false; this.msg = 'Falha ao carregar dados'; }
     });
   }
 
   private loadPhoto() {
-    this.http.get('/api/users/me/photo', { headers: this.headers(), responseType: 'blob' }).subscribe({
+    const ts = Date.now();
+    this.http.get(`/api/users/me/photo?t=${ts}` as string, { headers: this.headers(), responseType: 'blob' }).subscribe({
       next: (blob) => {
         this.clearPhotoUrl();
         const url = URL.createObjectURL(blob);
@@ -95,7 +99,7 @@ export class SettingsComponent implements OnDestroy {
     form.append('file', file);
     this.saving = true; this.msg='';
     this.http.post('/api/users/me/photo', form, { headers: this.headers() }).subscribe({
-      next: _ => { this.saving=false; this.msg='Foto atualizada'; this.loadPhoto(); this.refreshCachedUser(true); },
+      next: _ => { this.saving=false; this.msg='Foto atualizada'; this.hasAvatar = true; this.loadPhoto(); this.refreshCachedUser(true); },
       error: _ => { this.saving=false; this.msg='Falha ao enviar foto'; }
     });
   }
@@ -103,15 +107,32 @@ export class SettingsComponent implements OnDestroy {
   removePhoto() {
     this.saving = true; this.msg='';
     this.http.delete('/api/users/me/photo', { headers: this.headers() }).subscribe({
-      next: _ => { this.saving=false; this.msg='Foto removida'; this.clearPhotoUrl(); this.refreshCachedUser(true); },
+      next: _ => { this.saving=false; this.msg='Foto removida'; this.hasAvatar = false; this.clearPhotoUrl(); this.refreshCachedUser(true); },
       error: _ => { this.saving=false; this.msg='Falha ao remover foto'; }
     });
   }
 
   private refreshCachedUser(force?: boolean) {
-    // optionally update local cached user with new phone
+    // Atualiza imediatamente o cache do usuário com dados completos (inclui hasAvatar)
     try {
-      this.auth.me().subscribe(u => this.auth.setUser(u, true));
+      const remember = this.auth.isRemembered();
+      this.http.get('/api/users/me', { headers: this.headers() }).subscribe({
+        next: (profile: any) => {
+          try {
+            const raw = localStorage.getItem('mc_user') || sessionStorage.getItem('mc_user') || '{}';
+            const cached = JSON.parse(raw || '{}');
+            const merged = { ...cached, ...profile };
+            this.auth.setUser(merged, remember);
+            this.hasAvatar = !!merged?.hasAvatar;
+            if (this.hasAvatar) {
+              this.loadPhoto();
+            } else {
+              this.clearPhotoUrl();
+            }
+          } catch { /* ignore parse errors */ }
+        },
+        error: _ => { /* ignore */ }
+      });
     } catch {}
   }
 

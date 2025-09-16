@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnDestroy, OnInit, Inject, PLATFORM_ID, NgZone } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { CheckInService } from '../../services/checkin.service';
 import { UserService, CurrentUser } from '../../services/user.service';
@@ -43,13 +43,20 @@ export class HomeComponent implements OnInit, OnDestroy {
   // Disciplina atual do aluno
   disciplines: any[] = [];
   selectedDisciplineId: number | null = null;
-  constructor(private userService: UserService, private auth: AuthService, private router: Router, private check: CheckInService, private http: HttpClient, @Inject(PLATFORM_ID) private platformId: Object) {}
+  constructor(private userService: UserService, private auth: AuthService, private router: Router, private check: CheckInService, private http: HttpClient, @Inject(PLATFORM_ID) private platformId: Object, private zone: NgZone) {}
+
+  private userUpdatedListener = (e: any) => {
+    try {
+      // Quando o usuário em cache mudar (por upload/remoção de foto), recarregar avatar
+      if (isPlatformBrowser(this.platformId)) this.loadAvatarIfAny();
+    } catch {}
+  };
 
   ngOnInit(): void {
     // Restaura baseline persistido (secs + ts) para evitar reset visual
     this.loadWorkedCache();
   const cached = (this.auth as any).getUser?.();
-    if (cached && cached.name) {
+  if (cached && cached.name) {
       this.user = {
         name: cached.name,
         matricula: cached.matricula || '',
@@ -68,7 +75,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.loadWorkedCache();
       this.inService = this.user.status === 'Em serviço';
       this.firstName = (this.user.name || '').split(' ')[0];
-  if (isPlatformBrowser(this.platformId)) this.loadAvatar();
+  if (isPlatformBrowser(this.platformId)) this.loadAvatarIfAny();
       this.loading = false;
       // IMPORTANTE: carrega lista de disciplinas quando usuário vem do cache
       this.loadDisciplinesAndSelection();
@@ -102,7 +109,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             return;
           }
           this.firstName = (this.user.name || '').split(' ')[0];
-          if (isPlatformBrowser(this.platformId)) this.loadAvatar();
+          if (isPlatformBrowser(this.platformId)) this.loadAvatarIfAny();
           this.loading = false;
           this.updateCacheKeyWithUser();
           this.loadWorkedCache();
@@ -113,14 +120,29 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   this.updateTime();
   this.loadStatus();
-  this.statusInterval = setInterval(()=> this.refreshDynamic(), 1000);
-    this.intervalId = window.setInterval(() => this.updateTime(), 1000);
+  // Mover timers para fora da zona Angular para não bloquear estabilização/hidratação
+  this.zone.runOutsideAngular(() => {
+    this.statusInterval = setInterval(() => {
+      // Reentrar na zona apenas para atualizar o estado
+      this.zone.run(() => this.refreshDynamic());
+    }, 1000);
+    this.intervalId = window.setInterval(() => {
+      this.zone.run(() => this.updateTime());
+    }, 1000);
+  });
+  // Ouve atualizações do usuário (ex.: upload/remoção de foto) para atualizar avatar imediatamente
+  if (isPlatformBrowser(this.platformId)) {
+    window.addEventListener('mc:user-updated', this.userUpdatedListener as any);
+  }
   }
 
   ngOnDestroy(): void {
   if (this.intervalId) window.clearInterval(this.intervalId);
   if (this.statusInterval) clearInterval(this.statusInterval);
   this.clearAvatarUrl();
+  if (isPlatformBrowser(this.platformId)) {
+    window.removeEventListener('mc:user-updated', this.userUpdatedListener as any);
+  }
   }
 
   private updateTime() {
@@ -235,7 +257,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private loadAvatar() {
-    this.http.get('/api/users/me/photo', { headers: this.headers(), responseType: 'blob' }).subscribe({
+    const ts = Date.now();
+    this.http.get(`/api/users/me/photo?t=${ts}` as string, { headers: this.headers(), responseType: 'blob' }).subscribe({
       next: blob => {
         this.clearAvatarUrl();
         const url = URL.createObjectURL(blob);
@@ -244,6 +267,15 @@ export class HomeComponent implements OnInit, OnDestroy {
       },
       error: _ => { this.clearAvatarUrl(); }
     });
+  }
+
+  private loadAvatarIfAny() {
+    try {
+      const raw = localStorage.getItem('mc_user') || sessionStorage.getItem('mc_user');
+      const u = raw ? JSON.parse(raw) : null;
+      if (!u || u.hasAvatar !== true) { this.clearAvatarUrl(); return; }
+    } catch {}
+    this.loadAvatar();
   }
 
   private clearAvatarUrl() {

@@ -26,12 +26,12 @@ export class ShellComponent implements OnInit, OnDestroy {
         const u = JSON.parse(e.newValue);
         this.applyDisciplineFromUser(u);
         // Reload avatar when user cache changes (e.g., after updating profile photo)
-        this.loadAvatar();
+        this.loadAvatarIfAny();
       } catch {}
     }
   };
   private userUpdatedListener = (e: any) => {
-    try { this.applyDisciplineFromUser(e?.detail); this.loadAvatar(); } catch {}
+    try { this.applyDisciplineFromUser(e?.detail); this.loadAvatarIfAny(); } catch {}
   };
   constructor(private userService: UserService, private auth: AuthService, private http: HttpClient, @Inject(PLATFORM_ID) private platformId: Object) {}
 
@@ -55,7 +55,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     // Carrega avatar apenas no browser (evita SSR sem token)
     if (isPlatformBrowser(this.platformId)) {
       // Pequeno atraso para garantir que o token seja restaurado pelos storages
-      setTimeout(() => { this.loadAvatar(); this.loadUserDetails(); }, 0);
+      setTimeout(() => { this.loadAvatarIfAny(); this.loadUserDetails(); }, 0);
       // Ouve alterações no usuário em cache para refletir disciplina no header
       window.addEventListener('storage', this.storageListener);
       window.addEventListener('mc:user-updated', this.userUpdatedListener as any);
@@ -91,6 +91,16 @@ export class ShellComponent implements OnInit, OnDestroy {
       },
       error: _ => { this.clearAvatarUrl(); }
     });
+  }
+
+  private loadAvatarIfAny() {
+    // Consultar cache e evitar 404s desnecessários quando não há avatar
+    try {
+      const raw = localStorage.getItem('mc_user') || sessionStorage.getItem('mc_user');
+      const u = raw ? JSON.parse(raw) : null;
+      if (!u || u.hasAvatar !== true) { this.clearAvatarUrl(); return; }
+    } catch { /* ignore parse errors */ }
+    this.loadAvatar();
   }
 
   private clearAvatarUrl() {
@@ -147,6 +157,8 @@ export class ShellComponent implements OnInit, OnDestroy {
           sessionStorage.removeItem('mc_user');
           if (remember) localStorage.setItem('mc_user', JSON.stringify(merged)); else sessionStorage.setItem('mc_user', JSON.stringify(merged));
           window.dispatchEvent(new CustomEvent('mc:user-updated', { detail: merged }));
+          // tenta carregar avatar se perfil indica que há
+          if (isPlatformBrowser(this.platformId)) this.loadAvatarIfAny();
           // aplica imediatamente no header
           this.applyDisciplineFromUser(merged);
         } catch {}

@@ -32,7 +32,8 @@ export class AuthService {
   me(): Observable<any> {
     const token = this.getToken();
     const headers: any = token ? { Authorization: `Bearer ${token}` } : {};
-    return this.http.get(`${this.apiUrl}/me`, { headers });
+    // Use o endpoint de perfil completo para incluir campos como hasAvatar e disciplina atual
+    return this.http.get(`/api/users/me`, { headers });
   }
 
   setToken(token: string, remember: boolean) {

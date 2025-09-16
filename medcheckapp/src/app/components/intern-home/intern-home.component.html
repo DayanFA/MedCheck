@@ -1,13 +1,13 @@
 <div class="home-container p-0" *ngIf="!loading; else loadingTpl">
   <div class="content-box mx-auto">
     <div class="row g-4 align-items-start profile-row">
-      <div class="col-md-3 text-center">
-        <div class="profile-pic rounded d-flex align-items-center justify-content-center overflow-hidden">
+      <div class="col-12 col-md-3 text-center mb-3 mb-md-0">
+        <div class="profile-pic rounded d-flex align-items-center justify-content-center overflow-hidden mx-auto">
           <img *ngIf="avatarUrl" [src]="avatarUrl" alt="Foto de perfil" class="w-100 h-100 object-fit-cover" />
           <i *ngIf="!avatarUrl" class="bi bi-person-fill fs-1"></i>
         </div>
       </div>
-      <div class="col-md-9 profile-details small">
+      <div class="col-12 col-md-9 profile-details small ps-md-3 text-break">
         <p class="mb-1"><strong>Nome:</strong> {{user.name}}</p>
         <p class="mb-1"><strong>Matrícula:</strong> {{user.matricula}}</p>
   <p class="mb-1"><strong>CPF:</strong> {{ formatCpf(user.cpf) }}</p>
@@ -15,7 +15,7 @@
       </div>
     </div>
     <hr class="my-4" />
-    <div class="row text-center mb-4">
+    <div class="row row-cols-1 row-cols-sm-3 g-3 g-sm-0 text-center align-items-center mb-4">
       <div class="col status small">
         <strong>Status:</strong>
         <span [class.text-success]="inService" [class.text-danger]="!inService">
@@ -33,7 +33,7 @@
       </div>
     </div>
     <div class="row mb-3" *ngIf="role==='ALUNO'">
-      <div class="col-md-6">
+      <div class="col-12 col-md-6">
         <label class="form-label small fw-semibold">Internato Atual</label>
         <select class="form-select form-select-sm" [(ngModel)]="selectedDisciplineId" (ngModelChange)="onChangeDiscipline()">
           <option [ngValue]="null">Selecione...</option>
@@ -45,9 +45,9 @@
         </div>
       </div>
     </div>
-    <div class="text-center position-relative">
+    <div class="text-center position-relative d-grid d-sm-block">
       <button (click)="onPrimaryAction()"
-              class="btn fw-semibold px-4"
+              class="btn fw-semibold px-4 w-100 w-sm-auto"
               [ngClass]="inService ? 'btn-warning' : 'btn-primary'"
               [disabled]="performing || submitting">
         <ng-container *ngIf="!inService; else checkoutLabel">

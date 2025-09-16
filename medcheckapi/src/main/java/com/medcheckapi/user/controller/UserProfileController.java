@@ -25,25 +25,31 @@ public class UserProfileController {
 	public UserProfileController(UserRepository userRepository, DisciplineRepository disciplineRepository) { this.userRepository = userRepository; this.disciplineRepository = disciplineRepository; }
 
 	private User currentUser(org.springframework.security.core.userdetails.User principal) {
-		return userRepository.findByCpf(principal.getUsername()).orElseThrow();
+		if (principal == null) return null;
+		return userRepository.findByCpf(principal.getUsername()).orElse(null);
 	}
 
 	@GetMapping
 	public ResponseEntity<?> me(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
 		User u = currentUser(principal);
+		if (u == null) {
+			return ResponseEntity.status(401).body(Map.of("error", "unauthenticated"));
+		}
 		List<Discipline> preceptorDiscs = disciplineRepository.findByPreceptors_Id(u.getId());
-		return ResponseEntity.ok(Map.of(
-				"id", u.getId(),
-				"name", u.getName(),
-				"cpf", u.getCpf(),
-				"phone", Optional.ofNullable(u.getPhone()).orElse(""),
-				"role", u.getRole().name(),
-				"hasAvatar", u.getAvatar() != null && u.getAvatar().length > 0,
-				"currentDisciplineId", u.getCurrentDiscipline() == null ? null : u.getCurrentDiscipline().getId(),
-				"currentDisciplineName", u.getCurrentDiscipline() == null ? null : u.getCurrentDiscipline().getName(),
-				"currentDisciplineCode", u.getCurrentDiscipline() == null ? null : u.getCurrentDiscipline().getCode(),
-				"preceptorDisciplines", preceptorDiscs
-		));
+		java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+		resp.put("id", u.getId());
+		resp.put("name", u.getName());
+		resp.put("matricula", Optional.ofNullable(u.getMatricula()).orElse(""));
+		resp.put("cpf", u.getCpf());
+		resp.put("email", Optional.ofNullable(u.getInstitutionalEmail()).orElse(""));
+		resp.put("phone", Optional.ofNullable(u.getPhone()).orElse(""));
+		resp.put("role", u.getRole().name());
+		resp.put("hasAvatar", u.getAvatar() != null && u.getAvatar().length > 0);
+		resp.put("currentDisciplineId", u.getCurrentDiscipline() == null ? null : u.getCurrentDiscipline().getId());
+		resp.put("currentDisciplineName", u.getCurrentDiscipline() == null ? null : u.getCurrentDiscipline().getName());
+		resp.put("currentDisciplineCode", u.getCurrentDiscipline() == null ? null : u.getCurrentDiscipline().getCode());
+		resp.put("preceptorDisciplines", preceptorDiscs);
+		return ResponseEntity.ok(resp);
 	}
 
 	@PutMapping

@@ -26,6 +26,29 @@ button.btn-warning:hover { background-color: color.scale(#ffd400, $lightness: -1
 .profile-row { margin-bottom: .75rem; }
 .status { font-size: .9rem; }
 
+// Responsividade e ajustes de tipografia para evitar colisão com a imagem
+.profile-details {
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 768px) {
+  .profile-details {
+    // um pequeno recuo quando ao lado do avatar
+    padding-left: .5rem;
+  }
+}
+
+// Em telas menores, centralizar avatar
+@media (max-width: 767.98px) {
+  .profile-pic { margin-left: auto; margin-right: auto; }
+  .content-box { padding: 1.5rem 1.25rem; }
+  .time-display { font-size: 2.2rem; }
+  .hours-display { font-size: .95rem; }
+  .profile-details { font-size: .95rem; }
+  .profile-row { margin-bottom: 1rem; }
+}
+
 // Modal estilos (reutilizado padrão do aluno)
 .checkout-modal-backdrop {
   position: fixed;
@@ -43,3 +66,6 @@ button.btn-warning:hover { background-color: color.scale(#ffd400, $lightness: -1
   border-radius: 14px;
   box-shadow: 0 12px 32px rgba(0,0,0,.25);
 }
+
+// utilitário: garante espaçamento quando o botão vira full-width
+.d-grid > .btn { margin-top: .5rem; }

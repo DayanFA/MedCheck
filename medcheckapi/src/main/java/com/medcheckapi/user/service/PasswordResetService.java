@@ -74,6 +74,7 @@ public class PasswordResetService {
     Optional<User> opt = userRepository.findByInstitutionalEmailIgnoreCase(email);
         if (opt.isEmpty()) {
             // Não revela inexistência
+            log.info("[RESET_EMAIL] Requested for non-existent email={} (silently ignoring)", email);
             return;
         }
         User user = opt.get();
@@ -85,7 +86,15 @@ public class PasswordResetService {
 
         String link = baseUrl + "?token=" + token.getToken();
         if (logLink) {
-            log.info("[RESET_LINK] link={} expiresAt={} userEmail={}", link, token.getExpiresAt(), user.getInstitutionalEmail());
+            log.info("[RESET_LINK] link={} expiresAt={} userEmail={} smtpUserPresent={} from={} auth={} starttls={}",
+                link,
+                token.getExpiresAt(),
+                user.getInstitutionalEmail(),
+                (smtpUser != null && !smtpUser.isBlank()),
+                mailFrom,
+                smtpAuth,
+                System.getProperty("mail.smtp.starttls.enable")
+            );
         }
         // Caso SMTP exija autenticação mas faltem credenciais, não enviar
         if (smtpAuth && (smtpUser == null || smtpUser.isBlank() || smtpPass == null || smtpPass.isBlank())) {
@@ -100,6 +109,10 @@ public class PasswordResetService {
             }
             msg.setSubject("Redefinição de Senha");
             msg.setText("Olá,\n\nClique no link para redefinir sua senha: " + link + "\n\nSe não solicitou, ignore.");
+            log.info("[RESET_EMAIL] Attempting send host={} userPresent={} from={}",
+                System.getProperty("spring.mail.host"),
+                (smtpUser != null && !smtpUser.isBlank()),
+                mailFrom);
             mailSender.send(msg);
             log.info("[RESET_EMAIL] Sent reset email to {}", user.getInstitutionalEmail());
         } catch (Exception e) {

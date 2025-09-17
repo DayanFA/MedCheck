@@ -30,6 +30,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.medcheckapi.user.service.PasswordResetService;
 import com.medcheckapi.user.repository.PasswordResetTokenRepository;
 import com.medcheckapi.user.model.PasswordResetToken;
+import org.springframework.core.env.Environment;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -54,6 +55,9 @@ public class AuthController {
 
     @Autowired
     PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Autowired
+    Environment environment;
 
     @PostMapping("/signin")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
@@ -217,6 +221,27 @@ public class AuthController {
         resp.put("token", token.getToken());
         resp.put("expiresAt", token.getExpiresAt());
         resp.put("used", token.isUsed());
+        return ResponseEntity.ok(resp);
+    }
+
+    // DEV ONLY: Exibe configuracao de mail carregada. REMOVER em produção.
+    @GetMapping(value = "/dev/mail-config", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> mailConfig(){
+        java.util.Map<String,Object> resp = new java.util.HashMap<>();
+        String host = environment.getProperty("spring.mail.host");
+        String port = environment.getProperty("spring.mail.port");
+        String user = environment.getProperty("spring.mail.username");
+        String from = environment.getProperty("app.mail.from", environment.getProperty("spring.mail.username"));
+        String auth = environment.getProperty("spring.mail.properties.mail.smtp.auth","true");
+        String starttls = environment.getProperty("spring.mail.properties.mail.smtp.starttls.enable","true");
+        boolean canSend = (!"true".equalsIgnoreCase(auth)) || (user != null && !user.isBlank());
+        resp.put("host", host);
+        resp.put("port", port);
+        resp.put("usernamePresent", user != null && !user.isBlank());
+        resp.put("from", from);
+        resp.put("auth", auth);
+        resp.put("starttls", starttls);
+        resp.put("canSendDerived", canSend);
         return ResponseEntity.ok(resp);
     }
     private boolean isValidCpf(String raw) {

@@ -35,6 +35,9 @@ public class InternshipPlan {
     @Column(columnDefinition = "TEXT")
     private String note;
 
+    @Column(name = "week_number")
+    private Integer weekNumber; // 1..10 (opcional)
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -57,6 +60,8 @@ public class InternshipPlan {
     public void setLocation(String location) { this.location = location; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+    public Integer getWeekNumber() { return weekNumber; }
+    public void setWeekNumber(Integer weekNumber) { this.weekNumber = weekNumber; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

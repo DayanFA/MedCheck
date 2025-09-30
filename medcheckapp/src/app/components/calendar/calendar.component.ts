@@ -36,6 +36,9 @@ export class UserCalendarComponent {
   formEnd = signal<string>('12:00');
   formLocation = signal<string>('');
   formNote = signal<string>('');
+  // week selection (1..10) for the plan (UI only for now – not persisted in backend payload yet)
+  weeksOptions = Array.from({ length: 10 }, (_, i) => i + 1);
+  selectedWeek = signal<number>(1);
 
   // justification form
   justDate = signal<string>('');
@@ -146,6 +149,7 @@ export class UserCalendarComponent {
     this.formEnd.set('12:00');
     this.formLocation.set('');
     this.formNote.set('');
+    // Keep previously selected week; do not auto-reset to preserve user's context.
     // load day sessions
   this.loadDaySessions(dateIso);
     // preload justification state if exists
@@ -169,6 +173,7 @@ export class UserCalendarComponent {
       endTime: this.formEnd(),
       location: this.formLocation(),
       note: this.formNote() || undefined,
+      weekNumber: this.selectedWeek(),
     };
     this.api.upsertPlan(payload).subscribe((resp: any) => {
       const saved = resp?.plan || payload;

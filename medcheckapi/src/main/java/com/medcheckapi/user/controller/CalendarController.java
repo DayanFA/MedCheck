@@ -57,8 +57,15 @@ public class CalendarController {
             return ResponseEntity.badRequest().body(Map.of("error", "Local é obrigatório"));
         }
         String note = body.getOrDefault("note", null);
+        Integer weekNumber = null;
+        if (body.containsKey("weekNumber")) {
+            try {
+                weekNumber = Integer.valueOf(body.get("weekNumber"));
+                if (weekNumber < 1 || weekNumber > 52) weekNumber = null; // sanity
+            } catch (Exception ignored) {}
+        }
         InternshipPlan p = id == null ? new InternshipPlan() : planRepo.findById(id).orElse(new InternshipPlan());
-    p.setAluno(me); p.setDate(date); p.setStartTime(start); p.setEndTime(end); p.setLocation(location); p.setNote(note);
+    p.setAluno(me); p.setDate(date); p.setStartTime(start); p.setEndTime(end); p.setLocation(location); p.setNote(note); p.setWeekNumber(weekNumber);
     // Disciplina atual do aluno vincula o plano
     p.setDiscipline(me.getCurrentDiscipline());
         p = planRepo.save(p);
@@ -69,7 +76,8 @@ public class CalendarController {
                 "endTime", p.getEndTime().toString(),
                 "location", p.getLocation(),
                 "note", p.getNote(),
-                "plannedSeconds", p.getPlannedSeconds()
+                "plannedSeconds", p.getPlannedSeconds(),
+                "weekNumber", p.getWeekNumber()
         )));
     }
 

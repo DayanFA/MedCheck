@@ -104,6 +104,7 @@ CREATE TABLE internship_plans (
   date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
+  week_number INT NULL,
   location VARCHAR(160) NOT NULL,
   note TEXT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

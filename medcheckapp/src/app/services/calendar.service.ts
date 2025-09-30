@@ -17,6 +17,7 @@ export interface InternshipPlanDto {
   endTime: string;   // HH:mm
   location?: string;
   note?: string;
+  weekNumber?: number;
 }
 
 @Injectable({ providedIn: 'root' })

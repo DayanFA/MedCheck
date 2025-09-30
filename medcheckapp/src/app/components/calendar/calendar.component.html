@@ -73,6 +73,12 @@
               <input class="form-control" type="time" [readonly]="alunoId()" [ngModel]="formEnd()" (ngModelChange)="formEnd.set($event)" />
             </div>
             <div class="col-12">
+              <label class="form-label">Semana</label>
+              <select class="form-select w-auto" [ngModel]="selectedWeek()" (ngModelChange)="selectedWeek.set(+($event))">
+                <option *ngFor="let w of weeksOptions" [ngValue]="w">{{ w }}</option>
+              </select>
+            </div>
+            <div class="col-12">
               <label class="form-label">Local <span class="text-danger">*</span></label>
               <input class="form-control" placeholder="Ex: Clínica X" [readonly]="alunoId()" required [ngModel]="formLocation()" (ngModelChange)="formLocation.set($event)" />
             </div>

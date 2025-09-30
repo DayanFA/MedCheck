@@ -84,6 +84,7 @@ public class CalendarService {
         m.put("location", p.getLocation());
         m.put("note", p.getNote());
         m.put("plannedSeconds", p.getPlannedSeconds());
+        if (p.getWeekNumber() != null) m.put("weekNumber", p.getWeekNumber());
         return m;
     }
 

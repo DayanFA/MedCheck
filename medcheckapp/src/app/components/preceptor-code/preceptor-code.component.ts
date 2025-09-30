@@ -144,15 +144,17 @@ export class PreceptorCodeComponent implements OnInit, OnDestroy {
         const prev = this.code?.code;
         this.code = c; 
         this.loading = false; this.initialized = true;
-        this.secondsLeft = (c.secondsRemaining ?? 0);
-        // clamp para casos anômalos (evita 300:22 e progress quase zero)
-        if (this.secondsLeft > 120) this.secondsLeft = 60;
-        this.totalWindow = 60; // forçamos 60s fixos para consistência visual
+        // Preferir cálculo baseado em expiresAt para evitar divergência de zona
         if (c.expiresAt) {
           this.expiresAtTs = Date.parse(c.expiresAt);
+          const diff = this.expiresAtTs - Date.now();
+          this.secondsLeft = Math.max(0, Math.floor(diff/1000));
         } else {
+          // fallback para secondsRemaining
+          this.secondsLeft = (c.secondsRemaining ?? 0);
           this.expiresAtTs = Date.now() + this.secondsLeft*1000;
         }
+        this.totalWindow = 60; // janela fixa
         if (prev !== c.code) { this.renderQR(); }
         this.restartTicker();
         this.fetching = false;

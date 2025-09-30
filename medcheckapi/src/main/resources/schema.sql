@@ -8,7 +8,8 @@
 -- ============================================================================
 
 SET NAMES utf8mb4;
-SET time_zone = '+00:00';
+-- Ajuste para fuso horário do Acre (-05:00) durante seeds de desenvolvimento
+SET time_zone = '-05:00';
 SET foreign_key_checks = 0;
 SET unique_checks = 0;
 

@@ -55,7 +55,7 @@ public class CheckCode {
     @Transient
     public long getSecondsRemaining() {
         // Usa o mesmo fuso fixo configurado na aplicação (GMT-5) para evitar discrepâncias de countdown
-        ZoneId zone = ZoneId.of("GMT-5");
+    ZoneId zone = ZoneId.of("America/Rio_Branco");
         return Math.max(0, Duration.between(LocalDateTime.now(zone), expiresAt).getSeconds());
     }
 }

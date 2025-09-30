@@ -36,8 +36,9 @@ public class CheckInService {
         return sb.toString();
     }
 
-    private static final ZoneId FIXED_ZONE = ZoneId.of("GMT-5");
-    private LocalDateTime fixedNow() { return LocalDateTime.now(FIXED_ZONE); }
+    // Fuso oficial do Acre (sem horário de verão atualmente)
+    private static final ZoneId ACRE_ZONE = ZoneId.of("America/Rio_Branco");
+    private LocalDateTime fixedNow() { return LocalDateTime.now(ACRE_ZONE); }
 
     @Transactional
     public Map<String,Object> getOrCreateCurrentCode(Long preceptorId) {
@@ -63,7 +64,7 @@ public class CheckInService {
         Map<String,Object> m = new HashMap<>();
         m.put("code", c.getCode());
     // Timestamp de expiração com offset -05:00 explícito
-    m.put("expiresAt", c.getExpiresAt().atZone(FIXED_ZONE).toOffsetDateTime().toString());
+    m.put("expiresAt", c.getExpiresAt().atZone(ACRE_ZONE).toOffsetDateTime().toString());
         m.put("secondsRemaining", c.getSecondsRemaining());
         return m;
     }
@@ -132,8 +133,8 @@ public class CheckInService {
         m.put("id", cs.getId());
         m.put("alunoId", cs.getAluno().getId());
         m.put("preceptorId", cs.getPreceptor().getId());
-    m.put("checkInTime", cs.getCheckInTime().atZone(FIXED_ZONE).toOffsetDateTime().toString());
-    m.put("checkOutTime", cs.getCheckOutTime() == null ? null : cs.getCheckOutTime().atZone(FIXED_ZONE).toOffsetDateTime().toString());
+    m.put("checkInTime", cs.getCheckInTime().atZone(ACRE_ZONE).toOffsetDateTime().toString());
+    m.put("checkOutTime", cs.getCheckOutTime() == null ? null : cs.getCheckOutTime().atZone(ACRE_ZONE).toOffsetDateTime().toString());
         m.put("validated", cs.isValidated());
         if (cs.getCheckOutTime() != null) {
             Duration d = cs.getWorkedDuration();
@@ -148,7 +149,7 @@ public class CheckInService {
 
     public Map<String,Object> statusForAluno(Long alunoId) {
         User aluno = userRepo.findById(alunoId).orElseThrow();
-    LocalDate today = LocalDate.now(FIXED_ZONE);
+    LocalDate today = LocalDate.now(ACRE_ZONE);
     List<CheckSession> todays = sessionRepo.findByAlunoAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, today.atStartOfDay(), today.atTime(23,59,59));
         long workedSecs = 0;
         Optional<CheckSession> open = Optional.empty();

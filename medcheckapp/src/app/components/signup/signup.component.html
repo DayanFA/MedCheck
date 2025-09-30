@@ -8,8 +8,8 @@
           <input type="text" class="form-control form-control-sm" [(ngModel)]="userData.name" name="name" required>
         </div>
         <div class="col-md-6">
-          <label class="form-label small">Matricula</label>
-          <input type="text" class="form-control form-control-sm" [(ngModel)]="userData.matricula" name="matricula" placeholder="" appMask="matricula">
+          <label class="form-label small">Matrícula *</label>
+          <input type="text" class="form-control form-control-sm" [(ngModel)]="userData.matricula" name="matricula" appMask="matricula" required pattern="[A-Za-z0-9]{3,40}">
         </div>
         <div class="col-md-6">
           <label class="form-label small">Data de nascimento *</label>

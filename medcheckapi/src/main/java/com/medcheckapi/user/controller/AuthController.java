@@ -102,6 +102,15 @@ public class AuthController {
                 signUpRequest.getName(), signUpRequest.getCpf(), signUpRequest.getInstitutionalEmail(),
                 signUpRequest.getBirthDate(), signUpRequest.getNaturalidade(), signUpRequest.getNacionalidade(), signUpRequest.getPhone());
         try {
+            // Matricula obrigatória agora
+            if (signUpRequest.getMatricula() == null || signUpRequest.getMatricula().isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiMessage("Matrícula obrigatória"));
+            }
+            // Aceita letras e números apenas (alfa-num), tamanho razoável 3-40
+            String matricula = signUpRequest.getMatricula().trim();
+            if (!matricula.matches("[A-Za-z0-9]{3,40}")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiMessage("Matrícula inválida (usar apenas letras e números, 3-40)"));
+            }
             if (signUpRequest.getCpf() == null || signUpRequest.getCpf().isBlank()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiMessage("CPF obrigatório"));
             }
@@ -116,13 +125,20 @@ public class AuthController {
             User user = new User();
             user.setName(signUpRequest.getName());
             user.setBirthDate(signUpRequest.getBirthDate());
-            user.setMatricula(signUpRequest.getMatricula());
+            user.setMatricula(matricula);
             user.setCpf(signUpRequest.getCpf());
             user.setNaturalidade(signUpRequest.getNaturalidade());
             user.setNacionalidade(signUpRequest.getNacionalidade());
             user.setPhone(signUpRequest.getPhone());
             user.setInstitutionalEmail(signUpRequest.getInstitutionalEmail());
             user.setPassword(passwordEncoder.encode(signUpRequest.getPassword()));
+
+            // Atribui role PRECEPTOR se matrícula corresponde ao código especial
+            String preceptorCode = environment.getProperty("app.preceptor.matricula-code", "PRECEPTORMASTER");
+            if (preceptorCode != null && preceptorCode.equalsIgnoreCase(matricula)) {
+                user.setRole(com.medcheckapi.user.model.Role.PRECEPTOR);
+                log.info("[SIGNUP] Elevating user cpf={} to PRECEPTOR via matricula code match", user.getCpf());
+            }
 
             userRepository.save(user);
             log.info("[SIGNUP] User created cpf={}", user.getCpf());

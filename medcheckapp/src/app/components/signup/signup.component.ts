@@ -72,6 +72,13 @@ export class SignupComponent implements OnInit {
   onSubmit() {
   // Ajustar payload conforme backend espera (adapte se necessário)
     this.errors = [];
+    // Matrícula obrigatória (alfa-numérica 3-40)
+    const matriculaTrim = (this.userData.matricula || '').trim();
+    if (!matriculaTrim) {
+      this.errors.push('Matrícula obrigatória.');
+    } else if (!/^[A-Za-z0-9]{3,40}$/.test(matriculaTrim)) {
+      this.errors.push('Matrícula inválida (use apenas letras e números, 3-40).');
+    }
     // Data de nascimento
     if (this.isBirthDateInvalid()) {
       this.errors.push('Data de nascimento inválida.');
@@ -107,7 +114,7 @@ export class SignupComponent implements OnInit {
     const payload: any = {
       name: this.userData.name.trim(),
       birthDate: birthDate ? birthDate.toISOString().substring(0,10) : null,
-      matricula: this.userData.matricula || null,
+      matricula: matriculaTrim || null,
       cpf: digitsCpf,
       naturalidade: this.userData.naturalidade,
       nacionalidade: this.userData.nacionalidade,

@@ -12,35 +12,39 @@ export class InputMaskDirective {
 
   @HostListener('input', ['$event']) onInput(e: Event) {
     const input = e.target as HTMLInputElement;
-    const raw = input.value.replace(/\D/g, '');
-    let formatted = raw;
+  const value = input.value;
+  // Para máscaras numéricas usamos apenas dígitos; para matrícula permitimos alfanumérico
+  const rawDigits = value.replace(/\D/g, '');
+  let formatted = rawDigits;
 
     if (this.maskPattern) {
-      formatted = this.applyPattern(raw, this.maskPattern);
+      formatted = this.applyPattern(rawDigits, this.maskPattern);
       input.value = formatted;
       return;
     }
-  if (this.maskType === 'cpf') {
-      formatted = raw
+    if (this.maskType === 'cpf') {
+      formatted = rawDigits
         .slice(0, 11)
         .replace(/(\d{3})(\d)/, '$1.$2')
         .replace(/(\d{3})(\d)/, '$1.$2')
         .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
     } else if (this.maskType === 'phone') {
       // Supports 10 or 11 digits
-      if (raw.length <= 10) {
-        formatted = raw
+      if (rawDigits.length <= 10) {
+        formatted = rawDigits
           .slice(0, 10)
           .replace(/(\d{2})(\d)/, '($1)$2')
           .replace(/(\d{4})(\d)/, '$1-$2');
       } else {
-        formatted = raw
+        formatted = rawDigits
           .slice(0, 11)
           .replace(/(\d{2})(\d)/, '($1)$2')
           .replace(/(\d{5})(\d)/, '$1-$2');
       }
     } else if (this.maskType === 'matricula') {
-      formatted = raw.slice(0, 12); // limita a 12 dígitos
+      // Permite letras e números; remove tudo que não for A-Z a-z 0-9, limita 40
+      const alnum = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+      formatted = alnum.slice(0, 40);
     }
     input.value = formatted;
   }

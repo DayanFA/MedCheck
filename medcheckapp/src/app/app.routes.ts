@@ -16,6 +16,7 @@ import { SettingsComponent } from './components/settings/settings.component';
 import { AdminUsersComponent } from './components/admin/admin-users.component';
 import { AdminDisciplinesComponent } from './components/admin/admin-disciplines.component';
 import { CoordinatorComponent } from './components/coordinator/coordinator.component';
+import { ReportComponent } from './components/report/report.component';
 
 export const routes: Routes = [
     { path: '', redirectTo: '/login', pathMatch: 'full' },
@@ -32,11 +33,12 @@ export const routes: Routes = [
             { path: 'checkin', component: AlunoCheckinComponent, canActivate: [roleGuard], data: { roles: ['ALUNO'] } },
             { path: 'preceptor/codigo', component: PreceptorCodeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
             { path: 'preceptor/home', component: PreceptorHomeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
-            { path: 'calendario', component: UserCalendarComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN'] } }
-            ,{ path: 'configuracoes', component: SettingsComponent }
-            ,{ path: 'admin/usuarios', component: AdminUsersComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } }
-            ,{ path: 'admin/disciplinas', component: AdminDisciplinesComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } }
-            ,{ path: 'coordenacao/disciplinas', component: CoordinatorComponent, canActivate: [roleGuard], data: { roles: ['COORDENADOR','ADMIN'] } }
+            { path: 'calendario', component: UserCalendarComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN'] } },
+            { path: 'relatorio', component: ReportComponent, canActivate: [roleGuard], data: { roles: ['ALUNO'] } },
+            { path: 'configuracoes', component: SettingsComponent },
+            { path: 'admin/usuarios', component: AdminUsersComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
+            { path: 'admin/disciplinas', component: AdminDisciplinesComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
+            { path: 'coordenacao/disciplinas', component: CoordinatorComponent, canActivate: [roleGuard], data: { roles: ['COORDENADOR','ADMIN'] } }
             // futuras rotas autenticadas aqui
         ]
     },

@@ -1,0 +1,53 @@
+.report-container { background: #f5f8ff; }
+.week-tabs { overflow-x: visible; flex-wrap: wrap; border-bottom:1px solid #dee2e6; }
+.week-tabs::-webkit-scrollbar { display:none; }
+.week-tabs .nav-link { white-space: nowrap; padding:.45rem .9rem; }
+.report-table input { min-width: 110px; }
+.report-table th, .report-table td { vertical-align: middle; }
+
+/* Cabeçalho institucional */
+.institution-header { border:1px solid #cfd6e2; padding:1rem 1.25rem; background:#fff; }
+.logo-box { width:110px; flex:0 0 110px; }
+.report-logo { max-height:90px; width:auto; display:block; }
+.inst-lines-text { font-size:.78rem; letter-spacing:.3px; }
+.sheet-title { font-size:.95rem; font-weight:700; }
+
+/* Tabela identificação */
+.ident-table-wrapper { border:1px solid #cfd6e2; }
+.ident-table { font-size:.72rem; }
+.ident-table td { padding:.25rem .5rem; }
+.ident-table td.label { width:160px; font-weight:600; }
+.ident-table tr:nth-child(2) td.label, .ident-table tr:nth-child(3) td.label { width:140px; }
+
+/* Tabela de presença */
+.report-table { font-size:.7rem; }
+.report-table th { font-weight:600; }
+
+/* Ajustes gerais */
+.tab-content { font-size:.75rem; }
+
+@media (max-width: 992px) {
+  .logo-box { width:90px; }
+  .report-logo { max-height:70px; }
+  .inst-lines-text { font-size:.7rem; }
+  .sheet-title { font-size:.9rem; }
+}
+@media (max-width: 768px) {
+  .report-table { font-size:.62rem; }
+  .ident-table { font-size:.62rem; }
+  .sheet-title { font-size:.85rem; }
+  .inst-lines-text { font-size:.64rem; }
+}
+@media (max-width: 576px) {
+  .report-container h2 { font-size: 1rem; }
+  .logo-box { width:70px; }
+  .report-logo { max-height:55px; }
+  .inst-lines-text { font-size:.6rem; }
+  .sheet-title { font-size:.8rem; }
+}
+
+.week-tabs.no-scroll { overflow: hidden; flex-wrap: nowrap; }
+.week-tabs.no-scroll .nav-link { padding:.45rem .85rem; }
+.week-tabs.no-scroll .nav-link.active { font-weight:600; }
+/* Removidos estilos de dropdown antigos */
+.week-overflow, .week-overflow .dropdown-menu { display:none; }

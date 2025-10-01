@@ -32,4 +32,20 @@ export class PreceptorService {
     }
     return this.http.get(`${this.base}/students`, { headers: this.authHeaders(), params });
   }
+
+  disciplines() {
+    return this.http.get<{ items: { id:number; code:string; name:string; hours:number; ciclo:number; }[] }>(`${this.base}/disciplines`, { headers: this.authHeaders() });
+  }
+
+  weekReport(weekNumber: number, alunoId: number, disciplineId?: number) {
+    const params: any = { weekNumber, alunoId };
+    if (disciplineId) params.disciplineId = disciplineId;
+    return this.http.get<{ weekNumber:number; count:number; plans:any[]; discipline?: any }>(`/api/calendar/week`, { headers: this.authHeaders(), params });
+  }
+
+  studentInfo(alunoId: number, disciplineId?: number) {
+    const params: any = { alunoId };
+    if (disciplineId) params.disciplineId = disciplineId;
+    return this.http.get<{ alunoId:number; name:string; cpf:string; discipline?: {id:number;code:string;name:string}; preceptor:any }>(`${this.base}/student-info`, { headers: this.authHeaders(), params });
+  }
 }

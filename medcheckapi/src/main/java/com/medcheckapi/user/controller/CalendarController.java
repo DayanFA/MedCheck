@@ -81,7 +81,8 @@ public class CalendarController {
     @GetMapping("/week")
     public ResponseEntity<?> week(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
                                   @RequestParam("weekNumber") Integer weekNumber,
-                                  @RequestParam(value = "alunoId", required = false) Long alunoId) {
+                                  @RequestParam(value = "alunoId", required = false) Long alunoId,
+                                  @RequestParam(value = "disciplineId", required = false) Long disciplineId) {
         if (weekNumber == null || weekNumber < 1 || weekNumber > 52) {
             return ResponseEntity.badRequest().body(Map.of("error", "weekNumber inválido"));
         }
@@ -91,14 +92,30 @@ public class CalendarController {
             target = userRepo.findById(alunoId).orElse(me);
         }
     Discipline current = target.getCurrentDiscipline();
-    List<InternshipPlan> list = (current == null)
+    Discipline forced = null;
+    if (disciplineId != null && (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN)) {
+        Discipline fetched = discRepo.findById(disciplineId).orElse(null);
+        // security: if preceptor (not admin) ensure linkage (usa disciplineId direto para evitar var não final no lambda)
+        if (fetched != null && me.getRole() == Role.PRECEPTOR) {
+            boolean belongs = discRepo.findByPreceptors_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(disciplineId));
+            if (!belongs) {
+                return ResponseEntity.status(403).body(Map.of("error", "Preceptor não vinculado à disciplina"));
+            }
+        }
+        forced = fetched; // atribui após validação
+    }
+    Discipline effective = (forced != null) ? forced : current;
+    List<InternshipPlan> list = (effective == null)
         ? planRepo.findByAlunoAndWeekNumberOrderByDateAsc(target, weekNumber)
-        : planRepo.findByAlunoAndDisciplineAndWeekNumberOrderByDateAsc(target, current, weekNumber);
+        : planRepo.findByAlunoAndDisciplineAndWeekNumberOrderByDateAsc(target, effective, weekNumber);
         List<Map<String,Object>> plans = list.stream().map(this::planDto).toList();
         Map<String,Object> out = new HashMap<>();
         out.put("weekNumber", weekNumber);
         out.put("count", plans.size());
         out.put("plans", plans);
+    if (effective != null) {
+        out.put("discipline", Map.of("id", effective.getId(), "code", effective.getCode(), "name", effective.getName()));
+    }
         return ResponseEntity.ok(out);
     }
 

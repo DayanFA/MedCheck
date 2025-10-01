@@ -1,9 +1,11 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { CalendarServiceApi } from '../../services/calendar.service';
 import { WeekSelectionService } from '../../services/week-selection.service';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { PreceptorService } from '../../services/preceptor.service';
 
 interface PeriodInterval { start: string; end: string; }
 interface DayPeriod { shift: string; locations: string[]; intervals: PeriodInterval[]; }
@@ -17,7 +19,7 @@ interface WeekData { number: number; days: WeekDayRow[]; evaluation: number | nu
   templateUrl: './report.component.html',
   styleUrls: ['./report.component.scss']
 })
-export class ReportComponent {
+export class ReportComponent implements OnChanges {
   weeks: WeekData[] = [];
   selectedWeekIndex = 0;
 
@@ -30,7 +32,14 @@ export class ReportComponent {
   student = { name: '...', preceptorName: '', rotationPeriod: 'Manhã e Tarde' };
   disciplineLabel = '';
 
-  constructor(private auth: AuthService, private calApi: CalendarServiceApi, private weekSync: WeekSelectionService) {
+  @Input() alunoId?: number;          // usado em contexto de preceptor
+  @Input() disciplineId?: number;     // usado em contexto de preceptor
+
+  constructor(private auth: AuthService,
+              private calApi: CalendarServiceApi,
+              private weekSync: WeekSelectionService,
+              private route: ActivatedRoute,
+              private preceptorService: PreceptorService) {
     this.initWeeks();
     this.updatePaginationMode();
     this.ensureGroupForSelected();
@@ -50,7 +59,36 @@ export class ReportComponent {
     if (globalWeek && globalWeek >=1 && globalWeek <=10) {
       this.selectedWeekIndex = globalWeek - 1;
     }
+    // Carrega imediatamente a semana inicial no contexto do aluno.
+    // Para o preceptor, ngOnChanges (inputs) irá forçar recarga depois.
     this.loadWeek(this.selectedWeek.number);
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['alunoId'] || changes['disciplineId']) {
+      // Contexto preceptor: carregar info do aluno selecionado
+      if (this.alunoId) {
+        this.fetchStudentInfo();
+      }
+      // Resetar cache semanas para forçar recarga com novo contexto
+      this.weeks.forEach(w => w.loaded = false);
+      // Recarregar semana atual
+      this.loadWeek(this.selectedWeek.number);
+    }
+  }
+
+  private fetchStudentInfo() {
+    if (!this.alunoId) return;
+    this.preceptorService.studentInfo(this.alunoId, this.disciplineId).subscribe(info => {
+      if (info?.name) this.student.name = info.name;
+      if (info?.preceptor?.name) this.student.preceptorName = info.preceptor.name;
+      if (info?.discipline) {
+        this.disciplineLabel = `CURSO DE MEDICINA - ${info.discipline.code} - ${info.discipline.name}`;
+      } else {
+        // Sem disciplina específica: manter curso genérico
+        this.disciplineLabel = 'CURSO DE MEDICINA';
+      }
+    });
   }
 
   @HostListener('window:resize') onResize() { this.updatePaginationMode(); }
@@ -82,8 +120,14 @@ export class ReportComponent {
     const wk = this.weeks[idx];
     if (!wk) return;
     if (wk.loaded) return; // evitar reload repetido (pode ajustar depois com refresh)
-    this.calApi.getWeekPlans(weekNumber).subscribe(res => {
+    this.calApi.getWeekPlans(weekNumber, this.alunoId, this.disciplineId).subscribe(res => {
       const plans = res?.plans || [];
+      // Se estamos no contexto do aluno (sem @Input alunoId) e veio metadado de disciplina, atualizar cabeçalho
+      const anyRes: any = res as any;
+      if (!this.alunoId && anyRes?.discipline) {
+        const d = anyRes.discipline;
+        this.disciplineLabel = `CURSO DE MEDICINA - ${d.code} - ${d.name}`;
+      }
       // Fallback: se não há planos retornados (talvez registros antigos sem weekNumber), tentar derivar semana pegando todos planos do mês e filtrando por intervalo de datas.
       // (Simplificação: se vazio, não fazemos chamada extra agora para evitar overhead; poderia haver endpoint futuro.)
       // Agrupar por dia
@@ -158,6 +202,8 @@ export class ReportComponent {
       wk.days = dayRows;
       wk.loaded = true;
       this.updateRotationPeriodSummary(wk);
+      // Caso contexto preceptor e ainda não tenha carregado info (ex: input chegou antes de subscribe), reforçar
+      if (this.alunoId) this.fetchStudentInfo();
     });
   }
 

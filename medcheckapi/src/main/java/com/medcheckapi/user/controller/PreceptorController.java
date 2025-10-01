@@ -4,6 +4,10 @@ import com.medcheckapi.user.model.Role;
 import com.medcheckapi.user.model.User;
 import com.medcheckapi.user.repository.CheckSessionRepository;
 import com.medcheckapi.user.repository.UserRepository;
+import com.medcheckapi.user.repository.DisciplineRepository;
+import com.medcheckapi.user.repository.PreceptorEvaluationRepository;
+import com.medcheckapi.user.model.Discipline;
+import com.medcheckapi.user.model.PreceptorEvaluation;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,10 +32,14 @@ public class PreceptorController {
 
     private final UserRepository userRepository;
     private final CheckSessionRepository checkSessionRepository;
+    private final DisciplineRepository disciplineRepository;
+    private final PreceptorEvaluationRepository evaluationRepository;
 
-    public PreceptorController(UserRepository userRepository, CheckSessionRepository checkSessionRepository) {
+    public PreceptorController(UserRepository userRepository, CheckSessionRepository checkSessionRepository, DisciplineRepository disciplineRepository, PreceptorEvaluationRepository evaluationRepository) {
         this.userRepository = userRepository;
         this.checkSessionRepository = checkSessionRepository;
+        this.disciplineRepository = disciplineRepository;
+        this.evaluationRepository = evaluationRepository;
     }
 
     private User me(org.springframework.security.core.userdetails.User principal) {
@@ -96,5 +104,118 @@ public class PreceptorController {
         resp.put("totalPages", alunosPage.getTotalPages());
         resp.put("totalItems", alunosPage.getTotalElements());
         return ResponseEntity.ok(resp);
+    }
+
+    // List disciplines linked to this preceptor
+    @GetMapping("/disciplines")
+    public ResponseEntity<?> disciplines(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
+        User me = me(principal);
+        if (me.getRole() != Role.PRECEPTOR && me.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+        List<Discipline> discs = disciplineRepository.findByPreceptors_Id(me.getId());
+        List<Map<String,Object>> items = discs.stream().map(d -> {
+            Map<String,Object> m = new HashMap<>();
+            m.put("id", d.getId());
+            m.put("code", d.getCode());
+            m.put("name", d.getName());
+            m.put("hours", d.getHours());
+            m.put("ciclo", d.getCiclo());
+            return m;
+        }).toList();
+        return ResponseEntity.ok(Map.of("items", items));
+    }
+
+    // Student info for evaluation (includes discipline context)
+    @GetMapping("/student-info")
+    public ResponseEntity<?> studentInfo(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                         @RequestParam("alunoId") Long alunoId,
+                                         @RequestParam(value = "disciplineId", required = false) Long disciplineId) {
+        User me = me(principal);
+        if (me.getRole() != Role.PRECEPTOR && me.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+        User aluno = userRepository.findById(alunoId).orElse(null);
+        if (aluno == null) return ResponseEntity.notFound().build();
+        Discipline discipline = null;
+        if (disciplineId != null) {
+            discipline = disciplineRepository.findById(disciplineId).orElse(null);
+            if (discipline != null && me.getRole() == Role.PRECEPTOR) {
+                final Long dId = discipline.getId();
+                boolean belongs = disciplineRepository.findByPreceptors_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(dId));
+                if (!belongs) return ResponseEntity.status(403).body(Map.of("error","Preceptor não vinculado à disciplina"));
+            }
+        } else {
+            // fallback para disciplina atual do aluno
+            discipline = aluno.getCurrentDiscipline();
+        }
+        Map<String,Object> resp = new HashMap<>();
+        resp.put("alunoId", aluno.getId());
+        resp.put("name", aluno.getName());
+        resp.put("cpf", aluno.getCpf());
+        if (discipline != null) {
+            resp.put("discipline", Map.of(
+                    "id", discipline.getId(),
+                    "code", discipline.getCode(),
+                    "name", discipline.getName()
+            ));
+        }
+        // Preceptor (o avaliador) também pode ser mostrado
+        resp.put("preceptor", Map.of("id", me.getId(), "name", me.getName()));
+        return ResponseEntity.ok(resp);
+    }
+
+    // Create or update evaluation
+    @org.springframework.web.bind.annotation.PostMapping("/evaluate")
+    public ResponseEntity<?> evaluate(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                      @org.springframework.web.bind.annotation.RequestBody Map<String,Object> body) {
+        User me = me(principal);
+        if (me.getRole() != Role.PRECEPTOR && me.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error","Forbidden"));
+        }
+        try {
+            Long alunoId = Long.valueOf(String.valueOf(body.get("alunoId")));
+            Integer weekNumber = Integer.valueOf(String.valueOf(body.get("weekNumber")));
+            if (weekNumber < 1 || weekNumber > 52) return ResponseEntity.badRequest().body(Map.of("error","weekNumber inválido"));
+            Integer score = body.get("score") != null ? Integer.valueOf(String.valueOf(body.get("score"))) : null;
+            if (score != null && (score < 0 || score > 10)) return ResponseEntity.badRequest().body(Map.of("error","score fora de faixa"));
+            String comment = body.get("comment") != null ? String.valueOf(body.get("comment")) : null;
+            Discipline discipline = null;
+            if (body.get("disciplineId") != null) {
+                Long did = Long.valueOf(String.valueOf(body.get("disciplineId")));
+                discipline = disciplineRepository.findById(did).orElse(null);
+                if (discipline != null && me.getRole() == Role.PRECEPTOR) {
+                    final Long dId = discipline.getId();
+                    boolean belongs = disciplineRepository.findByPreceptors_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(dId));
+                    if (!belongs) return ResponseEntity.status(403).body(Map.of("error","Preceptor não vinculado à disciplina"));
+                }
+            }
+            User aluno = userRepository.findById(alunoId).orElseThrow();
+            PreceptorEvaluation eval;
+            if (discipline != null) {
+                eval = evaluationRepository.findFirstByAlunoAndPreceptorAndDisciplineAndWeekNumber(aluno, me, discipline, weekNumber).orElse(new PreceptorEvaluation());
+            } else {
+                eval = evaluationRepository.findFirstByAlunoAndPreceptorAndWeekNumberAndDisciplineIsNull(aluno, me, weekNumber).orElse(new PreceptorEvaluation());
+            }
+            eval.setAluno(aluno);
+            eval.setPreceptor(me);
+            eval.setDiscipline(discipline);
+            eval.setWeekNumber(weekNumber);
+            eval.setScore(score);
+            eval.setComment(comment);
+            eval.setUpdatedAt(java.time.LocalDateTime.now());
+            evaluationRepository.save(eval);
+            Map<String,Object> resp = new HashMap<>();
+            resp.put("id", eval.getId());
+            resp.put("alunoId", aluno.getId());
+            resp.put("preceptorId", me.getId());
+            resp.put("disciplineId", discipline == null ? null : discipline.getId());
+            resp.put("weekNumber", eval.getWeekNumber());
+            resp.put("score", eval.getScore());
+            resp.put("comment", eval.getComment());
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }

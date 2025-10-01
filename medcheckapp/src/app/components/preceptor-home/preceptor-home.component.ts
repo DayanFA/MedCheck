@@ -246,8 +246,8 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
   }
 
   avaliar(a: any){
-    const nome = a?.name || 'Interno';
-    this.toast.show('info', `Avaliação de ${nome} em breve.`);
+    if (!a?.id) return;
+    this.router.navigate(['/preceptor/avaliar', a.id]);
   }
 
   openCalendar(a: any){

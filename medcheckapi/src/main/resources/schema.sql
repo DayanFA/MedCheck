@@ -22,6 +22,7 @@ USE medcheck;
 -- ============================================================================
 DROP TABLE IF EXISTS internship_justifications;
 DROP TABLE IF EXISTS internship_plans;
+DROP TABLE IF EXISTS preceptor_evaluations;
 DROP TABLE IF EXISTS check_codes;
 DROP TABLE IF EXISTS check_sessions;
 DROP TABLE IF EXISTS password_reset_tokens;
@@ -163,6 +164,28 @@ CREATE TABLE discipline_preceptors (
   PRIMARY KEY (discipline_id, preceptor_id),
   CONSTRAINT fk_dp_discipline FOREIGN KEY (discipline_id) REFERENCES disciplines(id) ON DELETE CASCADE,
   CONSTRAINT fk_dp_preceptor FOREIGN KEY (preceptor_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABELA: preceptor_evaluations (avaliação semanal do aluno pelo preceptor)
+-- Cada registro representa uma avaliação de um aluno em uma semana (1..10) opcionalmente por disciplina.
+-- Se discipline_id for NULL, aplica-se ao contexto geral atual do aluno.
+-- ============================================================================
+CREATE TABLE preceptor_evaluations (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  aluno_id BIGINT NOT NULL,
+  preceptor_id BIGINT NOT NULL,
+  discipline_id BIGINT NULL,
+  week_number INT NOT NULL,
+  score DECIMAL(4,2) NOT NULL,
+  comment TEXT NULL,
+  details_json LONGTEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_pe_aluno FOREIGN KEY (aluno_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pe_preceptor FOREIGN KEY (preceptor_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pe_discipline FOREIGN KEY (discipline_id) REFERENCES disciplines(id) ON DELETE SET NULL,
+  INDEX idx_pe_lookup (aluno_id, discipline_id, week_number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================

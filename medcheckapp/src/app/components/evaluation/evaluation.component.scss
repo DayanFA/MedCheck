@@ -1,0 +1,4 @@
+.eval-table th, .eval-table td { vertical-align: middle; }
+.face-btn { border: none; background: transparent; font-size: 1.25rem; line-height:1; filter: grayscale(65%); transition: transform .15s, filter .15s; }
+.face-btn:hover { transform: scale(1.15); filter: grayscale(0%); }
+.face-btn.selected { filter: grayscale(0%); text-shadow: 0 0 2px rgba(0,0,0,.4); }

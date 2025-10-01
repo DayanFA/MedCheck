@@ -18,6 +18,7 @@ import { AdminDisciplinesComponent } from './components/admin/admin-disciplines.
 import { CoordinatorComponent } from './components/coordinator/coordinator.component';
 import { ReportComponent } from './components/report/report.component';
 import { PreceptorEvaluateComponent } from './components/preceptor-evaluate/preceptor-evaluate.component';
+import { EvaluationComponent } from './components/evaluation/evaluation.component';
 
 export const routes: Routes = [
     { path: '', redirectTo: '/login', pathMatch: 'full' },
@@ -37,6 +38,7 @@ export const routes: Routes = [
             { path: 'preceptor/avaliar/:alunoId', component: PreceptorEvaluateComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
             { path: 'calendario', component: UserCalendarComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN'] } },
             { path: 'relatorio', component: ReportComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN'] } },
+            { path: 'avaliacao', component: EvaluationComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
             { path: 'configuracoes', component: SettingsComponent },
             { path: 'admin/usuarios', component: AdminUsersComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
             { path: 'admin/disciplinas', component: AdminDisciplinesComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },

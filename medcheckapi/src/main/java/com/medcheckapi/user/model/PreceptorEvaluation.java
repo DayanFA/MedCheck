@@ -33,6 +33,10 @@ public class PreceptorEvaluation {
     @Column(name = "comment", columnDefinition = "TEXT")
     private String comment;
 
+    // Armazena JSON com respostas detalhadas (dimensões/perguntas)
+    @Column(name = "details_json", columnDefinition = "TEXT")
+    private String detailsJson;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -53,6 +57,8 @@ public class PreceptorEvaluation {
     public void setScore(Integer score) { this.score = score; }
     public String getComment() { return comment; }
     public void setComment(String comment) { this.comment = comment; }
+    public String getDetailsJson() { return detailsJson; }
+    public void setDetailsJson(String detailsJson) { this.detailsJson = detailsJson; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

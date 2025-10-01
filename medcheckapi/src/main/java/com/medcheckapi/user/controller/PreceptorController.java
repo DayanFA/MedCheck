@@ -180,6 +180,7 @@ public class PreceptorController {
             Integer score = body.get("score") != null ? Integer.valueOf(String.valueOf(body.get("score"))) : null;
             if (score != null && (score < 0 || score > 10)) return ResponseEntity.badRequest().body(Map.of("error","score fora de faixa"));
             String comment = body.get("comment") != null ? String.valueOf(body.get("comment")) : null;
+            String detailsJson = body.get("details") != null ? com.fasterxml.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(body.get("details")) : null;
             Discipline discipline = null;
             if (body.get("disciplineId") != null) {
                 Long did = Long.valueOf(String.valueOf(body.get("disciplineId")));
@@ -203,6 +204,7 @@ public class PreceptorController {
             eval.setWeekNumber(weekNumber);
             eval.setScore(score);
             eval.setComment(comment);
+            eval.setDetailsJson(detailsJson);
             eval.setUpdatedAt(java.time.LocalDateTime.now());
             evaluationRepository.save(eval);
             Map<String,Object> resp = new HashMap<>();
@@ -213,9 +215,54 @@ public class PreceptorController {
             resp.put("weekNumber", eval.getWeekNumber());
             resp.put("score", eval.getScore());
             resp.put("comment", eval.getComment());
+            resp.put("details", eval.getDetailsJson() != null ? eval.getDetailsJson() : null);
             return ResponseEntity.ok(resp);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    // Recupera avaliação existente (para preceptor ou aluno visualizar). Preceptor precisa vínculo; aluno só pode ver sua própria.
+    @GetMapping("/evaluation")
+    public ResponseEntity<?> getEvaluation(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                           @RequestParam("alunoId") Long alunoId,
+                                           @RequestParam("weekNumber") Integer weekNumber,
+                                           @RequestParam(value = "disciplineId", required = false) Long disciplineId) {
+        User me = me(principal);
+        if (weekNumber < 1 || weekNumber > 52) return ResponseEntity.badRequest().body(Map.of("error","weekNumber inválido"));
+        User aluno = userRepository.findById(alunoId).orElse(null);
+        if (aluno == null) return ResponseEntity.notFound().build();
+        Discipline discipline = null;
+        if (disciplineId != null) {
+            discipline = disciplineRepository.findById(disciplineId).orElse(null);
+        }
+        boolean isAluno = me.getId().equals(aluno.getId());
+        boolean isPreceptor = me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN;
+        if (!isAluno && !isPreceptor) return ResponseEntity.status(403).body(Map.of("error","Forbidden"));
+        if (isPreceptor && discipline != null && me.getRole() == Role.PRECEPTOR) {
+            final Long dId = discipline.getId();
+            boolean belongs = disciplineRepository.findByPreceptors_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(dId));
+            if (!belongs) return ResponseEntity.status(403).body(Map.of("error","Preceptor não vinculado à disciplina"));
+        }
+        PreceptorEvaluation eval;
+        if (discipline != null) {
+            eval = evaluationRepository.findFirstByAlunoAndDisciplineAndWeekNumber(aluno, discipline, weekNumber).orElse(null);
+        } else {
+            eval = evaluationRepository.findFirstByAlunoAndWeekNumberAndDisciplineIsNull(aluno, weekNumber).orElse(null);
+        }
+        if (eval == null) return ResponseEntity.ok(Map.of("found", false));
+        Map<String,Object> resp = new HashMap<>();
+        resp.put("found", true);
+        resp.put("id", eval.getId());
+        resp.put("alunoId", aluno.getId());
+        resp.put("preceptorId", eval.getPreceptor().getId());
+        resp.put("preceptorName", eval.getPreceptor().getName());
+        resp.put("disciplineId", eval.getDiscipline() == null ? null : eval.getDiscipline().getId());
+        resp.put("weekNumber", eval.getWeekNumber());
+        resp.put("score", eval.getScore());
+        resp.put("comment", eval.getComment());
+        resp.put("details", eval.getDetailsJson());
+        resp.put("updatedAt", eval.getUpdatedAt());
+        return ResponseEntity.ok(resp);
     }
 }

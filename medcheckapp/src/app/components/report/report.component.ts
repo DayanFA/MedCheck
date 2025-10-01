@@ -1,11 +1,12 @@
 import { Component, HostListener, Input, OnChanges, SimpleChanges } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { CalendarServiceApi } from '../../services/calendar.service';
 import { WeekSelectionService } from '../../services/week-selection.service';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PreceptorService } from '../../services/preceptor.service';
+import { EvaluationService } from '../../services/evaluation.service';
 
 interface PeriodInterval { start: string; end: string; }
 interface DayPeriod { shift: string; locations: string[]; intervals: PeriodInterval[]; }
@@ -22,6 +23,8 @@ interface WeekData { number: number; days: WeekDayRow[]; evaluation: number | nu
 export class ReportComponent implements OnChanges {
   weeks: WeekData[] = [];
   selectedWeekIndex = 0;
+  // Mapeamento das carinhas (mesma ordem usada na tela de avaliação)
+  faces: string[] = ['😠','🙁','😐','🙂','😄'];
 
   // Configuração de paginação
   groupSize = 5;            // tamanho do grupo em telas pequenas
@@ -35,11 +38,16 @@ export class ReportComponent implements OnChanges {
   @Input() alunoId?: number;          // usado em contexto de preceptor
   @Input() disciplineId?: number;     // usado em contexto de preceptor
 
+  evaluationDetails: any = null; // cache da avaliação carregada (aluno view)
+  showEvalModal = false;
+
   constructor(private auth: AuthService,
               private calApi: CalendarServiceApi,
               private weekSync: WeekSelectionService,
               private route: ActivatedRoute,
-              private preceptorService: PreceptorService) {
+              private preceptorService: PreceptorService,
+              private router: Router,
+              private evalService: EvaluationService) {
     this.initWeeks();
     this.updatePaginationMode();
     this.ensureGroupForSelected();
@@ -216,10 +224,42 @@ export class ReportComponent implements OnChanges {
       wk.days = dayRows;
       wk.loaded = true;
       this.updateRotationPeriodSummary(wk);
+      // Carregar avaliação se modo aluno (sem alunoId input) ou se preceptor vendo aluno (mostrar nota se existir)
+      this.loadEvaluationForWeek(wk.number);
       // Caso contexto preceptor e ainda não tenha carregado info (ex: input chegou antes de subscribe), reforçar
       if (this.alunoId) this.fetchStudentInfo();
     });
   }
+
+  private loadEvaluationForWeek(weekNumber: number) {
+    const alunoRef = this.alunoId || this.auth.getUser()?.id;
+    if (!alunoRef) return;
+    this.evalService.get(alunoRef, weekNumber, this.disciplineId).subscribe(res => {
+      if (res && res.found) {
+        const idx = weekNumber - 1;
+        if (this.weeks[idx]) this.weeks[idx].evaluation = res.score;
+        // Parse e enriquecer detalhes (JSON string -> objeto com textos das perguntas se disponíveis)
+        let parsed: any = null;
+        if (res.details) {
+          try { parsed = typeof res.details === 'string' ? JSON.parse(res.details) : res.details; } catch { parsed = null; }
+        }
+        // Estrutura final: { score, comment, details: { dimensions: [{ id, name, questions:[{ id,text, answer }] }] } }
+        const enriched: any = { score: res.score, comment: res.comment, preceptorName: res.preceptorName };
+        if (parsed?.dimensions) {
+          enriched.details = { dimensions: parsed.dimensions.map((d: any) => {
+            // Tentativa de obter definição local (se futuramente múltiplas dimensões forem carregadas dinamicamente) - por enquanto não temos catálogo aqui.
+            const answers = d.answers || {};
+            const questions = Object.keys(answers).map(qId => ({ id: qId, text: qId, answer: answers[qId] }));
+            return { id: d.id, name: d.id, questions };
+          }) };
+        }
+        this.evaluationDetails = enriched;
+      }
+    });
+  }
+
+  openEvaluationDetails() { this.showEvalModal = true; }
+  closeEvaluationDetails() { this.showEvalModal = false; }
 
   private updateRotationPeriodSummary(week: WeekData) {
     const used = new Set<string>();
@@ -291,4 +331,15 @@ export class ReportComponent implements OnChanges {
 
   onGeneratePdf() { console.log('Gerar PDF semana', this.selectedWeek.number, this.selectedWeek); }
   onSubmit() { console.log('Enviar relatório semana', this.selectedWeek.number, this.selectedWeek); }
+  isPreceptorViewingStudent(): boolean {
+    const u = this.auth.getUser();
+    return !!(u && (u.role === 'PRECEPTOR' || u.role === 'ADMIN') && this.alunoId);
+  }
+
+  goToEvaluation() {
+    // Rota dedicada (protótipo): /avaliacao?alunoId=...&disciplineId=...&week=...
+    const queryParams: any = { alunoId: this.alunoId || '' , week: this.selectedWeek.number };
+    if (this.disciplineId) queryParams.disciplineId = this.disciplineId;
+    this.router.navigate(['/avaliacao'], { queryParams });
+  }
 }

@@ -1,0 +1,52 @@
+<div class="evaluation container py-3" *ngIf="!loading(); else loadingTpl">
+  <h5 class="mb-3">Avaliação do Interno - Semana {{week}}</h5>
+  <ul class="nav nav-tabs small mb-3">
+    <li class="nav-item" *ngFor="let d of dimensions; let i = index">
+      <button class="nav-link" [class.active]="i===activeDimIndex()" (click)="activeDimIndex.set(i)">{{ d.title }}</button>
+    </li>
+  </ul>
+
+  <div *ngFor="let d of dimensions; let i=index" [hidden]="i!==activeDimIndex()">
+    <div class="table-responsive mb-3">
+      <table class="table table-bordered align-middle table-sm eval-table">
+        <thead class="table-light">
+          <tr>
+            <th style="width:55%">Pergunta</th>
+            <th *ngFor="let f of faces; let fi=index" class="text-center" style="width:9%">{{f}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let q of d.questions">
+            <td>{{ q.text }}</td>
+            <td *ngFor="let f of faces; let fi=index" class="text-center">
+              <button type="button" class="face-btn" [class.selected]="faceSelected(d.id,q.id,fi)" (click)="setFace(d.id,q.id,fi+1)">{{f}}</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="row g-2 align-items-center mb-3">
+    <div class="col-auto">
+      <label class="form-label mb-0">Nota Final (0-10):</label>
+    </div>
+    <div class="col-auto" style="max-width:100px;">
+      <input type="number" class="form-control form-control-sm" [(ngModel)]="score" min="0" max="10" />
+    </div>
+    <div class="col text-danger small" *ngIf="score!=null && (score<0 || score>10)">Valor inválido</div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Comentário (opcional)</label>
+    <textarea class="form-control" rows="3" [(ngModel)]="comment"></textarea>
+  </div>
+
+  <div class="d-flex justify-content-end gap-2">
+    <button class="btn btn-outline-secondary btn-sm" [routerLink]="['/relatorio']" [queryParams]="{ alunoId: alunoId, disciplineId: disciplineId }" type="button">Cancelar</button>
+    <button class="btn btn-primary btn-sm" [disabled]="!canSubmit()" (click)="submit()">{{ saving() ? 'Salvando...' : 'Enviar Avaliação' }}</button>
+  </div>
+</div>
+<ng-template #loadingTpl>
+  <div class="p-4 text-center text-muted small">Carregando...</div>
+</ng-template>

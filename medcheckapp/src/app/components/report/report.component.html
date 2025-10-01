@@ -89,22 +89,66 @@
     </div>
 
     <div class="row g-2 align-items-center mb-3 small">
-      <div class="col-12 col-md-8 col-lg-6">
-        <label class="form-label mb-0">Avaliação do(a) Preceptor(a) (0 a 10):</label>
-      </div>
-      <div class="col-4 col-sm-3 col-md-2 col-lg-1">
+      <div class="col-12 col-md-8 col-lg-6 d-flex align-items-center flex-wrap">
+        <label class="form-label mb-0 me-2">Avaliação do(a) Preceptor(a) (0 a 10):</label>
+        <ng-container *ngIf="weeks && weeks[selectedWeekIndex]?.evaluation !== undefined && weeks[selectedWeekIndex]?.evaluation !== null; else semAvaliacao">
+          <span class="evaluation-inline-score">{{ weeks[selectedWeekIndex].evaluation | number:'1.0-1' }}</span>
+          <button type="button" class="eval-inline-details-btn ms-2" (click)="openEvaluationDetails()" title="Ver detalhes da avaliação">!</button>
+        </ng-container>
+        <ng-template #semAvaliacao>
+          <span class="text-muted fst-italic">(não enviada)</span>
+        </ng-template>
       </div>
       <div class="col text-danger" *ngIf="selectedWeek.evaluation !== null && (selectedWeek.evaluation! < 0 || selectedWeek.evaluation! > 10)">
         Valor deve estar entre 0 e 10.
       </div>
     </div>
 
-    <!-- Botões agora em baixo -->
-    <div class="d-flex justify-content-end gap-2 pt-2 border-top mt-2">
-      <button class="btn btn-outline-secondary btn-sm" (click)="onGeneratePdf()">
-        <i class="bi bi-filetype-pdf"></i> Gerar PDF
-      </button>
-      <button class="btn btn-primary btn-sm" (click)="onSubmit()">Enviar</button>
+    <!-- Modal Detalhes Avaliação -->
+    <div class="eval-modal-backdrop" *ngIf="showEvalModal" (click)="closeEvaluationDetails()"></div>
+    <div class="eval-modal" *ngIf="showEvalModal">
+      <div class="modal-header">
+        <h3>Detalhes da Avaliação - Semana {{ selectedWeekIndex + 1 }}</h3>
+        <button class="close-btn" (click)="closeEvaluationDetails()">×</button>
+      </div>
+      <div class="modal-body" *ngIf="evaluationDetails as ev">
+        <div class="mb-2"><strong>Nota Final:</strong> <span class="eval-modal-score">{{ ev.score | number:'1.0-1' }}</span></div>
+        <div class="mb-3" *ngIf="ev.comment"><strong>Comentário:</strong> {{ ev.comment }}</div>
+        <div *ngIf="ev.details as det">
+          <div *ngFor="let dim of det.dimensions" class="dimension-block">
+            <h4>{{ dim.name }}</h4>
+            <table class="dimension-table">
+              <thead><tr><th style="width:65%">Questão</th><th style="width:35%">Resposta</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let q of dim.questions">
+                  <td>{{ q.text }}</td>
+                  <td class="answer-face">
+                    <span *ngIf="q.answer as ans" class="emoji-face" [title]="'Pontuação: ' + ans">{{ faces[ans-1] }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="close-secondary" (click)="closeEvaluationDetails()">Fechar</button>
+      </div>
+    </div>
+
+    <!-- Barra de ações inferior -->
+    <div class="d-flex flex-wrap justify-content-between gap-2 pt-3 border-top mt-3 action-bar">
+      <div class="d-flex align-items-center gap-2">
+        <button *ngIf="isPreceptorViewingStudent()" type="button" class="btn btn-warning btn-sm text-white fw-semibold" (click)="goToEvaluation()">
+          Avaliar Interno
+        </button>
+      </div>
+      <div class="d-flex align-items-center gap-2 ms-auto">
+        <button class="btn btn-outline-secondary btn-sm" (click)="onGeneratePdf()">
+          <i class="bi bi-filetype-pdf"></i> Gerar PDF
+        </button>
+        <button class="btn btn-primary btn-sm" (click)="onSubmit()">Enviar</button>
+      </div>
     </div>
   </div>
 </div>

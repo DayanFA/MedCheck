@@ -76,4 +76,10 @@ export class CalendarServiceApi {
     const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
     return this.http.post(`/api/calendar/justify/review`, payload, { headers });
   }
+
+  getCurrentPreceptor() {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.get<{ id?: number; name?: string }>(`/api/calendar/current/preceptor`, { headers });
+  }
 }

@@ -1,4 +1,6 @@
 import { Component, HostListener } from '@angular/core';
+import { AuthService } from '../../services/auth.service';
+import { CalendarServiceApi } from '../../services/calendar.service';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -23,12 +25,29 @@ export class ReportComponent {
   paginated = false;         // estado atual (determinado por largura de janela)
   groupStartIndex = 0;       // índice inicial do grupo atual
 
-  student = { name: 'Dayan Freitas Alves', preceptorName: 'Dr. Osvaldo', rotationPeriod: 'Manhã e Tarde' };
+  student = { name: '...', preceptorName: '', rotationPeriod: 'Manhã e Tarde' };
+  disciplineLabel = '';
 
-  constructor() {
+  constructor(private auth: AuthService, private calApi: CalendarServiceApi) {
     this.generateMockWeeks();
     this.updatePaginationMode();
     this.ensureGroupForSelected();
+    // tenta pegar nome real do usuário logado
+    const u = this.auth.getUser();
+    if (u?.name) this.student.name = u.name;
+    if (u?.currentDisciplineName) {
+      // Monta label: CURSO DE MEDICINA - {NOME DA DISCIPLINA}
+      const code = u.currentDisciplineCode ? u.currentDisciplineCode + ' - ' : '';
+      this.disciplineLabel = `CURSO DE MEDICINA - ${code}${u.currentDisciplineName}`;
+    } else {
+      this.disciplineLabel = 'CURSO DE MEDICINA';
+    }
+    // Busca preceptor vinculado à disciplina atual
+    this.calApi.getCurrentPreceptor().subscribe(p => {
+      if (p?.name) {
+        this.student.preceptorName = p.name;
+      }
+    });
   }
 
   @HostListener('window:resize') onResize() { this.updatePaginationMode(); }

@@ -24,7 +24,7 @@
         <div class="flex-grow-1 text-center">
           <div class="inst-lines fw-semibold lh-sm inst-lines-text">
             UNIVERSIDADE FEDERAL DO ACRE<br>
-            CURSO DE MEDICINA - INTERNATO EM MEDICINA FAMÍLIA E COMUNIDADE
+            {{ disciplineLabel || 'CURSO DE MEDICINA' }}
           </div>
           <div class="sheet-title mt-2">FOLHA DE PRESENÇA DIÁRIA</div>
         </div>
@@ -39,7 +39,7 @@
             <td class="label">Nome do(a) Interno(a):</td>
             <td>{{ student.name }}</td>
             <td class="label">Nome do(a) Preceptor(a):</td>
-            <td>{{ student.preceptorName }}</td>
+            <td>{{ student.preceptorName || '—' }}</td>
           </tr>
           <tr>
             <td class="label">Período do Rodízio:</td>

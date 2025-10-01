@@ -5,6 +5,7 @@ import com.medcheckapi.user.repository.UserRepository;
 import com.medcheckapi.user.repository.InternshipPlanRepository;
 import com.medcheckapi.user.repository.InternshipJustificationRepository;
 import com.medcheckapi.user.repository.DisciplineRepository;
+import com.medcheckapi.user.repository.UserRepository;
 import com.medcheckapi.user.service.CalendarService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,6 +31,23 @@ public class CalendarController {
 
     private User currentUser(org.springframework.security.core.userdetails.User principal) {
         return userRepo.findByCpf(principal.getUsername()).orElseThrow();
+    }
+
+    // Retorna o primeiro preceptor vinculado à disciplina atual do aluno logado (ou vazio)
+    @GetMapping("/current/preceptor")
+    public ResponseEntity<?> currentPreceptor(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
+        User me = currentUser(principal);
+        Discipline d = me.getCurrentDiscipline();
+        if (d == null) return ResponseEntity.ok(Map.of());
+        // Lazy load preceptores (ManyToMany). Se não carregado, buscar via repository
+        Discipline managed = discRepo.findById(d.getId()).orElse(null);
+        if (managed == null || managed.getPreceptors().isEmpty()) return ResponseEntity.ok(Map.of());
+        User preceptor = managed.getPreceptors().stream().findFirst().orElse(null);
+        if (preceptor == null) return ResponseEntity.ok(Map.of());
+        return ResponseEntity.ok(Map.of(
+                "id", preceptor.getId(),
+                "name", preceptor.getName()
+        ));
     }
 
     @GetMapping("/month")

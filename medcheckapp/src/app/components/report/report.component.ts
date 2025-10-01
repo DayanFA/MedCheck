@@ -1,12 +1,13 @@
-import { Component, HostListener, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, HostListener, Input, OnChanges, SimpleChanges, Inject, PLATFORM_ID, ViewChild, ElementRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { CalendarServiceApi } from '../../services/calendar.service';
 import { WeekSelectionService } from '../../services/week-selection.service';
-import { CommonModule, DatePipe } from '@angular/common';
+import { CommonModule, DatePipe, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PreceptorService } from '../../services/preceptor.service';
 import { EvaluationService } from '../../services/evaluation.service';
+// Removido import estático de jsPDF para evitar erro em SSR; será carregado dinamicamente dentro de onGeneratePdf.
 
 interface PeriodInterval { start: string; end: string; }
 interface DayPeriod { shift: string; locations: string[]; intervals: PeriodInterval[]; }
@@ -40,6 +41,7 @@ export class ReportComponent implements OnChanges {
 
   evaluationDetails: any = null; // cache da avaliação carregada (aluno view)
   showEvalModal = false;
+  @ViewChild('fullReportRoot') fullReportRoot?: ElementRef<HTMLDivElement>;
 
   // Mapas para exibir textos completos das dimensões e questões na modal de detalhes
   dimensionTitles: Record<string,string> = {
@@ -91,7 +93,8 @@ export class ReportComponent implements OnChanges {
               private route: ActivatedRoute,
               private preceptorService: PreceptorService,
               private router: Router,
-              private evalService: EvaluationService) {
+              private evalService: EvaluationService,
+              @Inject(PLATFORM_ID) private platformId: Object) {
     this.initWeeks();
     this.updatePaginationMode();
     this.ensureGroupForSelected();
@@ -379,8 +382,95 @@ export class ReportComponent implements OnChanges {
       this.weekSync.setWeek(wk.number);
     }
   }
+  // (stub removido)
+  // Verifica se avaliação global existe
+  get hasGlobalEvaluation(): boolean { return this.weeks.some(w => w.evaluation !== null && w.evaluation !== undefined); }
 
-  onGeneratePdf() { console.log('Gerar PDF semana', this.selectedWeek.number, this.selectedWeek); }
+  // Geração de PDF consolidando TODAS as semanas + avaliação global (dinâmico / browser only)
+  async onGeneratePdf() {
+    if (!isPlatformBrowser(this.platformId)) {
+      return; // evita executar em ambiente SSR
+    }
+    // Bloqueia se não houver avaliação
+    if (!this.hasGlobalEvaluation || !this.evaluationDetails) {
+      alert('Para gerar o PDF é necessário primeiro registrar a avaliação.');
+      return;
+    }
+    // Garantir que todas as semanas estejam carregadas antes de gerar
+    const unloaded = this.weeks.filter(w => !w.loaded).map(w => w.number);
+    if (unloaded.length) {
+      // Carrega sequencialmente e re-invoca após concluído
+      let idx = 0;
+      const loadNext = () => {
+        if (idx >= unloaded.length) { this.onGeneratePdf(); return; }
+        const n = unloaded[idx++];
+        // Forçar reload
+        const wref = this.weeks[n-1];
+        if (wref) wref.loaded = false;
+        this.loadWeek(n);
+        setTimeout(loadNext, 350); // pequeno intervalo para permitir subscribe concluir
+      };
+      loadNext();
+      return;
+    }
+    // --- Nova abordagem: captura visual do wrapper completo ---
+    // Garante que todas as semanas estejam montadas (já carregadas anteriormente)
+    await new Promise(r => setTimeout(r, 50));
+    const target = this.fullReportRoot?.nativeElement;
+    if (!target) {
+      alert('Estrutura completa ainda não pronta para exportar.');
+      return;
+    }
+    target.classList.remove('d-none');
+    let jsPDFMod: any;
+    let html2canvasMod: any;
+    try {
+      [jsPDFMod, html2canvasMod] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas')
+      ]);
+    } catch (e) {
+      console.error('Falha ao carregar libs PDF/canvas', e);
+      target.classList.add('d-none');
+      alert('Erro ao carregar bibliotecas para exportar PDF.');
+      return;
+    }
+    const jsPDF = jsPDFMod.default || jsPDFMod;
+    const html2canvas = html2canvasMod.default || html2canvasMod;
+    // Ajuste de largura para garantir render consistente
+    const originalWidth = target.style.width;
+    target.style.width = '1200px'; // força layout mais largo para melhor resolução
+    await new Promise(r => setTimeout(r, 30));
+    const canvas = await html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    target.style.width = originalWidth;
+    target.classList.add('d-none');
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'pt', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    // Calcular proporção
+    const imgWidth = pageWidth - 40; // margens
+    const imgHeight = canvas.height * (imgWidth / canvas.width);
+    let position = 20;
+    let heightLeft = imgHeight;
+    let y = 20;
+    pdf.addImage(imgData, 'PNG', 20, y, imgWidth, imgHeight, undefined, 'FAST');
+    heightLeft -= (pageHeight - 40);
+    while (heightLeft > 0) {
+      pdf.addPage();
+      y = 20;
+      pdf.addImage(imgData, 'PNG', 20, y - (imgHeight - heightLeft), imgWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= (pageHeight - 40);
+    }
+    // Rodapé páginas
+    const pages = pdf.getNumberOfPages();
+    pdf.setFontSize(8);
+    for (let i=1;i<=pages;i++) {
+      pdf.setPage(i);
+      pdf.text(`Página ${i} / ${pages}`, pageWidth - 40, pageHeight - 20, { align:'right' });
+    }
+    pdf.save(`relatorio-internato-${this.student.name.replace(/\s+/g,'_')}.pdf`);
+  }
   onSubmit() { console.log('Enviar relatório semana', this.selectedWeek.number, this.selectedWeek); }
   isPreceptorViewingStudent(): boolean {
     const u = this.auth.getUser();

@@ -140,4 +140,16 @@
     border-color:#ff9800;
   }
   .btn-warning:hover { background:#fb8c00; border-color:#fb8c00; }
+  button[disabled] { opacity:.55; cursor:not-allowed; }
 }
+
+/* Full report print capture */
+.full-report-print { font-size:.72rem; }
+.full-report-print .questions-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:.5rem; }
+.full-report-print .question-tile { border:1px solid #d7e0eb; background:#fff; padding:.4rem .45rem .9rem; border-radius:6px; position:relative; min-height:105px; }
+.full-report-print .question-tile .q-text { font-size:.55rem; line-height:1.15; font-weight:500; }
+.full-report-print .question-tile .q-face { position:absolute; bottom:.35rem; right:.35rem; font-size:1.1rem; }
+.full-report-print .dimension-card { background:#fdfefe; }
+.full-report-print h6 { font-size:.8rem; }
+
+.d-none { display:none !important; }

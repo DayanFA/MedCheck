@@ -1,4 +1,148 @@
 <div class="report-container container-fluid py-3">
+  <!-- Hidden full printable wrapper for PDF generation -->
+  <div class="full-report-print d-none" #fullReportRoot>
+    <!-- 10 Folhas de Presença (uma por semana) -->
+    <ng-container *ngFor="let w of weeks; let wi = index">
+      <div class="weekly-sheet mb-5">
+        <div class="institution-header mb-2">
+          <div class="d-flex align-items-center">
+            <div class="logo-box me-3 d-flex align-items-center justify-content-center">
+              <img src="assets/logo_ufac.png" alt="Logo UFAC" class="report-logo">
+            </div>
+            <div class="flex-grow-1 text-center">
+              <div class="inst-lines fw-semibold lh-sm inst-lines-text">
+                UNIVERSIDADE FEDERAL DO ACRE<br>
+                {{ disciplineLabel || 'CURSO DE MEDICINA' }}
+              </div>
+              <div class="sheet-title mt-2">FOLHA DE PRESENÇA DIÁRIA</div>
+            </div>
+          </div>
+        </div>
+        <div class="ident-table-wrapper mb-2">
+          <table class="table table-bordered table-sm mb-0 ident-table">
+            <tbody>
+              <tr>
+                <td class="label">Nome do(a) Interno(a):</td>
+                <td>{{ student.name }}</td>
+                <td class="label">Nome do(a) Preceptor(a):</td>
+                <td>{{ student.preceptorName || '—' }}</td>
+              </tr>
+              <tr>
+                <td class="label">Período do Rodízio:</td>
+                <td colspan="3">{{ student.rotationPeriod }}</td>
+              </tr>
+              <tr>
+                <td class="label">Semana:</td>
+                <td colspan="3">Semana {{ w.number }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <table class="table table-sm table-bordered align-middle report-table mb-2">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width:90px">Dias da Semana</th>
+              <th style="min-width:100px">Data</th>
+              <th style="min-width:110px">Período</th>
+              <th style="min-width:140px">Local</th>
+              <th style="min-width:220px">Assinatura do Preceptor</th>
+            </tr>
+          </thead>
+          <tbody>
+            <ng-container *ngFor="let day of w.days">
+              <tr *ngFor="let period of day.periods; index as pi">
+                <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length" class="fw-semibold">{{ day.weekday }}</td>
+                <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length">{{ day.date | date:'dd/MM/yyyy' }}</td>
+                <td>
+                  <div class="fw-semibold">{{ period.shift }}</div>
+                  <div class="text-muted small" *ngIf="period.intervals?.length">
+                    <span *ngFor="let it of period.intervals; let last = last">
+                      {{ it.start }}-{{ it.end }}<span *ngIf="!last">; </span>
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <span *ngIf="period.locations?.length; else vazioPB">{{ period.locations.join(', ') }}</span>
+                  <ng-template #vazioPB><span class="text-muted">—</span></ng-template>
+                </td>
+                <td class="text-muted small">{{ '{' }}Assinatura eletrônica automática pelo sistema{{ '}' }}</td>
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
+        <div class="small">
+          <strong>Avaliação do(a) Preceptor(a) (0 a 10):</strong>
+          <ng-container *ngIf="w.evaluation !== undefined && w.evaluation !== null; else nEvalPrint">
+            {{ w.evaluation | number:'1.0-1' }}
+          </ng-container>
+          <ng-template #nEvalPrint><span class="text-muted fst-italic">(não enviada)</span></ng-template>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Formulário de Avaliação (completo, após as semanas) -->
+    <div *ngIf="evaluationDetails as ev" class="evaluation-form-print mt-4">
+      <div class="institution-header mb-2">
+        <div class="d-flex align-items-center">
+          <div class="logo-box me-3 d-flex align-items-center justify-content-center">
+            <img src="assets/logo_ufac.png" alt="Logo UFAC" class="report-logo">
+          </div>
+          <div class="flex-grow-1 text-center">
+            <div class="inst-lines fw-semibold lh-sm inst-lines-text">
+              UNIVERSIDADE FEDERAL DO ACRE<br>
+              {{ disciplineLabel || 'CURSO DE MEDICINA' }}
+            </div>
+            <div class="sheet-title mt-2">FORMULÁRIO DE AVALIAÇÃO DO RODÍZIO DO INTERNATO</div>
+          </div>
+        </div>
+      </div>
+      <div class="ident-table-wrapper mb-2">
+        <table class="table table-bordered table-sm mb-0 ident-table">
+          <tbody>
+            <tr>
+              <td class="label">Nome do(a) Interno(a):</td>
+              <td>{{ student.name }}</td>
+              <td class="label">Nome do(a) Preceptor(a):</td>
+              <td>{{ student.preceptorName || '—' }}</td>
+            </tr>
+            <tr>
+              <td class="label">Período do Rodízio:</td>
+              <td colspan="3">{{ student.rotationPeriod }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Nota & Comentário finais -->
+      <div class="final-score-comment mb-3 small">
+        <strong>Nota Final:</strong> {{ ev.score | number:'1.0-1' }}
+        <span *ngIf="ev.comment"> | <strong>Comentário:</strong> {{ ev.comment }}</span>
+      </div>
+      <!-- Dimensões -->
+      <div *ngIf="ev.details?.dimensions as dimsPrint">
+        <div class="dimension-print mb-4" *ngFor="let dim of dimsPrint; let di = index">
+          <div class="dimension-header fw-semibold mb-2">
+            {{ dimensionTitles[dim.id] || ('Dimensão ' + (di+1)) }}
+          </div>
+          <table class="table table-bordered table-sm mb-2 align-middle evaluation-questions-table">
+            <thead class="table-light">
+              <tr>
+                <th style="width:40px">#</th>
+                <th>Pergunta</th>
+                <th style="width:70px">Resposta</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let q of dim.questions; let qi = index">
+                <td>{{ qi + 1 }}</td>
+                <td>{{ fullQuestionText(dim.id, q.id) }}</td>
+                <td class="text-center">{{ q.answer ? faces[q.answer-1] : '' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
   <!-- Tabs Semanas responsivas -->
   <ul class="nav nav-tabs week-tabs no-scroll justify-content-start" role="tablist">
     <li class="nav-item" *ngIf="hasPrevGroup" role="presentation">
@@ -160,7 +304,7 @@
         </button>
       </div>
       <div class="d-flex align-items-center gap-2 ms-auto">
-        <button class="btn btn-outline-secondary btn-sm" (click)="onGeneratePdf()">
+        <button class="btn btn-outline-secondary btn-sm" (click)="onGeneratePdf()" [disabled]="!hasGlobalEvaluation">
           <i class="bi bi-filetype-pdf"></i> Gerar PDF
         </button>
         <button class="btn btn-primary btn-sm" (click)="onSubmit()">Enviar</button>

@@ -2,3 +2,40 @@
 .face-btn { border: none; background: transparent; font-size: 1.25rem; line-height:1; filter: grayscale(65%); transition: transform .15s, filter .15s; }
 .face-btn:hover { transform: scale(1.15); filter: grayscale(0%); }
 .face-btn.selected { filter: grayscale(0%); text-shadow: 0 0 2px rgba(0,0,0,.4); }
+
+/* Harmonizar com layout do relatório */
+.institution-header { border:1px solid #cfd6e2; padding:1rem 1.25rem; background:#fff; }
+.ident-table { font-size:.72rem; }
+.ident-table td { padding:.25rem .5rem; }
+.ident-table td.label { width:160px; font-weight:600; }
+.info-box { font-size:.7rem; border:1px solid #cfd6e2; background:#fff; border-radius:4px; }
+/* Fundo igual ao relatório */
+.report-container { background:#f5f8ff; }
+/* Tamanho da logo igual ao relatório */
+.logo-box { width:110px; flex:0 0 110px; }
+.report-logo { max-height:90px; width:auto; display:block; }
+/* Tipografia cabeçalho igual relatório */
+.inst-lines-text { font-size:.78rem; letter-spacing:.3px; }
+.sheet-title { font-size:.95rem; font-weight:700; }
+/* Ajustes abas semanas (herda estilos globais bootstrap/report) */
+.week-tabs .nav-link { white-space: nowrap; padding:.45rem .85rem; }
+.week-tabs .nav-link.active { font-weight:600; }
+.week-tabs .nav-link { position:relative; }
+.progress { background:#e9ecef; }
+.progress-bar { background:#28a745; }
+.progress-animated .progress-bar { transition: width .4s ease-in-out; }
+.week-tabs .nav-link.locked { cursor:not-allowed; opacity:.5; }
+.week-tabs .nav-link.complete { background:#e8f9ef; }
+.week-tabs .nav-link.complete.active { background:#d1f2df; }
+@media (max-width: 992px) {
+	.logo-box { width:90px; }
+	.report-logo { max-height:70px; }
+	.inst-lines-text { font-size:.7rem; }
+	.sheet-title { font-size:.9rem; }
+}
+@media (max-width: 576px) {
+	.logo-box { width:70px; }
+	.report-logo { max-height:55px; }
+	.inst-lines-text { font-size:.6rem; }
+	.sheet-title { font-size:.8rem; }
+}

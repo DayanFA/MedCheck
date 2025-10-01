@@ -1,4 +1,4 @@
-import { Component, signal, computed, effect } from '@angular/core';
+import { Component, signal, computed, effect, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -21,6 +21,17 @@ export class EvaluationComponent {
   score: number | null = null;
   comment = '';
   preloaded = false;
+  studentName = '—';
+  preceptorName = '—';
+  disciplineLabel = 'CCSD459 - Internato em Medicina de Família e Comunidade';
+  rotationPeriod: string = '—';
+  weeks: number[] = Array.from({length:10}, (_,i)=> i+1);
+
+  // Paginação de abas (mesma lógica do relatório)
+  groupSize = 5;
+  breakpointPx = 900; // largura abaixo da qual usamos grupos + reticências
+  paginated = false;
+  groupStartIndex = 0; // índice base (0-based) do grupo atual
 
   // Escala 1..5 - emojis
   faces = [ '😞','🙁','😐','🙂','😃' ];
@@ -38,11 +49,31 @@ export class EvaluationComponent {
       { id: 'q9', text: 'Confecciona lista de problemas com propostas de encaminhamentos?' },
       { id: 'q10', text: 'Compreende os ciclos de vida das famílias e aplica no entendimento do adoecimento?' },
       { id: 'q11', text: 'Domina a clínica da APS, principais temas e manejo clínico adequado?' }
+    ] },
+    { id: 'dim2', title: 'Dimensão 2: Atuação comunitária', questions: [
+      { id: 'q1', text: 'Dispõe-se, havendo indicação, a realizar visita domiciliar de reconhecimento, seguimento ou busca ativa?' },
+      { id: 'q2', text: 'É permeável ao contato e vínculo com outros equipamentos e representações sociais no território (escolas, igrejas, associações comunitárias etc.)?' },
+      { id: 'q3', text: 'Propõe e realiza atividades nos ambientes comunitários citados (escolas, associações, espaços coletivos)?' }
+    ] },
+    { id: 'dim3', title: 'Dimensão 3: Vínculo com a equipe e processo de trabalho', questions: [
+      { id: 'q1', text: 'Tem bom vínculo com a equipe de saúde?' },
+      { id: 'q2', text: 'Atua de forma integrada e solidária junto à equipe buscando melhorar o processo de trabalho?' },
+      { id: 'q3', text: 'Compreende a necessidade de fortalecimento e legitimação da equipe junto à comunidade?' },
+      { id: 'q4', text: 'Compreende as limitações do local onde atua e procura adequar suas condutas aos recursos disponíveis sem prejuízo ao tratamento?' },
+      { id: 'q5', text: 'É proativo na coordenação do cuidado (acompanhamento, resgate de faltosos por telefone, mensagem ou visita domiciliar)?' }
+    ] },
+    { id: 'dim4', title: 'Dimensão 4: Conhecimento sobre o sistema de saúde e políticas públicas', questions: [
+      { id: 'q1', text: 'Conhece o sistema de saúde loco-regional, reconhece os diversos pontos de atenção e direciona os pacientes adequadamente (integralidade)?' },
+      { id: 'q2', text: 'Compreende processos de gestão e gerenciamento como fundamentais para garantir melhor cuidado às pessoas e trabalhadores (organização, condições de trabalho, remuneração)?' },
+      { id: 'q3', text: 'É capaz de elaborar e ter visão crítica e propositiva sobre as políticas de saúde?' }
     ] }
   ];
 
   activeDimIndex = signal(0);
   answers = signal<Record<string, Record<string, number>>>({}); // dimensionId -> { qId:score }
+  private draftSaveTimer: any;
+  private activeDimFromDraft = false;
+  private autoAdvancedDims = new Set<string>();
 
   constructor(private route: ActivatedRoute,
               private evalApi: EvaluationService,
@@ -53,7 +84,13 @@ export class EvaluationComponent {
       this.week = Number(p.get('week'));
       const d = p.get('disciplineId');
       this.disciplineId = d ? Number(d) : undefined;
+      this.loadDraft();
+      this.loadStudentInfo();
       this.fetchExisting();
+      // Ajustar paginação conforme largura e posicionar grupo da semana selecionada
+      this.updatePaginationMode();
+      this.ensureGroupForSelected();
+      this.loadRotationPeriod();
     });
   }
 
@@ -61,6 +98,25 @@ export class EvaluationComponent {
     const cur = { ...this.answers() };
     cur[dimId] = { ...(cur[dimId]||{}) , [qId]: score };
     this.answers.set(cur);
+    this.saveDraftDebounced();
+    // Auto-avançar se completou dimensão atual e não é a última
+    const idx = this.activeDimIndex();
+    const dim = this.dimensions[idx];
+    if (this.dimensionComplete(idx) && !this.isLastDim() && dim && !this.autoAdvancedDims.has(dim.id)) {
+      this.autoAdvancedDims.add(dim.id);
+      setTimeout(() => {
+        if (this.activeDimIndex() === idx) this.nextDim();
+      }, 120);
+    }
+  }
+
+  setActiveDim(i: number) {
+    if (i < 0 || i >= this.dimensions.length) return;
+    // Bloquear navegar para dimensão futura se anteriores não completas
+    for (let idx = 0; idx < i; idx++) {
+      if (!this.dimensionComplete(idx)) return;
+    }
+    this.activeDimIndex.set(i);
   }
 
   faceSelected(dimId: string, qId: string, idx: number) {
@@ -86,20 +142,52 @@ export class EvaluationComponent {
             }
           } catch { /* ignore */ }
         }
+        // Merge com draft local (caso tenhamos adicionado novas dimensões após primeira submissão)
+        this.mergeDraftAnswers();
       }
       this.loading.set(false);
     }, _ => this.loading.set(false));
   }
 
+  dimensionComplete(idx: number): boolean {
+    const dim = this.dimensions[idx];
+    if (!dim) return false;
+    const a = this.answers()[dim.id] || {};
+    return !dim.questions.some(q => a[q.id] == null);
+  }
+
+  allDimensionsComplete(): boolean {
+    return this.dimensions.every((_, i) => this.dimensionComplete(i));
+  }
+
+  completedCount(): number { return this.dimensions.filter((_,i)=> this.dimensionComplete(i)).length; }
+  progressPercent(): number { return Math.round((this.completedCount() / this.dimensions.length) * 100); }
+
+  dimensionProgressTooltip(i: number): string {
+    const dim = this.dimensions[i];
+    if (!dim) return '';
+    const a = this.answers()[dim.id] || {};
+    const answered = dim.questions.filter(q => a[q.id] != null).length;
+    return `${answered}/${dim.questions.length} questões` + (this.dimensionComplete(i) ? ' (completa)' : '');
+  }
+
+  isLastDim(): boolean { return this.activeDimIndex() === this.dimensions.length - 1; }
+
+  canGoNext(): boolean { return this.dimensionComplete(this.activeDimIndex()); }
+
   canSubmit(): boolean {
+    if (!this.isLastDim()) return false;
     if (this.saving()) return false;
+    if (!this.allDimensionsComplete()) return false;
     if (this.score == null || this.score < 0 || this.score > 10) return false;
-    // exige todas perguntas respondidas da dimensão ativa? ou todas? Vamos exigir todas da lista para protótipo
-    for (const dim of this.dimensions) {
-      const a = this.answers()[dim.id] || {};
-      if (dim.questions.some(q => a[q.id] == null)) return false;
-    }
     return true;
+  }
+
+  nextDim() {
+    if (!this.canGoNext()) return;
+    if (!this.isLastDim()) {
+      this.activeDimIndex.set(this.activeDimIndex() + 1);
+    }
   }
 
   submit() {
@@ -108,8 +196,172 @@ export class EvaluationComponent {
     const details = { dimensions: this.dimensions.map(d => ({ id: d.id, answers: this.answers()[d.id] || {} })) };
     this.evalApi.save({ alunoId: this.alunoId, weekNumber: this.week, disciplineId: this.disciplineId, score: this.score!, comment: this.comment, details }).subscribe(_ => {
       this.saving.set(false);
+      this.clearDraft();
       // voltar ao relatório
       this.router.navigate(['/relatorio'], { queryParams: { alunoId: this.alunoId, disciplineId: this.disciplineId } });
     }, _ => this.saving.set(false));
+  }
+
+  private loadStudentInfo() {
+    if (!this.alunoId) return;
+    this.preceptorService.studentInfo(this.alunoId, this.disciplineId).subscribe(info => {
+      if (info?.name) this.studentName = info.name;
+      if (info?.preceptor?.name) this.preceptorName = info.preceptor.name;
+      if (info?.discipline) {
+        this.disciplineLabel = `${info.discipline.code} - ${info.discipline.name}`;
+      }
+    });
+  }
+
+  selectWeek(w: number) {
+    if (w === this.week) return;
+    this.week = w;
+    this.fetchExisting();
+    this.ensureGroupForSelected();
+    this.loadRotationPeriod();
+  }
+
+  // ===== Paginação Semanas =====
+  @HostListener('window:resize') onResize() { this.updatePaginationMode(); }
+
+  private updatePaginationMode() {
+    const wasPaginated = this.paginated;
+    this.paginated = window.innerWidth < this.breakpointPx;
+    if (!this.paginated) {
+      this.groupStartIndex = 0; // mostrar tudo
+    } else if (!wasPaginated && this.paginated) {
+      this.ensureGroupForSelected();
+    } else if (wasPaginated && this.paginated) {
+      // garantir que semana selecionada continua visível
+      this.ensureGroupForSelected();
+    }
+  }
+
+  private ensureGroupForSelected() {
+    if (!this.paginated || !this.week) return;
+    const selIndex = this.week - 1; // 0-based
+    const group = Math.floor(selIndex / this.groupSize);
+    this.groupStartIndex = group * this.groupSize;
+  }
+
+  get displayedWeeks(): number[] {
+    if (!this.paginated) return this.weeks;
+    return this.weeks.slice(this.groupStartIndex, this.groupStartIndex + this.groupSize);
+  }
+  get hasPrevGroup(): boolean { return this.paginated && this.groupStartIndex > 0; }
+  get hasNextGroup(): boolean { return this.paginated && (this.groupStartIndex + this.groupSize) < this.weeks.length; }
+  prevGroup() { if (this.hasPrevGroup) this.groupStartIndex = Math.max(0, this.groupStartIndex - this.groupSize); }
+  nextGroup() { if (this.hasNextGroup) this.groupStartIndex = this.groupStartIndex + this.groupSize; }
+
+  // ===== Cálculo Período do Rodízio =====
+  private loadRotationPeriod() {
+    if (!this.alunoId || !this.week) { this.rotationPeriod = '—'; return; }
+    // Reutiliza endpoint de semana para obter planos e derivar períodos (Manhã, Tarde, Noite)
+    this.preceptorService.weekReport(this.week, this.alunoId, this.disciplineId).subscribe(res => {
+      const plans = res?.plans || [];
+      if (!plans.length) { this.rotationPeriod = '—'; return; }
+      const used = new Set<string>();
+      for (const p of plans) {
+        if (p.startTime) {
+          const shift = this.classifyShift(p.startTime);
+          used.add(shift);
+          // Se overnight (end < start) também considera segmento do dia seguinte mantendo mesmo turno de origem até meia-noite e novo turno após? Para relatório principal dividimos; aqui basta contar uma vez.
+        }
+      }
+      const order = ['Manhã','Tarde','Noite'];
+      const list = order.filter(o => used.has(o));
+      this.rotationPeriod = list.length ? list.join(', ') : '—';
+    }, _ => this.rotationPeriod = '—');
+  }
+
+  private classifyShift(startTime: string): 'Manhã'|'Tarde'|'Noite' {
+    const [hStr, mStr] = startTime.split(':');
+    const h = parseInt(hStr, 10); const m = parseInt(mStr||'0',10);
+    const minutes = h*60 + m;
+    if (minutes >= 4*60 && minutes <= 12*60 + 59) return 'Manhã';
+    if (minutes >= 13*60 && minutes <= 17*60 + 59) return 'Tarde';
+    return 'Noite';
+  }
+
+  // ===== Persistência local (draft) =====
+  private draftKey(): string {
+    const aluno = this.alunoId || 0;
+    const disc = this.disciplineId || 0;
+    const week = this.week || 0;
+    return `evalDraft:${aluno}:${disc}:${week}`;
+  }
+
+  private saveDraftDebounced() {
+    if (this.draftSaveTimer) clearTimeout(this.draftSaveTimer);
+    this.draftSaveTimer = setTimeout(() => this.saveDraft(), 300);
+  }
+
+  private saveDraft() {
+    try {
+      const payload = {
+        answers: this.answers(),
+        score: this.score,
+        comment: this.comment,
+        activeDim: this.activeDimIndex()
+      };
+      localStorage.setItem(this.draftKey(), JSON.stringify(payload));
+    } catch { /* ignore quota errors */ }
+  }
+
+  private loadDraft() {
+    try {
+      const raw = localStorage.getItem(this.draftKey());
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed.answers) this.answers.set(parsed.answers);
+      if (parsed.score != null) this.score = parsed.score;
+      if (parsed.comment) this.comment = parsed.comment;
+      if (parsed.activeDim != null && parsed.activeDim >=0 && parsed.activeDim < this.dimensions.length) {
+        this.activeDimIndex.set(parsed.activeDim);
+        this.activeDimFromDraft = true;
+      }
+    } catch { /* ignore */ }
+  }
+
+  private clearDraft() {
+    try { localStorage.removeItem(this.draftKey()); } catch { /* ignore */ }
+  }
+
+  private mergeDraftAnswers() {
+    try {
+      const raw = localStorage.getItem(this.draftKey());
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (!draft?.answers) return;
+      const merged = { ...this.answers() };
+      let changed = false;
+      for (const dimId of Object.keys(draft.answers)) {
+        const draftDim = draft.answers[dimId] || {};
+        merged[dimId] = { ...(merged[dimId] || {}) };
+        for (const qId of Object.keys(draftDim)) {
+          if (merged[dimId][qId] == null) {
+            merged[dimId][qId] = draftDim[qId];
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        this.answers.set(merged);
+        this.saveDraft(); // atualizar draft com merge
+      }
+      // Se não havia activeDim salvo no draft, calcular última dimensão tocada
+      if (!this.activeDimFromDraft) this.selectLastTouchedDimension();
+    } catch { /* ignore */ }
+  }
+
+  private selectLastTouchedDimension() {
+    const ans = this.answers();
+    let last = 0;
+    this.dimensions.forEach((dim, idx) => {
+      const dimAns = ans[dim.id] || {};
+      // Tocada se existe pelo menos uma resposta
+      if (Object.keys(dimAns).length > 0) last = idx;
+    });
+    this.activeDimIndex.set(last);
   }
 }

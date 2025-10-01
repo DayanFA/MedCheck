@@ -84,6 +84,15 @@ export class ReportComponent implements OnChanges {
         this.loadWeek(this.selectedWeek.number);
       }
     });
+
+    // Se navegação veio com pedido de refresh de avaliação global
+    const nav = this.router.getCurrentNavigation();
+    if (nav?.extras?.state && (nav.extras.state as any).refreshEval) {
+      this.evaluationDetails = null;
+      // forçar recarregar avaliação (loadWeek chama loadEvaluationForWeek na primeira semana)
+      this.weeks.forEach(w => w.evaluation = null);
+      this.loadEvaluationForWeek(this.selectedWeek.number);
+    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -231,30 +240,28 @@ export class ReportComponent implements OnChanges {
     });
   }
 
-  private loadEvaluationForWeek(weekNumber: number) {
+  private loadEvaluationForWeek(_weekNumberIgnored: number) {
+    // Força uso de weekNumber=1 como chave global de avaliação
     const alunoRef = this.alunoId || this.auth.getUser()?.id;
     if (!alunoRef) return;
-    this.evalService.get(alunoRef, weekNumber, this.disciplineId).subscribe(res => {
-      if (res && res.found) {
-        const idx = weekNumber - 1;
-        if (this.weeks[idx]) this.weeks[idx].evaluation = res.score;
-        // Parse e enriquecer detalhes (JSON string -> objeto com textos das perguntas se disponíveis)
-        let parsed: any = null;
-        if (res.details) {
-          try { parsed = typeof res.details === 'string' ? JSON.parse(res.details) : res.details; } catch { parsed = null; }
-        }
-        // Estrutura final: { score, comment, details: { dimensions: [{ id, name, questions:[{ id,text, answer }] }] } }
-        const enriched: any = { score: res.score, comment: res.comment, preceptorName: res.preceptorName };
-        if (parsed?.dimensions) {
-          enriched.details = { dimensions: parsed.dimensions.map((d: any) => {
-            // Tentativa de obter definição local (se futuramente múltiplas dimensões forem carregadas dinamicamente) - por enquanto não temos catálogo aqui.
-            const answers = d.answers || {};
-            const questions = Object.keys(answers).map(qId => ({ id: qId, text: qId, answer: answers[qId] }));
-            return { id: d.id, name: d.id, questions };
-          }) };
-        }
-        this.evaluationDetails = enriched;
+    this.evalService.get(alunoRef, 1, this.disciplineId).subscribe(res => {
+      if (!(res && res.found)) return;
+      // Parse e enriquecer detalhes (JSON string -> objeto com textos das perguntas se disponíveis)
+      let parsed: any = null;
+      if (res.details) {
+        try { parsed = typeof res.details === 'string' ? JSON.parse(res.details) : res.details; } catch { parsed = null; }
       }
+      const enriched: any = { score: res.score, comment: res.comment, preceptorName: res.preceptorName };
+      if (parsed?.dimensions) {
+        enriched.details = { dimensions: parsed.dimensions.map((d: any) => {
+          const answers = d.answers || {};
+          const questions = Object.keys(answers).map(qId => ({ id: qId, text: qId, answer: answers[qId] }));
+          return { id: d.id, name: d.id, questions };
+        }) };
+      }
+      this.evaluationDetails = enriched;
+      // Propagar score para todas as semanas para exibição uniforme.
+      for (const w of this.weeks) { w.evaluation = res.score; }
     });
   }
 
@@ -337,8 +344,8 @@ export class ReportComponent implements OnChanges {
   }
 
   goToEvaluation() {
-    // Rota dedicada (protótipo): /avaliacao?alunoId=...&disciplineId=...&week=...
-    const queryParams: any = { alunoId: this.alunoId || '' , week: this.selectedWeek.number };
+    // Navega para avaliação global (sem parâmetro de semana)
+    const queryParams: any = { alunoId: this.alunoId || '' };
     if (this.disciplineId) queryParams.disciplineId = this.disciplineId;
     this.router.navigate(['/avaliacao'], { queryParams });
   }

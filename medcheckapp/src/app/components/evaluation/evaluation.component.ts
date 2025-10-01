@@ -1,4 +1,4 @@
-import { Component, signal, computed, effect, HostListener } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -15,7 +15,7 @@ interface DimensionDef { id: string; title: string; questions: { id: string; tex
   styleUrls: ['./evaluation.component.scss']
 })
 export class EvaluationComponent {
-  alunoId!: number; week!: number; disciplineId?: number;
+  alunoId!: number; disciplineId?: number; // avaliação global única
   loading = signal(true);
   saving = signal(false);
   score: number | null = null;
@@ -25,13 +25,7 @@ export class EvaluationComponent {
   preceptorName = '—';
   disciplineLabel = 'CCSD459 - Internato em Medicina de Família e Comunidade';
   rotationPeriod: string = '—';
-  weeks: number[] = Array.from({length:10}, (_,i)=> i+1);
-
-  // Paginação de abas (mesma lógica do relatório)
-  groupSize = 5;
-  breakpointPx = 900; // largura abaixo da qual usamos grupos + reticências
-  paginated = false;
-  groupStartIndex = 0; // índice base (0-based) do grupo atual
+  // Removidas semanas: avaliação não segmentada por week.
 
   // Escala 1..5 - emojis
   faces = [ '😞','🙁','😐','🙂','😃' ];
@@ -81,15 +75,11 @@ export class EvaluationComponent {
               private router: Router) {
     this.route.queryParamMap.subscribe(p => {
       this.alunoId = Number(p.get('alunoId'));
-      this.week = Number(p.get('week'));
       const d = p.get('disciplineId');
       this.disciplineId = d ? Number(d) : undefined;
       this.loadDraft();
       this.loadStudentInfo();
       this.fetchExisting();
-      // Ajustar paginação conforme largura e posicionar grupo da semana selecionada
-      this.updatePaginationMode();
-      this.ensureGroupForSelected();
       this.loadRotationPeriod();
     });
   }
@@ -125,9 +115,9 @@ export class EvaluationComponent {
   }
 
   fetchExisting() {
-    if (!this.alunoId || !this.week) return;
+    if (!this.alunoId) return;
     this.loading.set(true);
-    this.evalApi.get(this.alunoId, this.week, this.disciplineId).subscribe(res => {
+    this.evalApi.get(this.alunoId, 1, this.disciplineId).subscribe(res => {
       if (res && res.found) {
         this.preloaded = true;
         if (res.score !== undefined && res.score !== null) this.score = res.score;
@@ -194,11 +184,11 @@ export class EvaluationComponent {
     if (!this.canSubmit()) return;
     this.saving.set(true);
     const details = { dimensions: this.dimensions.map(d => ({ id: d.id, answers: this.answers()[d.id] || {} })) };
-    this.evalApi.save({ alunoId: this.alunoId, weekNumber: this.week, disciplineId: this.disciplineId, score: this.score!, comment: this.comment, details }).subscribe(_ => {
+    this.evalApi.save({ alunoId: this.alunoId, weekNumber: 1, disciplineId: this.disciplineId, score: this.score!, comment: this.comment, details }).subscribe(_ => {
       this.saving.set(false);
       this.clearDraft();
       // voltar ao relatório
-      this.router.navigate(['/relatorio'], { queryParams: { alunoId: this.alunoId, disciplineId: this.disciplineId } });
+  this.router.navigate(['/relatorio'], { queryParams: { alunoId: this.alunoId, disciplineId: this.disciplineId }, state: { refreshEval: true, ts: Date.now() } });
     }, _ => this.saving.set(false));
   }
 
@@ -213,51 +203,13 @@ export class EvaluationComponent {
     });
   }
 
-  selectWeek(w: number) {
-    if (w === this.week) return;
-    this.week = w;
-    this.fetchExisting();
-    this.ensureGroupForSelected();
-    this.loadRotationPeriod();
-  }
-
-  // ===== Paginação Semanas =====
-  @HostListener('window:resize') onResize() { this.updatePaginationMode(); }
-
-  private updatePaginationMode() {
-    const wasPaginated = this.paginated;
-    this.paginated = window.innerWidth < this.breakpointPx;
-    if (!this.paginated) {
-      this.groupStartIndex = 0; // mostrar tudo
-    } else if (!wasPaginated && this.paginated) {
-      this.ensureGroupForSelected();
-    } else if (wasPaginated && this.paginated) {
-      // garantir que semana selecionada continua visível
-      this.ensureGroupForSelected();
-    }
-  }
-
-  private ensureGroupForSelected() {
-    if (!this.paginated || !this.week) return;
-    const selIndex = this.week - 1; // 0-based
-    const group = Math.floor(selIndex / this.groupSize);
-    this.groupStartIndex = group * this.groupSize;
-  }
-
-  get displayedWeeks(): number[] {
-    if (!this.paginated) return this.weeks;
-    return this.weeks.slice(this.groupStartIndex, this.groupStartIndex + this.groupSize);
-  }
-  get hasPrevGroup(): boolean { return this.paginated && this.groupStartIndex > 0; }
-  get hasNextGroup(): boolean { return this.paginated && (this.groupStartIndex + this.groupSize) < this.weeks.length; }
-  prevGroup() { if (this.hasPrevGroup) this.groupStartIndex = Math.max(0, this.groupStartIndex - this.groupSize); }
-  nextGroup() { if (this.hasNextGroup) this.groupStartIndex = this.groupStartIndex + this.groupSize; }
+  // Removidas funções de seleção/paginação de semanas.
 
   // ===== Cálculo Período do Rodízio =====
   private loadRotationPeriod() {
-    if (!this.alunoId || !this.week) { this.rotationPeriod = '—'; return; }
-    // Reutiliza endpoint de semana para obter planos e derivar períodos (Manhã, Tarde, Noite)
-    this.preceptorService.weekReport(this.week, this.alunoId, this.disciplineId).subscribe(res => {
+    if (!this.alunoId) { this.rotationPeriod = '—'; return; }
+    // Usa semana 1 como referência arbitrária enquanto não houver endpoint global
+    this.preceptorService.weekReport(1, this.alunoId, this.disciplineId).subscribe(res => {
       const plans = res?.plans || [];
       if (!plans.length) { this.rotationPeriod = '—'; return; }
       const used = new Set<string>();
@@ -287,8 +239,7 @@ export class EvaluationComponent {
   private draftKey(): string {
     const aluno = this.alunoId || 0;
     const disc = this.disciplineId || 0;
-    const week = this.week || 0;
-    return `evalDraft:${aluno}:${disc}:${week}`;
+    return `evalDraft:${aluno}:${disc}:GLOBAL`;
   }
 
   private saveDraftDebounced() {

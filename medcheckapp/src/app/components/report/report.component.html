@@ -88,8 +88,9 @@
       </table>
     </div>
 
-    <div class="row g-2 align-items-center mb-3 small">
-      <div class="col-12 col-md-8 col-lg-6 d-flex align-items-center flex-wrap">
+    <!-- Card de Avaliação (agora separado da área de identificação/presenças) -->
+    <div class="evaluation-card mb-3">
+      <div class="d-flex align-items-center flex-wrap small">
         <label class="form-label mb-0 me-2">Avaliação do(a) Preceptor(a) (0 a 10):</label>
         <ng-container *ngIf="weeks && weeks[selectedWeekIndex]?.evaluation !== undefined && weeks[selectedWeekIndex]?.evaluation !== null; else semAvaliacao">
           <span class="evaluation-inline-score">{{ weeks[selectedWeekIndex].evaluation | number:'1.0-1' }}</span>
@@ -99,7 +100,7 @@
           <span class="text-muted fst-italic">(não enviada)</span>
         </ng-template>
       </div>
-      <div class="col text-danger" *ngIf="selectedWeek.evaluation !== null && (selectedWeek.evaluation! < 0 || selectedWeek.evaluation! > 10)">
+      <div class="text-danger mt-2 small" *ngIf="selectedWeek.evaluation !== null && (selectedWeek.evaluation! < 0 || selectedWeek.evaluation! > 10)">
         Valor deve estar entre 0 e 10.
       </div>
     </div>
@@ -108,7 +109,7 @@
     <div class="eval-modal-backdrop" *ngIf="showEvalModal" (click)="closeEvaluationDetails()"></div>
     <div class="eval-modal" *ngIf="showEvalModal">
       <div class="modal-header">
-        <h3>Detalhes da Avaliação - Semana {{ selectedWeekIndex + 1 }}</h3>
+        <h3>Detalhes da Avaliação</h3>
         <button class="close-btn" (click)="closeEvaluationDetails()">×</button>
       </div>
       <div class="modal-body" *ngIf="evaluationDetails as ev">

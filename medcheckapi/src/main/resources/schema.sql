@@ -253,8 +253,9 @@ SELECT d.id, 2 FROM disciplines d WHERE d.code IN ('CCSD459','CCSD463');
 -- Geração de datas do mês atual sem CTE (compatível com variações do MySQL 8)
 -- Cria uma tabela derivada de números de 0..30 e soma ao primeiro dia do mês atual
 -- para obter todas as datas do mês corrente.
-INSERT INTO internship_plans (aluno_id, discipline_id, `date`, start_time, end_time, location, note)
-SELECT u.id, NULL, cal.d AS `date`, '08:00', '12:00', 'UBS Central', 'Plano (seed) manhã'
+-- week_number calculado: ((dia-1) DIV 7) + 1 limitado a 10
+INSERT INTO internship_plans (aluno_id, discipline_id, `date`, start_time, end_time, week_number, location, note)
+SELECT u.id, NULL, cal.d AS `date`, '08:00', '12:00', LEAST(10, ((DAYOFMONTH(cal.d)-1) DIV 7) + 1) AS week_number, 'UBS Central', 'Plano (seed) manhã'
 FROM users u
 JOIN (
   SELECT DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL n.n DAY) AS d
@@ -272,8 +273,8 @@ JOIN (
 WHERE u.role = 'ALUNO';
 
 -- Inserir planos (tarde) apenas em dias pares (sem CTE)
-INSERT INTO internship_plans (aluno_id, discipline_id, `date`, start_time, end_time, location, note)
-SELECT u.id, NULL, cal.d AS `date`, '14:00', '18:00', 'UBS Central', 'Plano (seed) tarde'
+INSERT INTO internship_plans (aluno_id, discipline_id, `date`, start_time, end_time, week_number, location, note)
+SELECT u.id, NULL, cal.d AS `date`, '14:00', '18:00', LEAST(10, ((DAYOFMONTH(cal.d)-1) DIV 7) + 1) AS week_number, 'UBS Central', 'Plano (seed) tarde'
 FROM users u
 JOIN (
   SELECT DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL n.n DAY) AS d

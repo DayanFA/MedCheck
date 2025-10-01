@@ -1,12 +1,14 @@
 import { Component, HostListener } from '@angular/core';
 import { AuthService } from '../../services/auth.service';
 import { CalendarServiceApi } from '../../services/calendar.service';
+import { WeekSelectionService } from '../../services/week-selection.service';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-interface DayPeriod { shift: string; location: string; }
+interface PeriodInterval { start: string; end: string; }
+interface DayPeriod { shift: string; locations: string[]; intervals: PeriodInterval[]; }
 interface WeekDayRow { weekday: string; date: Date; periods: DayPeriod[]; }
-interface WeekData { number: number; days: WeekDayRow[]; evaluation: number | null; }
+interface WeekData { number: number; days: WeekDayRow[]; evaluation: number | null; loaded: boolean; }
 
 @Component({
   selector: 'app-report',
@@ -28,26 +30,27 @@ export class ReportComponent {
   student = { name: '...', preceptorName: '', rotationPeriod: 'Manhã e Tarde' };
   disciplineLabel = '';
 
-  constructor(private auth: AuthService, private calApi: CalendarServiceApi) {
-    this.generateMockWeeks();
+  constructor(private auth: AuthService, private calApi: CalendarServiceApi, private weekSync: WeekSelectionService) {
+    this.initWeeks();
     this.updatePaginationMode();
     this.ensureGroupForSelected();
-    // tenta pegar nome real do usuário logado
     const u = this.auth.getUser();
     if (u?.name) this.student.name = u.name;
     if (u?.currentDisciplineName) {
-      // Monta label: CURSO DE MEDICINA - {NOME DA DISCIPLINA}
       const code = u.currentDisciplineCode ? u.currentDisciplineCode + ' - ' : '';
       this.disciplineLabel = `CURSO DE MEDICINA - ${code}${u.currentDisciplineName}`;
     } else {
       this.disciplineLabel = 'CURSO DE MEDICINA';
     }
-    // Busca preceptor vinculado à disciplina atual
     this.calApi.getCurrentPreceptor().subscribe(p => {
-      if (p?.name) {
-        this.student.preceptorName = p.name;
-      }
+      if (p?.name) this.student.preceptorName = p.name;
     });
+    // Sincroniza semana global selecionada vinda do calendário (se já alterada lá)
+    const globalWeek = this.weekSync.week();
+    if (globalWeek && globalWeek >=1 && globalWeek <=10) {
+      this.selectedWeekIndex = globalWeek - 1;
+    }
+    this.loadWeek(this.selectedWeek.number);
   }
 
   @HostListener('window:resize') onResize() { this.updatePaginationMode(); }
@@ -70,20 +73,106 @@ export class ReportComponent {
     this.groupStartIndex = group * this.groupSize;
   }
 
-  private generateMockWeeks() {
-    const start = new Date();
-    const diffToThursday = (4 - start.getDay() + 7) % 7;
-    const firstThursday = new Date(start.getFullYear(), start.getMonth(), start.getDate() + diffToThursday);
-    for (let w = 0; w < 10; w++) {
-      const weekDays: WeekDayRow[] = [];
-      for (let d = 0; d < 3; d++) {
-        const date = new Date(firstThursday); date.setDate(firstThursday.getDate() + w * 7 + d);
-        const weekdayNames = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-        const weekday = weekdayNames[(4 + d) % 7];
-        weekDays.push({ weekday, date, periods: [ { shift: 'Manhã', location: '' }, { shift: 'Tarde', location: '' } ] });
+  private initWeeks() {
+    this.weeks = Array.from({ length: 10 }, (_, i) => ({ number: i + 1, days: [], evaluation: null, loaded: false }));
+  }
+
+  private loadWeek(weekNumber: number) {
+    const idx = weekNumber - 1;
+    const wk = this.weeks[idx];
+    if (!wk) return;
+    if (wk.loaded) return; // evitar reload repetido (pode ajustar depois com refresh)
+    this.calApi.getWeekPlans(weekNumber).subscribe(res => {
+      const plans = res?.plans || [];
+      // Fallback: se não há planos retornados (talvez registros antigos sem weekNumber), tentar derivar semana pegando todos planos do mês e filtrando por intervalo de datas.
+      // (Simplificação: se vazio, não fazemos chamada extra agora para evitar overhead; poderia haver endpoint futuro.)
+      // Agrupar por dia
+      const byDate: Record<string, any[]> = {};
+      for (const p of plans) {
+        byDate[p.date] = byDate[p.date] || [];
+        byDate[p.date].push(p);
       }
-      this.weeks.push({ number: w + 1, days: weekDays, evaluation: null });
-    }
+      const weekdayFull = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+      const dayRows: WeekDayRow[] = Object.keys(byDate).sort().map(dateStr => {
+        const date = new Date(dateStr + 'T00:00:00');
+        const weekday = weekdayFull[date.getDay()];
+        const periodsMap: { [shift: string]: { locs: Set<string>; intervals: PeriodInterval[] } } = {
+          'Manhã': { locs: new Set<string>(), intervals: [] },
+          'Tarde': { locs: new Set<string>(), intervals: [] },
+          'Noite': { locs: new Set<string>(), intervals: [] }
+        };
+        for (const plan of byDate[dateStr]) {
+          const start = plan.startTime;
+          const end = plan.endTime;
+          // Se end < start, é overnight: dividir em (start-23:59) no dia atual e (00:00-end) no dia seguinte
+          if (start && end && end < start) {
+            // Primeiro segmento (dia atual)
+            const shift1 = this.classifyShift(start);
+            if (plan.location) periodsMap[shift1].locs.add(plan.location);
+            periodsMap[shift1].intervals.push({ start: start, end: '23:59' });
+            // Segundo segmento: armazenar em buffer para dia seguinte
+            const nextDate = new Date(date.getTime());
+            nextDate.setDate(nextDate.getDate() + 1);
+            const nextIso = nextDate.toISOString().substring(0,10);
+            // garantir estrutura no map global byDate se for do mesmo fetch (apenas para visual no relatório semanal)
+            if (!byDate[nextIso]) byDate[nextIso] = [];
+            byDate[nextIso].push({ ...plan, date: nextIso, startTime: '00:00', endTime: end });
+          } else {
+            // Normal
+            const shift = this.classifyShift(start);
+            if (plan.location) periodsMap[shift].locs.add(plan.location);
+            if (plan.startTime && plan.endTime) {
+              periodsMap[shift].intervals.push({ start: plan.startTime, end: plan.endTime });
+            }
+          }
+        }
+        const periods: DayPeriod[] = Object.keys(periodsMap).map(shift => {
+          const data = periodsMap[shift];
+          // ordenar intervalos
+          const ordered = data.intervals.sort((a,b) => a.start.localeCompare(b.start));
+          // opcional: merge intervalos sobrepostos (não solicitado; manter granular)
+          return {
+            shift,
+            locations: Array.from(data.locs),
+            intervals: ordered
+          } as DayPeriod;
+        }).filter(p => p.locations.length > 0 || p.intervals.length > 0);
+        return { weekday, date, periods };
+      });
+      // Se nenhum dia carregado, garantir estrutura vazia com placeholders (Seg-Sex) para não aparecer tabela em branco.
+      if (dayRows.length === 0) {
+        // Aproximação: construir uma semana base a partir da data atual + (weekNumber-1)*7
+        const base = new Date();
+        base.setHours(0,0,0,0);
+        // alinhar base para segunda-feira
+        const day = base.getDay(); // 0=Dom
+        const diffToMon = (day === 0 ? -6 : 1 - day); // deslocamento até segunda
+        base.setDate(base.getDate() + diffToMon + (weekNumber-1)*7);
+        for (let i=0;i<5;i++) { // Segunda..Sexta
+          const d = new Date(base.getTime());
+          d.setDate(base.getDate() + i);
+          const weekday = weekdayFull[d.getDay()];
+          dayRows.push({ weekday, date: d, periods: [] });
+        }
+      }
+      wk.days = dayRows;
+      wk.loaded = true;
+    });
+  }
+
+  private classifyShift(startTime: string): 'Manhã'|'Tarde'|'Noite' {
+    // startTime formato HH:mm
+    const [hStr, mStr] = startTime.split(':');
+    const h = parseInt(hStr, 10); const m = parseInt(mStr, 10) || 0;
+    const minutes = h*60 + m;
+    const manhaStart = 4*60; // 04:00
+    const manhaEnd = 12*60 + 59; // 12:59
+    const tardeStart = 13*60; // 13:00
+    const tardeEnd = 17*60 + 59; // 17:59
+    // noite: 18:00 (1080) até 23:59 (1439) e 00:00 (0) até 03:59 (239)
+    if (minutes >= manhaStart && minutes <= manhaEnd) return 'Manhã';
+    if (minutes >= tardeStart && minutes <= tardeEnd) return 'Tarde';
+    return 'Noite';
   }
 
   get selectedWeek(): WeekData { return this.weeks[this.selectedWeekIndex]; }
@@ -111,6 +200,13 @@ export class ReportComponent {
   selectWeek(i: number) {
     this.selectedWeekIndex = i;
     this.ensureGroupForSelected();
+    const wk = this.weeks[i];
+    if (wk) {
+      // sempre recarrega para refletir alterações recentes feitas no calendário
+      wk.loaded = false; // invalidar cache
+      this.loadWeek(wk.number);
+      this.weekSync.setWeek(wk.number);
+    }
   }
 
   onGeneratePdf() { console.log('Gerar PDF semana', this.selectedWeek.number, this.selectedWeek); }

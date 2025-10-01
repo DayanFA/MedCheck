@@ -2,6 +2,7 @@ import { Component, effect, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CalendarServiceApi, CalendarDay, InternshipPlanDto } from '../../services/calendar.service';
+import { WeekSelectionService } from '../../services/week-selection.service';
 import { ActivatedRoute } from '@angular/router';
 
 @Component({
@@ -71,13 +72,15 @@ export class UserCalendarComponent {
     return weeks;
   });
 
-  constructor() {
+  constructor(private weekSync: WeekSelectionService) {
     this.route.queryParamMap.subscribe(mp => {
       const idStr = mp.get('alunoId');
       const idNum = idStr ? Number(idStr) : undefined;
       this.alunoId.set(idNum && Number.isFinite(idNum) ? idNum : undefined);
       this.load();
     });
+  // sincroniza seleção inicial com service compartilhado
+  this.selectedWeek.set(this.weekSync.week());
   }
 
   pickDate(dateIso: string) {
@@ -175,6 +178,8 @@ export class UserCalendarComponent {
       note: this.formNote() || undefined,
       weekNumber: this.selectedWeek(),
     };
+    // atualizar semana global selecionada
+    this.weekSync.setWeek(this.selectedWeek());
     this.api.upsertPlan(payload).subscribe((resp: any) => {
       const saved = resp?.plan || payload;
       const cur = this.data();
@@ -197,6 +202,10 @@ export class UserCalendarComponent {
     this.formEnd.set(p.endTime);
     this.formLocation.set(p.location || '');
     this.formNote.set(p.note || '');
+    if (p.weekNumber) {
+      this.selectedWeek.set(p.weekNumber);
+      this.weekSync.setWeek(p.weekNumber);
+    }
   }
 
   deletePlan(id: number) {

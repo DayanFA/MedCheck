@@ -70,6 +70,11 @@ public class InternshipPlan {
     @Transient
     public long getPlannedSeconds() {
         if (startTime == null || endTime == null) return 0;
-        return Duration.between(startTime, endTime).getSeconds();
+        Duration d = Duration.between(startTime, endTime);
+        if (d.isNegative()) {
+            // intervalo atravessa a meia-noite: soma 24h
+            d = d.plusHours(24);
+        }
+        return d.getSeconds();
     }
 }

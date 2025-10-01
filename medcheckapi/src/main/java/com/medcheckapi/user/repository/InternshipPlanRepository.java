@@ -10,4 +10,5 @@ import java.util.List;
 public interface InternshipPlanRepository extends JpaRepository<InternshipPlan, Long> {
     List<InternshipPlan> findByAlunoAndDateBetweenOrderByDateAsc(User aluno, LocalDate start, LocalDate end);
     List<InternshipPlan> findByAlunoAndDate(User aluno, LocalDate date);
+    List<InternshipPlan> findByAlunoAndWeekNumberOrderByDateAsc(User aluno, Integer weekNumber);
 }

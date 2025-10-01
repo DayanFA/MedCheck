@@ -82,4 +82,12 @@ export class CalendarServiceApi {
     const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
     return this.http.get<{ id?: number; name?: string }>(`/api/calendar/current/preceptor`, { headers });
   }
+
+  getWeekPlans(weekNumber: number, alunoId?: number) {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    const params: any = { weekNumber };
+    if (alunoId) params.alunoId = alunoId;
+    return this.http.get<{ weekNumber: number; count: number; plans: InternshipPlanDto[] }>(`/api/calendar/week`, { headers, params });
+  }
 }

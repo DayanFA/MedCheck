@@ -83,7 +83,12 @@ public class CalendarService {
         m.put("endTime", p.getEndTime().toString());
         m.put("location", p.getLocation());
         m.put("note", p.getNote());
-        m.put("plannedSeconds", p.getPlannedSeconds());
+        long secs = p.getPlannedSeconds();
+        if (secs < 0 && p.getStartTime() != null && p.getEndTime() != null) {
+            // segurança extra: overnight não tratado por algum motivo => soma 24h
+            secs += 24 * 3600;
+        }
+        m.put("plannedSeconds", secs);
         if (p.getWeekNumber() != null) m.put("weekNumber", p.getWeekNumber());
         return m;
     }

@@ -5,7 +5,6 @@ import com.medcheckapi.user.repository.UserRepository;
 import com.medcheckapi.user.repository.InternshipPlanRepository;
 import com.medcheckapi.user.repository.InternshipJustificationRepository;
 import com.medcheckapi.user.repository.DisciplineRepository;
-import com.medcheckapi.user.repository.UserRepository;
 import com.medcheckapi.user.service.CalendarService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -29,6 +30,20 @@ public class CalendarController {
         this.userRepo = userRepo; this.calendarService = calendarService; this.planRepo = planRepo; this.justRepo = justRepo; this.discRepo = discRepo;
     }
 
+    private Map<String,Object> planDto(InternshipPlan p) {
+        Map<String,Object> m = new HashMap<>();
+        m.put("id", p.getId());
+        m.put("date", p.getDate().toString());
+        m.put("startTime", p.getStartTime() == null ? null : p.getStartTime().toString());
+        m.put("endTime", p.getEndTime() == null ? null : p.getEndTime().toString());
+        m.put("location", p.getLocation());
+        if (p.getNote() != null) m.put("note", p.getNote());
+        if (p.getWeekNumber() != null) m.put("weekNumber", p.getWeekNumber());
+        // opcional: incluir plannedSeconds
+        m.put("plannedSeconds", p.getPlannedSeconds());
+        return m;
+    }
+
     private User currentUser(org.springframework.security.core.userdetails.User principal) {
         return userRepo.findByCpf(principal.getUsername()).orElseThrow();
     }
@@ -38,16 +53,16 @@ public class CalendarController {
     public ResponseEntity<?> currentPreceptor(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
         User me = currentUser(principal);
         Discipline d = me.getCurrentDiscipline();
-        if (d == null) return ResponseEntity.ok(Map.of());
+    if (d == null) return ResponseEntity.ok(new HashMap<>()); // empty
         // Lazy load preceptores (ManyToMany). Se não carregado, buscar via repository
         Discipline managed = discRepo.findById(d.getId()).orElse(null);
-        if (managed == null || managed.getPreceptors().isEmpty()) return ResponseEntity.ok(Map.of());
+    if (managed == null || managed.getPreceptors().isEmpty()) return ResponseEntity.ok(new HashMap<>());
         User preceptor = managed.getPreceptors().stream().findFirst().orElse(null);
-        if (preceptor == null) return ResponseEntity.ok(Map.of());
-        return ResponseEntity.ok(Map.of(
-                "id", preceptor.getId(),
-                "name", preceptor.getName()
-        ));
+    if (preceptor == null) return ResponseEntity.ok(new HashMap<>());
+    Map<String,Object> resp = new HashMap<>();
+    resp.put("id", preceptor.getId());
+    resp.put("name", preceptor.getName());
+    return ResponseEntity.ok(resp);
     }
 
     @GetMapping("/month")
@@ -60,6 +75,28 @@ public class CalendarController {
             target = userRepo.findById(alunoId).orElse(me);
         }
         return ResponseEntity.ok(calendarService.monthView(target, year, month));
+    }
+
+    // Planos do aluno logado filtrados por weekNumber (1..10)
+    @GetMapping("/week")
+    public ResponseEntity<?> week(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                  @RequestParam("weekNumber") Integer weekNumber,
+                                  @RequestParam(value = "alunoId", required = false) Long alunoId) {
+        if (weekNumber == null || weekNumber < 1 || weekNumber > 52) {
+            return ResponseEntity.badRequest().body(Map.of("error", "weekNumber inválido"));
+        }
+        User me = currentUser(principal);
+        User target = me;
+        if (alunoId != null && (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN)) {
+            target = userRepo.findById(alunoId).orElse(me);
+        }
+        List<InternshipPlan> list = planRepo.findByAlunoAndWeekNumberOrderByDateAsc(target, weekNumber);
+        List<Map<String,Object>> plans = list.stream().map(this::planDto).toList();
+        Map<String,Object> out = new HashMap<>();
+        out.put("weekNumber", weekNumber);
+        out.put("count", plans.size());
+        out.put("plans", plans);
+        return ResponseEntity.ok(out);
     }
 
     @PostMapping("/plan")
@@ -83,20 +120,19 @@ public class CalendarController {
             } catch (Exception ignored) {}
         }
         InternshipPlan p = id == null ? new InternshipPlan() : planRepo.findById(id).orElse(new InternshipPlan());
-    p.setAluno(me); p.setDate(date); p.setStartTime(start); p.setEndTime(end); p.setLocation(location); p.setNote(note); p.setWeekNumber(weekNumber);
-    // Disciplina atual do aluno vincula o plano
-    p.setDiscipline(me.getCurrentDiscipline());
+        p.setAluno(me);
+        p.setDate(date);
+        p.setStartTime(start);
+        p.setEndTime(end);
+        p.setLocation(location);
+        p.setNote(note);
+        p.setWeekNumber(weekNumber);
+        // Disciplina atual do aluno vincula o plano
+        p.setDiscipline(me.getCurrentDiscipline());
         p = planRepo.save(p);
-        return ResponseEntity.ok(Map.of("plan", Map.of(
-                "id", p.getId(),
-                "date", p.getDate().toString(),
-                "startTime", p.getStartTime().toString(),
-                "endTime", p.getEndTime().toString(),
-                "location", p.getLocation(),
-                "note", p.getNote(),
-                "plannedSeconds", p.getPlannedSeconds(),
-                "weekNumber", p.getWeekNumber()
-        )));
+        Map<String,Object> resp = new HashMap<>();
+        resp.put("plan", planDto(p));
+        return ResponseEntity.ok(resp);
     }
 
     @DeleteMapping("/plan/{id}")
@@ -112,38 +148,36 @@ public class CalendarController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    // Criar ou atualizar justificativa do aluno logado
     @PostMapping("/justify")
     public ResponseEntity<?> upsertJustification(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
-                                                 @RequestBody Map<String, String> body) {
+                                                 @RequestBody Map<String,String> body) {
         User me = currentUser(principal);
+        Long id = body.containsKey("id") ? Long.valueOf(body.get("id")) : null;
         LocalDate date = LocalDate.parse(body.get("date"));
-        // Business rule: justification only allowed if there is at least one plan on that date
-        if (planRepo.findByAlunoAndDate(me, date).isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Crie um plano para o dia antes de justificar"));
-        }
-        InternshipJustification j = justRepo.findFirstByAlunoAndDate(me, date).orElseGet(() -> {
-            InternshipJustification nj = new InternshipJustification();
-            nj.setAluno(me);
-            nj.setDate(date);
-            return nj;
-        });
+        InternshipJustification j = id == null ? new InternshipJustification() : justRepo.findById(id).orElse(new InternshipJustification());
+        j.setAluno(me);
+        j.setDate(date);
         if (body.containsKey("planId")) {
-            try { Long pid = Long.valueOf(body.get("planId")); planRepo.findById(pid).ifPresent(j::setPlan);} catch (Exception ignored) { j.setPlan(null); }
+            try {
+                Long pid = Long.valueOf(body.get("planId"));
+                planRepo.findById(pid).ifPresent(j::setPlan);
+            } catch (Exception ignored) { j.setPlan(null); }
         }
-    j.setType(body.getOrDefault("type", "GENERAL"));
+        j.setType(body.getOrDefault("type", "GENERAL"));
         j.setReason(body.getOrDefault("reason", ""));
-        // always reset to PENDING on edit by aluno
+        // Sempre reseta para PENDING quando o aluno cria/edita
         j.setStatus("PENDING");
-    j.setDiscipline(me.getCurrentDiscipline());
+        j.setDiscipline(me.getCurrentDiscipline());
         j = justRepo.save(j);
-        return ResponseEntity.ok(Map.of(
-                "id", j.getId(),
-                "date", j.getDate().toString(),
-                "type", j.getType(),
-                "reason", j.getReason(),
-                "status", j.getStatus(),
-                "planId", j.getPlan() == null ? null : j.getPlan().getId()
-        ));
+        Map<String,Object> resp = new HashMap<>();
+        resp.put("id", j.getId());
+        resp.put("date", j.getDate().toString());
+        resp.put("type", j.getType());
+        resp.put("reason", j.getReason());
+        resp.put("status", j.getStatus());
+        resp.put("planId", j.getPlan() == null ? null : j.getPlan().getId());
+        return ResponseEntity.ok(resp);
     }
 
     @DeleteMapping("/justify/{id}")

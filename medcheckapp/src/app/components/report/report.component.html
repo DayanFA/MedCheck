@@ -69,10 +69,18 @@
             <tr *ngFor="let period of day.periods; index as pi">
               <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length" class="fw-semibold">{{ day.weekday }}</td>
               <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length">{{ day.date | date:'dd/MM/yyyy' }}</td>
-              <td>{{ period.shift }}</td>
               <td>
-                <input class="form-control form-control-sm" [(ngModel)]="period.location" placeholder="Local" />
+                <div class="fw-semibold">{{ period.shift }}</div>
+                <div class="text-muted small" *ngIf="period.intervals?.length">
+                  <span *ngFor="let it of period.intervals; let last = last">
+                    {{ it.start }}-{{ it.end }}<span *ngIf="!last">; </span>
+                  </span>
+                </div>
               </td>
+                <td>
+                  <span *ngIf="period.locations?.length; else vazio">{{ period.locations.join(', ') }}</span>
+                  <ng-template #vazio><span class="text-muted">—</span></ng-template>
+                </td>
               <td class="text-muted small">{{ '{' }}Assinatura eletrônica automática pelo sistema{{ '}' }}</td>
             </tr>
           </ng-container>

@@ -41,6 +41,50 @@ export class ReportComponent implements OnChanges {
   evaluationDetails: any = null; // cache da avaliação carregada (aluno view)
   showEvalModal = false;
 
+  // Mapas para exibir textos completos das dimensões e questões na modal de detalhes
+  dimensionTitles: Record<string,string> = {
+    dim1: 'Dimensão 1: Clínica da APS',
+    dim2: 'Dimensão 2: Atuação comunitária',
+    dim3: 'Dimensão 3: Vínculo com a equipe e processo de trabalho',
+    dim4: 'Dimensão 4: Sistema de saúde e políticas públicas'
+  };
+  private questionTexts: Record<string, Record<string,string>> = {
+    dim1: {
+      q1: 'Atua com empatia e busca criar vínculo com as pessoas?',
+      q2: 'Utiliza o tempo de forma adequada no atendimento às necessidades apresentadas?',
+      q3: 'Sabe conduzir a entrevista clínica abordando os diversos problemas relatados?',
+      q4: 'Sabe conduzir o exame clínico com base nas informações da entrevista?',
+      q5: 'Busca a compreensão do processo de adoecimento de forma ampla?',
+      q6: 'Oportuniza contato para explorar condições de vida e saúde de membros da família?',
+      q7: 'Estabelece diálogo acessível à compreensão dos pacientes?',
+      q8: 'Dedica-se à explicação detalhada da condição de saúde acolhendo dúvidas?',
+      q9: 'Confecciona lista de problemas com propostas de encaminhamentos?',
+      q10: 'Compreende os ciclos de vida das famílias e aplica no entendimento do adoecimento?',
+      q11: 'Domina a clínica da APS, principais temas e manejo clínico adequado?'
+    },
+    dim2: {
+      q1: 'Dispõe-se, havendo indicação, a realizar visita domiciliar de reconhecimento, seguimento ou busca ativa?',
+      q2: 'É permeável ao contato e vínculo com outros equipamentos e representações sociais no território?',
+      q3: 'Propõe e realiza atividades nos ambientes comunitários (escolas, associações, espaços coletivos)?'
+    },
+    dim3: {
+      q1: 'Tem bom vínculo com a equipe de saúde?',
+      q2: 'Atua de forma integrada e solidária junto à equipe buscando melhorar o processo de trabalho?',
+      q3: 'Compreende a necessidade de fortalecimento e legitimação da equipe junto à comunidade?',
+      q4: 'Compreende as limitações do local onde atua e adequa condutas aos recursos disponíveis sem prejuízo ao tratamento?',
+      q5: 'É proativo na coordenação do cuidado (acompanhamento, resgate de faltosos etc.)?'
+    },
+    dim4: {
+      q1: 'Conhece o sistema de saúde loco-regional e direciona os pacientes adequadamente (integralidade)?',
+      q2: 'Compreende processos de gestão e gerenciamento como fundamentais para garantir melhor cuidado?',
+      q3: 'É capaz de elaborar e ter visão crítica e propositiva sobre as políticas de saúde?'
+    }
+  };
+
+  fullQuestionText(dimId: string, qId: string): string {
+    return this.questionTexts[dimId]?.[qId] || qId;
+  }
+
   constructor(private auth: AuthService,
               private calApi: CalendarServiceApi,
               private weekSync: WeekSelectionService,

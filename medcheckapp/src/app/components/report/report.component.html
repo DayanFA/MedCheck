@@ -113,22 +113,37 @@
         <button class="close-btn" (click)="closeEvaluationDetails()">×</button>
       </div>
       <div class="modal-body" *ngIf="evaluationDetails as ev">
-        <div class="mb-2"><strong>Nota Final:</strong> <span class="eval-modal-score">{{ ev.score | number:'1.0-1' }}</span></div>
-        <div class="mb-3" *ngIf="ev.comment"><strong>Comentário:</strong> {{ ev.comment }}</div>
-        <div *ngIf="ev.details as det">
-          <div *ngFor="let dim of det.dimensions" class="dimension-block">
-            <h4>{{ dim.name }}</h4>
-            <table class="dimension-table">
-              <thead><tr><th style="width:65%">Questão</th><th style="width:35%">Resposta</th></tr></thead>
-              <tbody>
-                <tr *ngFor="let q of dim.questions">
-                  <td>{{ q.text }}</td>
-                  <td class="answer-face">
-                    <span *ngIf="q.answer as ans" class="emoji-face" [title]="'Pontuação: ' + ans">{{ faces[ans-1] }}</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+        <!-- Legenda da escala -->
+        <div class="legend-scale mb-3 small d-flex flex-wrap align-items-center gap-3">
+          <div class="legend-title fw-semibold">Escala:</div>
+          <div class="legend-item" *ngFor="let f of faces; let idx = index">
+            <span class="legend-face">{{ f }}</span>
+            <span class="legend-label">{{ idx+1 }}</span>
+          </div>
+        </div>
+        <!-- Nota e comentário -->
+        <div class="summary-strip mb-3 p-2 p-sm-3">
+          <div class="row g-3 align-items-center">
+            <div class="col-12 col-md-auto d-flex align-items-center gap-2">
+              <strong>Nota Final:</strong>
+              <span class="eval-modal-score display-score">{{ ev.score | number:'1.0-1' }}</span>
+            </div>
+            <div class="col d-flex align-items-start gap-2" *ngIf="ev.comment">
+              <strong>Comentário:</strong>
+              <span class="eval-modal-comment flex-grow-1">{{ ev.comment }}</span>
+            </div>
+          </div>
+        </div>
+        <!-- Dimensões em cards -->
+        <div *ngIf="ev.details as det" class="dimensions-grid-wrapper">
+          <div *ngFor="let dim of det.dimensions" class="dimension-card mb-4">
+            <div class="dimension-card-header">{{ dimensionTitles[dim.id] || dim.id }}</div>
+            <div class="questions-grid">
+              <div *ngFor="let q of dim.questions" class="question-tile">
+                <div class="q-text">{{ fullQuestionText(dim.id, q.id) }}</div>
+                <div class="q-face" *ngIf="q.answer as ans" [attr.data-score]="ans" [title]="'Pontuação: ' + ans">{{ faces[ans-1] }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

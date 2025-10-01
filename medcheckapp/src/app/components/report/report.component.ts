@@ -157,7 +157,27 @@ export class ReportComponent {
       }
       wk.days = dayRows;
       wk.loaded = true;
+      this.updateRotationPeriodSummary(wk);
     });
+  }
+
+  private updateRotationPeriodSummary(week: WeekData) {
+    const used = new Set<string>();
+    for (const d of week.days) {
+      for (const p of d.periods) {
+        if (p.intervals.length > 0 || p.locations.length > 0) {
+          used.add(p.shift);
+        }
+      }
+    }
+    if (used.size === 0) {
+      this.student.rotationPeriod = '—';
+      return;
+    }
+    // Ordem desejada: Manhã, Tarde, Noite
+    const order = ['Manhã','Tarde','Noite'];
+    const list = order.filter(o => used.has(o));
+    this.student.rotationPeriod = list.join(', ');
   }
 
   private classifyShift(startTime: string): 'Manhã'|'Tarde'|'Noite' {

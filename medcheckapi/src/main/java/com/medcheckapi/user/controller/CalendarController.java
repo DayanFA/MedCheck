@@ -90,7 +90,10 @@ public class CalendarController {
         if (alunoId != null && (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN)) {
             target = userRepo.findById(alunoId).orElse(me);
         }
-        List<InternshipPlan> list = planRepo.findByAlunoAndWeekNumberOrderByDateAsc(target, weekNumber);
+    Discipline current = target.getCurrentDiscipline();
+    List<InternshipPlan> list = (current == null)
+        ? planRepo.findByAlunoAndWeekNumberOrderByDateAsc(target, weekNumber)
+        : planRepo.findByAlunoAndDisciplineAndWeekNumberOrderByDateAsc(target, current, weekNumber);
         List<Map<String,Object>> plans = list.stream().map(this::planDto).toList();
         Map<String,Object> out = new HashMap<>();
         out.put("weekNumber", weekNumber);

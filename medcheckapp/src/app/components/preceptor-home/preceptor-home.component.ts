@@ -247,7 +247,7 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
 
   avaliar(a: any){
     if (!a?.id) return;
-    this.router.navigate(['/preceptor/avaliar', a.id]);
+    this.router.navigate(['/relatorio'], { queryParams: { alunoId: a.id } });
   }
 
   openCalendar(a: any){

@@ -36,7 +36,7 @@ export const routes: Routes = [
             { path: 'preceptor/home', component: PreceptorHomeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
             { path: 'preceptor/avaliar/:alunoId', component: PreceptorEvaluateComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
             { path: 'calendario', component: UserCalendarComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN'] } },
-            { path: 'relatorio', component: ReportComponent, canActivate: [roleGuard], data: { roles: ['ALUNO'] } },
+            { path: 'relatorio', component: ReportComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN'] } },
             { path: 'configuracoes', component: SettingsComponent },
             { path: 'admin/usuarios', component: AdminUsersComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
             { path: 'admin/disciplinas', component: AdminDisciplinesComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },

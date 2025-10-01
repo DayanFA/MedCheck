@@ -62,6 +62,20 @@ export class ReportComponent implements OnChanges {
     // Carrega imediatamente a semana inicial no contexto do aluno.
     // Para o preceptor, ngOnChanges (inputs) irá forçar recarga depois.
     this.loadWeek(this.selectedWeek.number);
+    // Caso seja acessado via rota /relatorio?alunoId=... (preceptor/admin) sem uso de inputs.
+    this.route.queryParamMap.subscribe(pm => {
+      // Só aplica se não recebemos @Input (Inputs prevalecem via ngOnChanges)
+      if (this.alunoId) return;
+      const aid = pm.get('alunoId');
+      const did = pm.get('disciplineId');
+      if (aid) {
+        this.alunoId = Number(aid);
+        this.disciplineId = did ? Number(did) : undefined;
+        this.weeks.forEach(w => w.loaded = false);
+        this.fetchStudentInfo();
+        this.loadWeek(this.selectedWeek.number);
+      }
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {

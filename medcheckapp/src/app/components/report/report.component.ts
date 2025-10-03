@@ -87,6 +87,10 @@ export class ReportComponent implements OnChanges {
     return this.questionTexts[dimId]?.[qId] || qId;
   }
 
+  // Armazena conjunto global de turnos usados em todas as semanas carregadas
+  private globalShiftSet: Set<string> = new Set<string>();
+  globalRotationPeriod: string = '—';
+
   constructor(private auth: AuthService,
               private calApi: CalendarServiceApi,
               private weekSync: WeekSelectionService,
@@ -329,6 +333,10 @@ export class ReportComponent implements OnChanges {
     if (this.selectedWeek && this.selectedWeek.number === week.number) {
       this.student.rotationPeriod = week.rotationPeriod;
     }
+    // Atualiza conjunto global e string global
+    for (const s of used) this.globalShiftSet.add(s);
+    const globalList = order.filter(o => this.globalShiftSet.has(o));
+    this.globalRotationPeriod = globalList.length ? globalList.join(', ') : '—';
   }
 
   get overallRotationPeriod(): string {

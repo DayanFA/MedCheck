@@ -208,22 +208,25 @@ export class EvaluationComponent {
   // ===== Cálculo Período do Rodízio =====
   private loadRotationPeriod() {
     if (!this.alunoId) { this.rotationPeriod = '—'; return; }
-    // Usa semana 1 como referência arbitrária enquanto não houver endpoint global
-    this.preceptorService.weekReport(1, this.alunoId, this.disciplineId).subscribe(res => {
-      const plans = res?.plans || [];
-      if (!plans.length) { this.rotationPeriod = '—'; return; }
-      const used = new Set<string>();
-      for (const p of plans) {
-        if (p.startTime) {
-          const shift = this.classifyShift(p.startTime);
-          used.add(shift);
-          // Se overnight (end < start) também considera segmento do dia seguinte mantendo mesmo turno de origem até meia-noite e novo turno após? Para relatório principal dividimos; aqui basta contar uma vez.
-        }
+    const used = new Set<string>();
+    const order = ['Manhã','Tarde','Noite'];
+    let currentWeek = 1;
+    const loadWeek = () => {
+      if (currentWeek > 10) {
+        const list = order.filter(o => used.has(o));
+        this.rotationPeriod = list.length ? list.join(', ') : '—';
+        return;
       }
-      const order = ['Manhã','Tarde','Noite'];
-      const list = order.filter(o => used.has(o));
-      this.rotationPeriod = list.length ? list.join(', ') : '—';
-    }, _ => this.rotationPeriod = '—');
+      this.preceptorService.weekReport(currentWeek, this.alunoId, this.disciplineId).subscribe(res => {
+        const plans = res?.plans || [];
+        for (const p of plans) {
+          if (p.startTime) used.add(this.classifyShift(p.startTime));
+        }
+        currentWeek++;
+        loadWeek();
+      }, _ => { currentWeek++; loadWeek(); });
+    };
+    loadWeek();
   }
 
   private classifyShift(startTime: string): 'Manhã'|'Tarde'|'Noite' {

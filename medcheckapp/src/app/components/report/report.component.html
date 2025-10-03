@@ -29,7 +29,7 @@
               </tr>
               <tr>
                 <td class="label">Período do Rodízio:</td>
-                <td colspan="3">{{ student.rotationPeriod }}</td>
+                <td colspan="3">{{ w.rotationPeriod }}</td>
               </tr>
               <tr>
                 <td class="label">Semana:</td>
@@ -70,13 +70,6 @@
             </ng-container>
           </tbody>
         </table>
-        <div class="small">
-          <strong>Avaliação do(a) Preceptor(a) (0 a 10):</strong>
-          <ng-container *ngIf="w.evaluation !== undefined && w.evaluation !== null; else nEvalPrint">
-            {{ w.evaluation | number:'1.0-1' }}
-          </ng-container>
-          <ng-template #nEvalPrint><span class="text-muted fst-italic">(não enviada)</span></ng-template>
-        </div>
       </div>
     </ng-container>
 
@@ -107,38 +100,42 @@
             </tr>
             <tr>
               <td class="label">Período do Rodízio:</td>
-              <td colspan="3">{{ student.rotationPeriod }}</td>
+              <td colspan="3">{{ overallRotationPeriod }}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <!-- Nota & Comentário finais -->
-      <div class="final-score-comment mb-3 small">
-        <strong>Nota Final:</strong> {{ ev.score | number:'1.0-1' }}
-        <span *ngIf="ev.comment"> | <strong>Comentário:</strong> {{ ev.comment }}</span>
+      <!-- Caixa de informação introdutória MFC -->
+      <div class="info-box bordered-box p-3 mb-3 small lh-sm">
+        <strong>A Medicina de Família e Comunidade (MFC)</strong> é definida como a “especialidade médica que presta assistência à saúde de forma continuada, integral e abrangente para as pessoas, suas famílias e a comunidade” (Gusso & Lopes, Tratado de MFC).<br><br>
+        Atua no nível de atenção primária à saúde (APS), entendida como “oferta de cuidados essenciais de saúde baseados em métodos e tecnologias práticas, cientificamente bem fundamentadas e socialmente aceitáveis, colocadas ao alcance universal de indivíduos e famílias da comunidade, mediante sua plena participação e a um custo que a comunidade e o país podem manter em cada fase do seu desenvolvimento” (Gusso & Lopes, Tratado de MFC).
       </div>
       <!-- Dimensões -->
       <div *ngIf="ev.details?.dimensions as dimsPrint">
         <div class="dimension-print mb-4" *ngFor="let dim of dimsPrint; let di = index">
-          <div class="dimension-header fw-semibold mb-2">
-            {{ dimensionTitles[dim.id] || ('Dimensão ' + (di+1)) }}
+          <div class="table-responsive mb-3">
+            <table class="table table-bordered align-middle table-sm eval-table mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:55%">{{ dimensionTitles[dim.id] || ('Dimensão ' + (di+1)) }}</th>
+                  <th *ngFor="let f of faces" class="text-center" style="width:9%">{{ f }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let q of dim.questions; let qi = index">
+                  <td class="question-text"><span class="q-number">{{ qi+1 }})</span> {{ fullQuestionText(dim.id, q.id) }}</td>
+                  <td *ngFor="let f of faces; let fi = index" class="text-center">
+                    <span *ngIf="q.answer === (fi+1)">{{ f }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <table class="table table-bordered table-sm mb-2 align-middle evaluation-questions-table">
-            <thead class="table-light">
-              <tr>
-                <th style="width:40px">#</th>
-                <th>Pergunta</th>
-                <th style="width:70px">Resposta</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let q of dim.questions; let qi = index">
-                <td>{{ qi + 1 }}</td>
-                <td>{{ fullQuestionText(dim.id, q.id) }}</td>
-                <td class="text-center">{{ q.answer ? faces[q.answer-1] : '' }}</td>
-              </tr>
-            </tbody>
-          </table>
+        </div>
+        <!-- Nota final ao término das dimensões -->
+        <div class="final-score-comment mt-3 bordered-box p-3 text-center">
+          <span class="final-score-label">Nota Final:</span>
+          <span class="final-score-value">{{ ev.score | number:'1.0-1' }}</span>
         </div>
       </div>
     </div>

@@ -145,6 +145,12 @@
 
 /* Full report print capture */
 .full-report-print { font-size:.72rem; }
+.full-report-print .weekly-sheet { page-break-after: always; }
+.full-report-print .evaluation-form-print { page-break-after: always; }
+@media print {
+  .weekly-sheet { page-break-after: always; }
+  .evaluation-form-print { page-break-after: always; }
+}
 .full-report-print .questions-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:.5rem; }
 .full-report-print .question-tile { border:1px solid #d7e0eb; background:#fff; padding:.4rem .45rem .9rem; border-radius:6px; position:relative; min-height:105px; }
 .full-report-print .question-tile .q-text { font-size:.55rem; line-height:1.15; font-weight:500; }
@@ -153,3 +159,11 @@
 .full-report-print h6 { font-size:.8rem; }
 
 .d-none { display:none !important; }
+
+/* Boxes reutilizados na impressão/formulário */
+.bordered-box { border:1px solid #cfd6e2; background:#fff; border-radius:6px; }
+.final-score-label { font-weight:600; font-size:.9rem; margin-right:.35rem; }
+.final-score-value { font-weight:700; font-size:1.55rem; color:#000; letter-spacing:.5px; }
+@media (max-width: 768px) {
+  .final-score-value { font-size:1.3rem; }
+}

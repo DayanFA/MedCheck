@@ -12,7 +12,7 @@ import { EvaluationService } from '../../services/evaluation.service';
 interface PeriodInterval { start: string; end: string; }
 interface DayPeriod { shift: string; locations: string[]; intervals: PeriodInterval[]; }
 interface WeekDayRow { weekday: string; date: Date; periods: DayPeriod[]; }
-interface WeekData { number: number; days: WeekDayRow[]; evaluation: number | null; loaded: boolean; }
+interface WeekData { number: number; days: WeekDayRow[]; evaluation: number | null; loaded: boolean; rotationPeriod: string; }
 
 @Component({
   selector: 'app-report',
@@ -190,7 +190,7 @@ export class ReportComponent implements OnChanges {
   }
 
   private initWeeks() {
-    this.weeks = Array.from({ length: 10 }, (_, i) => ({ number: i + 1, days: [], evaluation: null, loaded: false }));
+    this.weeks = Array.from({ length: 10 }, (_, i) => ({ number: i + 1, days: [], evaluation: null, loaded: false, rotationPeriod: '—' }));
   }
 
   private loadWeek(weekNumber: number) {
@@ -319,19 +319,30 @@ export class ReportComponent implements OnChanges {
     const used = new Set<string>();
     for (const d of week.days) {
       for (const p of d.periods) {
-        if (p.intervals.length > 0 || p.locations.length > 0) {
-          used.add(p.shift);
+        if (p.intervals.length > 0 || p.locations.length > 0) used.add(p.shift);
+      }
+    }
+    const order = ['Manhã','Tarde','Noite'];
+    const list = order.filter(o => used.has(o));
+    week.rotationPeriod = list.length ? list.join(', ') : '—';
+    // Atualiza cabeçalho exibido apenas se esta é a semana selecionada (para UI interativa)
+    if (this.selectedWeek && this.selectedWeek.number === week.number) {
+      this.student.rotationPeriod = week.rotationPeriod;
+    }
+  }
+
+  get overallRotationPeriod(): string {
+    const used = new Set<string>();
+    for (const w of this.weeks) {
+      for (const d of w.days) {
+        for (const p of d.periods) {
+          if (p.intervals.length > 0 || p.locations.length > 0) used.add(p.shift);
         }
       }
     }
-    if (used.size === 0) {
-      this.student.rotationPeriod = '—';
-      return;
-    }
-    // Ordem desejada: Manhã, Tarde, Noite
+    if (!used.size) return '—';
     const order = ['Manhã','Tarde','Noite'];
-    const list = order.filter(o => used.has(o));
-    this.student.rotationPeriod = list.join(', ');
+    return order.filter(o => used.has(o)).join(', ');
   }
 
   private classifyShift(startTime: string): 'Manhã'|'Tarde'|'Noite' {
@@ -413,62 +424,58 @@ export class ReportComponent implements OnChanges {
       loadNext();
       return;
     }
-    // --- Nova abordagem: captura visual do wrapper completo ---
-    // Garante que todas as semanas estejam montadas (já carregadas anteriormente)
+    // --- Nova abordagem: capturar cada bloco (semana + formulário) individualmente para evitar cortes ---
     await new Promise(r => setTimeout(r, 50));
-    const target = this.fullReportRoot?.nativeElement;
-    if (!target) {
-      alert('Estrutura completa ainda não pronta para exportar.');
-      return;
-    }
-    target.classList.remove('d-none');
-    let jsPDFMod: any;
-    let html2canvasMod: any;
+    const root = this.fullReportRoot?.nativeElement;
+    if (!root) { alert('Estrutura completa ainda não pronta para exportar.'); return; }
+    root.classList.remove('d-none');
+    let jsPDFMod: any; let html2canvasMod: any;
     try {
       [jsPDFMod, html2canvasMod] = await Promise.all([
         import('jspdf'),
         import('html2canvas')
       ]);
     } catch (e) {
-      console.error('Falha ao carregar libs PDF/canvas', e);
-      target.classList.add('d-none');
-      alert('Erro ao carregar bibliotecas para exportar PDF.');
-      return;
-    }
+      console.error('Falha ao carregar libs PDF/canvas', e); root.classList.add('d-none'); alert('Erro ao carregar bibliotecas para exportar PDF.'); return; }
     const jsPDF = jsPDFMod.default || jsPDFMod;
     const html2canvas = html2canvasMod.default || html2canvasMod;
-    // Ajuste de largura para garantir render consistente
-    const originalWidth = target.style.width;
-    target.style.width = '1200px'; // força layout mais largo para melhor resolução
-    await new Promise(r => setTimeout(r, 30));
-    const canvas = await html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-    target.style.width = originalWidth;
-    target.classList.add('d-none');
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'pt', 'a4');
+    const pdf = new jsPDF('p','pt','a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    // Calcular proporção
-    const imgWidth = pageWidth - 40; // margens
-    const imgHeight = canvas.height * (imgWidth / canvas.width);
-    let position = 20;
-    let heightLeft = imgHeight;
-    let y = 20;
-    pdf.addImage(imgData, 'PNG', 20, y, imgWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= (pageHeight - 40);
-    while (heightLeft > 0) {
-      pdf.addPage();
-      y = 20;
-      pdf.addImage(imgData, 'PNG', 20, y - (imgHeight - heightLeft), imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= (pageHeight - 40);
+    const marginX = 20;
+    const usableWidth = pageWidth - marginX*2;
+
+    // Selecionar todos os blocos semanais e formulário final
+    const blocks: HTMLElement[] = Array.from(root.querySelectorAll('.weekly-sheet')) as HTMLElement[];
+    const evalForm = root.querySelector('.evaluation-form-print') as HTMLElement | null;
+    if (evalForm) blocks.push(evalForm);
+
+    // Ajustar largura para render
+    const originalWidth = root.style.width;
+    root.style.width = '1100px';
+    for (let i=0;i<blocks.length;i++) {
+      const b = blocks[i];
+      // Garantir pequeno delay para layout
+      await new Promise(r => setTimeout(r, 25));
+      const canvas = await html2canvas(b, { scale: 2, useCORS: true, backgroundColor:'#ffffff' });
+      const imgWidth = usableWidth;
+      const imgHeight = canvas.height * (imgWidth / canvas.width);
+      if (i>0) pdf.addPage();
+      const yStart = 20;
+      // Se imagem maior que página, escala adicional para caber (fit-to-page)
+      let drawWidth = imgWidth;
+      let drawHeight = imgHeight;
+      const maxHeight = pageHeight - 40; // margem vertical
+      if (drawHeight > maxHeight) {
+        const ratio = maxHeight / drawHeight;
+        drawHeight = maxHeight;
+        drawWidth = drawWidth * ratio;
+      }
+      const xCentered = marginX + (usableWidth - drawWidth)/2;
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', xCentered, yStart, drawWidth, drawHeight, undefined, 'FAST');
     }
-    // Rodapé páginas
-    const pages = pdf.getNumberOfPages();
-    pdf.setFontSize(8);
-    for (let i=1;i<=pages;i++) {
-      pdf.setPage(i);
-      pdf.text(`Página ${i} / ${pages}`, pageWidth - 40, pageHeight - 20, { align:'right' });
-    }
+    root.style.width = originalWidth;
+    root.classList.add('d-none');
     pdf.save(`relatorio-internato-${this.student.name.replace(/\s+/g,'_')}.pdf`);
   }
   onSubmit() { console.log('Enviar relatório semana', this.selectedWeek.number, this.selectedWeek); }

@@ -34,6 +34,16 @@ public class Discipline {
     @JsonIgnore // evita recursão e payloads grandes em listagens
     private Set<User> preceptors = new HashSet<>();
 
+    // Coordenadores responsáveis pela disciplina (permite múltiplos coordenadores por disciplina)
+    @ManyToMany
+    @JoinTable(
+        name = "discipline_coordinators",
+        joinColumns = @JoinColumn(name = "discipline_id"),
+        inverseJoinColumns = @JoinColumn(name = "coordinator_id")
+    )
+    @JsonIgnore
+    private Set<User> coordinators = new HashSet<>();
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getCode() { return code; }
@@ -47,4 +57,7 @@ public class Discipline {
 
     public Set<User> getPreceptors() { return preceptors; }
     public void setPreceptors(Set<User> preceptors) { this.preceptors = preceptors; }
+
+    public Set<User> getCoordinators() { return coordinators; }
+    public void setCoordinators(Set<User> coordinators) { this.coordinators = coordinators; }
 }

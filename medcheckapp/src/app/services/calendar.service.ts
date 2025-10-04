@@ -65,12 +65,13 @@ export class CalendarServiceApi {
     return this.http.delete<{ deleted: boolean }>(`/api/calendar/justify`, { headers, params: { date: dateIso } as any });
   }
 
-  getSessions(startIso: string, endIso: string, alunoId?: number, disciplineId?: number) {
+  getSessions(startIso: string, endIso: string, alunoId?: number, disciplineId?: number, preceptorId?: number) {
     const token = this.auth.getToken();
     const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
     const params: any = { start: startIso, end: endIso };
     if (alunoId) params.alunoId = alunoId;
     if (disciplineId) params.disciplineId = disciplineId;
+    if (preceptorId) params.preceptorId = preceptorId;
     return this.http.get<any[]>(`/api/check/sessions`, { params, headers });
   }
 

@@ -78,13 +78,20 @@ export class UserCalendarComponent {
   });
 
   filteredDisciplineLabel = computed(() => {
-    const d = this.data()?.forcedDiscipline;
-    if (d && d.code) return `${d.code} — ${d.name}`;
+    const forced = this.data()?.forcedDiscipline;
+    if (forced && forced.code) return `${forced.code} — ${forced.name}`;
+    const did = this.disciplineId();
+    const list = this.disciplines();
+    if (did != null && Array.isArray(list)) {
+      const d = list.find(x => x.id === did);
+      if (d) return `${d.code} — ${d.name}`;
+    }
     return 'Visão Geral';
   });
 
   private alunoCtx = inject(PreceptorAlunoContextService);
   private initialized = false;
+  isCoordinator = false;
   private alunoChangedHandler = (e: any) => {
     // Só reagir se nenhum alunoId explícito na URL (modo preceptor com contexto global)
     if (this.alunoId()) return; // já há alunoId via query
@@ -100,9 +107,11 @@ export class UserCalendarComponent {
     setTimeout(() => {
       const user: any = (this.api as any)?.auth?.getUser?.() || (window as any).mc_user_cache;
       const role = user?.role;
-      if ((role === 'PRECEPTOR' || role === 'ADMIN') && !this.alunoId()) {
-        this.toast.show('warning', 'Por favor selecione um aluno para visualizar o calendário.');
-        this.router.navigate(['/preceptor/home'], { queryParams: { redirect: 'calendario' } });
+      this.isCoordinator = role === 'COORDENADOR';
+      if ((role === 'PRECEPTOR' || role === 'ADMIN' || role === 'COORDENADOR') && !this.alunoId()) {
+        const dest = role === 'COORDENADOR' ? '/coordenador/home' : '/preceptor/home';
+        this.toast.show('warning', `Por favor selecione um aluno para visualizar o calendário.`);
+        this.router.navigate([dest], { queryParams: { redirect: 'calendario' } });
         return;
       }
     }, 50);
@@ -199,35 +208,57 @@ export class UserCalendarComponent {
         .then(list => this.disciplines.set(list))
         .catch(()=>{});
     } else {
-      // Preceptor visualizando aluno: sempre carregar/forçar apenas disciplinas vinculadas
+      // Preceptor ou Coordenador visualizando aluno: carregar disciplinas específicas
       const t = (this.api as any)['auth'].getToken?.();
       const init: RequestInit = t ? { headers: { Authorization: `Bearer ${t}` } } : {};
       fetch('/api/users/me', init)
         .then(r => r.ok ? r.json() : null)
         .then(profile => {
-          if (profile && Array.isArray(profile.preceptorDisciplines)) {
-            // Evita reaplicar se já idêntico
-            const list = profile.preceptorDisciplines;
-            this.disciplines.set(list);
-            // Se disciplina atual não pertence mais (ex: trocar usuário), limpar
-            const cur = this.disciplineId();
-            if (cur != null && !list.some((d: any) => d.id === cur)) {
-              this.disciplineId.set(undefined);
+          const role = profile?.role;
+          // Cenário PRECEPTOR (ou ADMIN atuando como preceptor) com lista preceptorDisciplines
+            if (profile && Array.isArray(profile.preceptorDisciplines) && profile.preceptorDisciplines.length) {
+              const list = profile.preceptorDisciplines;
+              this.disciplines.set(list);
+              const cur = this.disciplineId();
+              if (cur != null && !list.some((d: any) => d.id === cur)) {
+                this.disciplineId.set(undefined);
+              }
+              if ((this.disciplineId() == null) && list.length > 0) {
+                this.disciplineId.set(list[0].id);
+                this.loading.set(true);
+                this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe(res => {
+                  this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
+                  this.loading.set(false);
+                }, _ => this.loading.set(false));
+              }
+              return; // já tratou como preceptor
             }
-            // Auto-seleciona primeira disciplina caso nenhuma válida esteja definida
-            if ((this.disciplineId() == null) && list.length > 0) {
-              this.disciplineId.set(list[0].id);
-              // Recarregar mês imediatamente com a disciplina agora definida (sem chamar load() para evitar segundo fetch de /me)
-              this.loading.set(true);
-              this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe(res => {
-                this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
-                this.loading.set(false);
-              }, _ => this.loading.set(false));
-            }
-          } else {
-            this.disciplines.set([]);
-            this.disciplineId.set(undefined);
+          // Caso COORDENADOR (ou ADMIN sem preceptorDisciplines) buscar disciplinas via endpoint de coordenação
+          if (role === 'COORDENADOR' || role === 'ADMIN') {
+            fetch('/api/coord/disciplinas', init)
+              .then(r => r.ok ? r.json() : [])
+              .then((list: any[]) => {
+                if (!Array.isArray(list)) list = [] as any[];
+                this.disciplines.set(list);
+                const cur = this.disciplineId();
+                if (cur != null && !list.some((d: any) => d.id === cur)) {
+                  this.disciplineId.set(undefined);
+                }
+                if ((this.disciplineId() == null) && list.length > 0) {
+                  this.disciplineId.set(list[0].id);
+                  this.loading.set(true);
+                  this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe(res => {
+                    this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
+                    this.loading.set(false);
+                  }, _ => this.loading.set(false));
+                }
+              })
+              .catch(() => { this.disciplines.set([]); });
+            return;
           }
+          // Fallback: nenhum conjunto específico
+          this.disciplines.set([]);
+          this.disciplineId.set(undefined);
         })
         .catch(()=>{ this.disciplines.set([]); this.disciplineId.set(undefined); });
     }
@@ -451,6 +482,7 @@ export class UserCalendarComponent {
   }
 
   private loadDaySessions(dateIso: string) {
+    // TODO: extender CalendarServiceApi.getSessions para aceitar preceptorId (atualmente ignorado)
     this.api.getSessions(dateIso, dateIso, this.alunoId() || undefined, this.disciplineId() || undefined).subscribe(list => {
       this.sessionsForDay.set(list);
     });

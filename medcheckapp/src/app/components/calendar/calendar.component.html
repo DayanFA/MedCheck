@@ -22,7 +22,7 @@
       </div>
     </div>
     <div class="ms-auto small text-muted d-flex align-items-center gap-3 flex-wrap">
-      <!-- Selector de disciplina NÃO aparece mais para o próprio aluno; somente para preceptor visualizando um aluno -->
+      <!-- Selector de disciplina: visível quando visualizando aluno (preceptor ou coordenador) -->
       <div *ngIf="alunoId()" class="d-flex align-items-center gap-2">
         <label class="form-label m-0 small text-nowrap">Disciplina:</label>
         <ng-container *ngIf="disciplines(); else discLoading">

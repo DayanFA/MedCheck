@@ -85,15 +85,16 @@ public class CheckInController {
     public ResponseEntity<?> sessions(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
                                       @RequestParam String start, @RequestParam String end,
                                       @RequestParam(required = false) Long alunoId,
-                                      @RequestParam(required = false) Long disciplineId) {
+                                      @RequestParam(required = false) Long disciplineId,
+                                      @RequestParam(required = false) Long preceptorId) {
         User me = currentUser(principal);
         LocalDate s = LocalDate.parse(start);
         LocalDate e = LocalDate.parse(end);
         Long targetId = me.getId();
-        if (alunoId != null && (me.getRole() == com.medcheckapi.user.model.Role.PRECEPTOR || me.getRole() == com.medcheckapi.user.model.Role.ADMIN)) {
+        if (alunoId != null && (me.getRole() == com.medcheckapi.user.model.Role.PRECEPTOR || me.getRole() == com.medcheckapi.user.model.Role.ADMIN || me.getRole() == com.medcheckapi.user.model.Role.COORDENADOR)) {
             targetId = alunoId;
         }
-        return ResponseEntity.ok(checkInService.listSessionsForAluno(targetId, s, e, disciplineId));
+        return ResponseEntity.ok(checkInService.listSessionsForAluno(targetId, s, e, disciplineId, preceptorId, me));
     }
 
     // ALUNO: status (open or not + worked seconds today)

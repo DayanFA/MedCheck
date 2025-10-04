@@ -125,7 +125,7 @@ public class CheckInService {
         return sessionToMap(open);
     }
 
-    public List<Map<String,Object>> listSessionsForAluno(Long alunoId, LocalDate start, LocalDate end, Long disciplineId) {
+    public List<Map<String,Object>> listSessionsForAluno(Long alunoId, LocalDate start, LocalDate end, Long disciplineId, Long preceptorIdFilter, User requester) {
         User aluno = userRepo.findById(alunoId).orElseThrow();
         LocalDateTime from = start.atStartOfDay();
         LocalDateTime to = end.atTime(23,59,59);
@@ -135,11 +135,15 @@ public class CheckInService {
         } else {
             selected = aluno.getCurrentDiscipline();
         }
-        List<CheckSession> list = (selected == null)
+        List<CheckSession> base = (selected == null)
                 ? sessionRepo.findByAlunoAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, from, to)
                 : sessionRepo.findByAlunoAndDisciplineAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, selected, from, to);
+        // Filtro por preceptor (somente se requester for COORDENADOR ou ADMIN ou o próprio preceptor especificado)
+        if (preceptorIdFilter != null) {
+            base = base.stream().filter(cs -> Objects.equals(cs.getPreceptor().getId(), preceptorIdFilter)).toList();
+        }
         List<Map<String,Object>> out = new ArrayList<>();
-        list.forEach(cs -> out.add(sessionToMap(cs)));
+        base.forEach(cs -> out.add(sessionToMap(cs)));
         return out;
     }
 

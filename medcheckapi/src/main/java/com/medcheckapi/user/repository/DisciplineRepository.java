@@ -9,4 +9,5 @@ import java.util.List;
 public interface DisciplineRepository extends JpaRepository<Discipline, Long> {
     Optional<Discipline> findByCode(String code);
     List<Discipline> findByPreceptors_Id(Long preceptorId);
+    List<Discipline> findByCoordinators_Id(Long coordinatorId);
 }

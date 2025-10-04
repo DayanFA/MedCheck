@@ -27,6 +27,7 @@ DROP TABLE IF EXISTS check_codes;
 DROP TABLE IF EXISTS check_sessions;
 DROP TABLE IF EXISTS password_reset_tokens;
 DROP TABLE IF EXISTS discipline_preceptors;
+DROP TABLE IF EXISTS discipline_coordinators;
 DROP TABLE IF EXISTS disciplines;
 DROP TABLE IF EXISTS users;
 
@@ -166,6 +167,15 @@ CREATE TABLE discipline_preceptors (
   CONSTRAINT fk_dp_preceptor FOREIGN KEY (preceptor_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Relação: discipline_coordinators (muitos-para-muitos)
+CREATE TABLE discipline_coordinators (
+  discipline_id BIGINT NOT NULL,
+  coordinator_id BIGINT NOT NULL,
+  PRIMARY KEY (discipline_id, coordinator_id),
+  CONSTRAINT fk_dc_discipline FOREIGN KEY (discipline_id) REFERENCES disciplines(id) ON DELETE CASCADE,
+  CONSTRAINT fk_dc_coordinator FOREIGN KEY (coordinator_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ============================================================================
 -- TABELA: preceptor_evaluations (avaliação semanal do aluno pelo preceptor)
 -- Cada registro representa uma avaliação de um aluno em uma semana (1..10) opcionalmente por disciplina.
@@ -268,6 +278,10 @@ INSERT INTO disciplines (code, name, hours, ciclo) VALUES
 -- ============================================================================
 INSERT INTO discipline_preceptors (discipline_id, preceptor_id)
 SELECT d.id, 2 FROM disciplines d WHERE d.code IN ('CCSD459','CCSD463');
+
+-- Vínculo do coordenador de teste (id=4) a algumas disciplinas para testes
+INSERT INTO discipline_coordinators (discipline_id, coordinator_id)
+SELECT d.id, 4 FROM disciplines d WHERE d.code IN ('CCSD459','CCSD463','CCSD464');
 
 -- ============================================================================
 -- - Planos: 08:00-12:00 em todos os dias úteis do mês atual; 14:00-18:00 apenas nos dias pares

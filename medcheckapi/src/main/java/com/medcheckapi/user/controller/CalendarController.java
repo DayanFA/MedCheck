@@ -77,15 +77,16 @@ public class CalendarController {
                                    @RequestParam(required = false) Long disciplineId) {
         User me = currentUser(principal);
         User target = me;
-        if (alunoId != null && (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN)) {
+        // Permitir que PRECEPTOR, ADMIN e agora COORDENADOR consultem calendário de um aluno específico
+        if (alunoId != null && (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN || me.getRole() == Role.COORDENADOR)) {
             target = userRepo.findById(alunoId).orElse(me);
         }
         Discipline forced;
         if (disciplineId == null) {
             forced = null; // visão geral (todas as disciplinas planejadas) ou current_discipline somente para status agregado
         } else {
-            // Novo comportamento: PRECEPTOR ou ADMIN podem forçar QUALQUER disciplina existente
-            if (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN) {
+            // Novo comportamento: PRECEPTOR, ADMIN ou COORDENADOR podem forçar QUALQUER disciplina existente
+            if (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN || me.getRole() == Role.COORDENADOR) {
                 forced = discRepo.findById(disciplineId).orElse(null); // se inexistente -> null (sem erro explícito)
             } else if (!Objects.equals(target.getId(), me.getId())) {
                 return ResponseEntity.status(403).body(Map.of("error", "Sem permissão para disciplina forçada"));
@@ -107,7 +108,7 @@ public class CalendarController {
         }
         User me = currentUser(principal);
         User target = me;
-        if (alunoId != null && (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN)) {
+        if (alunoId != null && (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN || me.getRole() == Role.COORDENADOR)) {
             target = userRepo.findById(alunoId).orElse(me);
         }
     Discipline current = target.getCurrentDiscipline();
@@ -116,7 +117,7 @@ public class CalendarController {
         // Permitir força de disciplina quando:
         // - PRECEPTOR / ADMIN visualizando qualquer aluno
         // - Aluno visualizando a si mesmo (target == me)
-        if ((me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN) || Objects.equals(target.getId(), me.getId())) {
+        if ((me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN || me.getRole() == Role.COORDENADOR) || Objects.equals(target.getId(), me.getId())) {
             forced = discRepo.findById(disciplineId).orElse(null); // se inexistente, permanece null (resultará em visão geral ou current)
         } else {
             return ResponseEntity.status(403).body(Map.of("error", "Sem permissão para disciplina forçada"));

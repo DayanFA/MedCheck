@@ -41,6 +41,8 @@ export class ReportComponent implements OnChanges {
   disciplineLabel = '';
   // Lista de disciplinas para contexto PRECEPTOR visualizando um aluno
   preceptorDisciplines: any[] | null = null; // null = carregando, [] = nenhuma
+  isCoordinator = false;
+  coordinatorDisciplines: any[] | null = null; // lista de disciplinas vinculadas ao coordenador quando visualizando aluno
 
   @Input() alunoId?: number;          // usado em contexto de preceptor
   @Input() disciplineId?: number;     // usado em contexto de preceptor
@@ -125,15 +127,18 @@ export class ReportComponent implements OnChanges {
     // Guard pós-inicialização: se preceptor/admin e nenhum aluno selecionado (contexto + query), redirecionar
     setTimeout(() => {
       const u = this.auth.getUser();
-      if (u && (u.role === 'PRECEPTOR' || u.role === 'ADMIN') && !this.alunoId) {
-          this.toast.show('warning', 'Por favor selecione um aluno para visualizar o relatório.'); // Changed alert to toast
-        this.router.navigate(['/preceptor/home']);
+      if (u && (u.role === 'PRECEPTOR' || u.role === 'ADMIN' || u.role === 'COORDENADOR') && !this.alunoId) {
+        const dest = u.role === 'COORDENADOR' ? '/coordenador/home' : '/preceptor/home';
+        const feature = 'relatório';
+        this.toast.show('warning', `Por favor selecione um aluno para visualizar o ${feature}.`);
+        this.router.navigate([dest], { queryParams: { redirect: 'relatorio' } });
       }
     }, 60);
     this.initWeeks();
     this.updatePaginationMode();
     this.ensureGroupForSelected();
     const u = this.auth.getUser();
+  if (u?.role === 'COORDENADOR') this.isCoordinator = true;
     if (u?.name) this.student.name = u.name;
     // Disciplina passa a ser derivada de preference local do aluno (mc_current_discipline_id) ou parâmetro disciplineId quando preceptor.
     this.setupInitialDisciplineContext();
@@ -180,6 +185,7 @@ export class ReportComponent implements OnChanges {
         this.weeks.forEach(w => w.loaded = false);
         this.loadWeek(this.selectedWeek.number);
         this.fetchPreceptorDisciplines();
+        if (this.isCoordinator) this.fetchCoordinatorDisciplines();
       }
     }
     if (isPlatformBrowser(this.platformId)) {
@@ -188,6 +194,7 @@ export class ReportComponent implements OnChanges {
     // Se já temos alunoId via query params (preceptor) carregar disciplinas vinculadas
     if (this.alunoId) {
       this.fetchPreceptorDisciplines();
+      if (this.isCoordinator) this.fetchCoordinatorDisciplines();
     }
   }
 
@@ -336,6 +343,42 @@ export class ReportComponent implements OnChanges {
         }
       })
       .catch(() => { this.preceptorDisciplines = []; });
+  }
+
+  private fetchCoordinatorDisciplines() {
+    if (!this.isCoordinator || !this.alunoId) return;
+    this.coordinatorDisciplines = null; // loading
+    const token = (this.auth as any)?.getToken?.();
+    const init: RequestInit = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    fetch('/api/coord/disciplinas', init)
+      .then(r => r.ok ? r.json() : [])
+      .then(list => {
+        if (!Array.isArray(list)) list = [];
+        this.coordinatorDisciplines = list;
+        // validar disciplina atual
+        if (this.disciplineId && !list.some((d: any) => d.id === this.disciplineId)) {
+          this.disciplineId = undefined;
+        }
+        if (!this.disciplineId && list.length > 0) {
+          this.disciplineId = list[0].id;
+          this.resetWeeksAndReload();
+        } else {
+          // Mesmo sem mudança, garantir label correta se disciplinaId já setada
+          if (this.disciplineId) this.fetchDisciplineDetail();
+        }
+      })
+      .catch(() => { this.coordinatorDisciplines = []; });
+  }
+
+  setDisciplineForCoordinator(raw: any) {
+    const idNum = raw ? Number(raw) : undefined;
+    if (idNum && this.coordinatorDisciplines && !this.coordinatorDisciplines.some(d => d.id === idNum)) return;
+    if (this.disciplineId === idNum) return;
+    this.disciplineId = idNum;
+    this.resetWeeksAndReload();
+    const qp: any = { alunoId: this.alunoId };
+    if (this.disciplineId) qp.disciplineId = this.disciplineId;
+    this.router.navigate([], { relativeTo: this.route, queryParams: qp, queryParamsHandling: 'merge' });
   }
 
   setDisciplineForPreceptor(raw: any) {

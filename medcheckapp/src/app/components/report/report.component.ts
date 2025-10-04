@@ -9,6 +9,8 @@ import { FormsModule } from '@angular/forms';
 import { PreceptorService } from '../../services/preceptor.service';
 import { EvaluationService } from '../../services/evaluation.service';
 import { DisciplineService } from '../../services/discipline.service';
+import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-context.service';
+import { ToastService } from '../../services/toast.service';
 // Removido import estático de jsPDF para evitar erro em SSR; será carregado dinamicamente dentro de onGeneratePdf.
 
 interface PeriodInterval { start: string; end: string; }
@@ -27,7 +29,7 @@ export class ReportComponent implements OnChanges {
   weeks: WeekData[] = [];
   selectedWeekIndex = 0;
   // Mapeamento das carinhas (mesma ordem usada na tela de avaliação)
-  faces: string[] = ['😠','🙁','😐','🙂','😄'];
+  faces: string[] = ['😞','🙁','😐','🙂','😃'];
 
   // Configuração de paginação
   groupSize = 5;            // tamanho do grupo em telas pequenas
@@ -37,6 +39,8 @@ export class ReportComponent implements OnChanges {
 
   student = { name: '...', preceptorName: '', rotationPeriod: 'Manhã e Tarde' };
   disciplineLabel = '';
+  // Lista de disciplinas para contexto PRECEPTOR visualizando um aluno
+  preceptorDisciplines: any[] | null = null; // null = carregando, [] = nenhuma
 
   @Input() alunoId?: number;          // usado em contexto de preceptor
   @Input() disciplineId?: number;     // usado em contexto de preceptor
@@ -95,6 +99,18 @@ export class ReportComponent implements OnChanges {
 
   private disciplineCache: any[] = [];
 
+  private alunoCtx = new PreceptorAlunoContextService(); // manual inject fallback (standalone new)
+  private alunoChangedHandler = (e: any) => {
+    if (this.alunoId) return; // já temos alunoId definido (query ou input)
+    const c = this.alunoCtx.getAluno();
+    if (c.id) {
+      this.alunoId = c.id;
+      this.weeks.forEach(w => { w.loaded = false; w.days = []; w.evaluation = null; });
+      this.loadWeek(this.selectedWeek.number);
+      this.fetchStudentInfo();
+    }
+  };
+
   constructor(private auth: AuthService,
               private calApi: CalendarServiceApi,
               private weekSync: WeekSelectionService,
@@ -104,7 +120,16 @@ export class ReportComponent implements OnChanges {
               private evalService: EvaluationService,
               private http: HttpClient,
               private disciplineService: DisciplineService,
+              private toast: ToastService,
               @Inject(PLATFORM_ID) private platformId: Object) {
+    // Guard pós-inicialização: se preceptor/admin e nenhum aluno selecionado (contexto + query), redirecionar
+    setTimeout(() => {
+      const u = this.auth.getUser();
+      if (u && (u.role === 'PRECEPTOR' || u.role === 'ADMIN') && !this.alunoId) {
+          this.toast.show('warning', 'Por favor selecione um aluno para visualizar o relatório.'); // Changed alert to toast
+        this.router.navigate(['/preceptor/home']);
+      }
+    }, 60);
     this.initWeeks();
     this.updatePaginationMode();
     this.ensureGroupForSelected();
@@ -138,13 +163,31 @@ export class ReportComponent implements OnChanges {
       }
     });
 
-    // Se navegação veio com pedido de refresh de avaliação global
+  // Se navegação veio com pedido de refresh de avaliação global
     const nav = this.router.getCurrentNavigation();
     if (nav?.extras?.state && (nav.extras.state as any).refreshEval) {
       this.evaluationDetails = null;
       // forçar recarregar avaliação (loadWeek chama loadEvaluationForWeek na primeira semana)
       this.weeks.forEach(w => w.evaluation = null);
       this.loadEvaluationForWeek(this.selectedWeek.number);
+    }
+    // Se não veio alunoId (query) e contexto global tem aluno selecionado, aplicar (preceptor menu acesso direto)
+    if (!this.alunoId) {
+      const c = this.alunoCtx.getAluno();
+      if (c.id) {
+        this.alunoId = c.id;
+        this.fetchStudentInfo();
+        this.weeks.forEach(w => w.loaded = false);
+        this.loadWeek(this.selectedWeek.number);
+        this.fetchPreceptorDisciplines();
+      }
+    }
+    if (isPlatformBrowser(this.platformId)) {
+      window.addEventListener('mc:aluno-changed', this.alunoChangedHandler as any);
+    }
+    // Se já temos alunoId via query params (preceptor) carregar disciplinas vinculadas
+    if (this.alunoId) {
+      this.fetchPreceptorDisciplines();
     }
   }
 
@@ -247,8 +290,8 @@ export class ReportComponent implements OnChanges {
       // Em contexto de preceptor, queremos exibir os preceptores vinculados à disciplina (se houver)
       // Limpa qualquer nome antigo até disciplina detalhada chegar
       this.student.preceptorName = '—';
-      if (!this.disciplineId && info?.preceptor?.name) {
-        // Caso sem disciplina específica, manter o preceptor "avaliador" como fallback
+      // Sempre que a API retornar preceptor principal, aplicar (independente de haver disciplineId)
+      if (info?.preceptor?.name) {
         this.student.preceptorName = info.preceptor.name;
       }
       if (info?.discipline) {
@@ -257,13 +300,63 @@ export class ReportComponent implements OnChanges {
         // Sem disciplina específica: manter curso genérico
         this.disciplineLabel = 'CURSO DE MEDICINA';
       }
-      // Se não temos nome de preceptor (pode acontecer se não há sessão atual), tentar disciplina
-      if (!this.student.preceptorName && this.disciplineId) {
+      // Sempre buscar detalhes da disciplina quando disciplineId definido para garantir lista de preceptores
+      if (this.disciplineId) {
         this.fetchDisciplineDetail();
       }
-      // Ajustar período do rodízio para ser recalculado após a semana carregar
-      this.student.rotationPeriod = '—';
+      // NÃO resetar rotationPeriod aqui: evita sumir valor existente antes de semana recalcular
     });
+  }
+
+  private fetchPreceptorDisciplines() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    // Somente no contexto preceptor visualizando aluno
+    const u = this.auth.getUser();
+    if (!(u && (u.role === 'PRECEPTOR' || u.role === 'ADMIN') && this.alunoId)) return;
+    // Evitar refetch desnecessário se já carregado
+    this.preceptorDisciplines = null; // estado carregando
+    const token = (this.auth as any)?.getToken?.();
+    const init: RequestInit = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    fetch('/api/users/me', init)
+      .then(r => r.ok ? r.json() : null)
+      .then(profile => {
+        if (profile && Array.isArray(profile.preceptorDisciplines)) {
+          this.preceptorDisciplines = profile.preceptorDisciplines;
+        } else {
+          this.preceptorDisciplines = [];
+        }
+        // Validar disciplina atual
+        if (this.disciplineId && this.preceptorDisciplines && !this.preceptorDisciplines.some(d => d.id === this.disciplineId)) {
+          this.disciplineId = undefined;
+        }
+        // Auto selecionar primeira se nenhuma definida
+        if (!this.disciplineId && this.preceptorDisciplines && this.preceptorDisciplines.length > 0) {
+          this.disciplineId = this.preceptorDisciplines[0].id;
+          this.resetWeeksAndReload();
+        }
+      })
+      .catch(() => { this.preceptorDisciplines = []; });
+  }
+
+  setDisciplineForPreceptor(raw: any) {
+    const idNum = raw ? Number(raw) : undefined;
+    if (idNum && this.preceptorDisciplines && !this.preceptorDisciplines.some(d => d.id === idNum)) {
+      return; // inválido
+    }
+    if (this.disciplineId === idNum) return; // nada mudou
+    this.disciplineId = idNum;
+    this.resetWeeksAndReload();
+    // Atualizar query params para compartilhamento de URL
+    const qp: any = { alunoId: this.alunoId };
+    if (this.disciplineId) qp.disciplineId = this.disciplineId;
+    this.router.navigate([], { relativeTo: this.route, queryParams: qp, queryParamsHandling: 'merge' });
+  }
+
+  private resetWeeksAndReload() {
+    this.weeks.forEach(w => { w.loaded = false; w.days = []; w.evaluation = null; });
+    this.evaluationDetails = null;
+    this.fetchStudentInfo();
+    this.loadWeek(this.selectedWeek.number);
   }
 
   private fetchDisciplineDetail() {
@@ -396,6 +489,10 @@ export class ReportComponent implements OnChanges {
       wk.days = dayRows;
       wk.loaded = true;
       this.updateRotationPeriodSummary(wk);
+      // Se a semana carregada é a selecionada, garantir que o cabeçalho reflita o período atualizado
+      if (wk.number === this.selectedWeek.number) {
+        this.student.rotationPeriod = wk.rotationPeriod;
+      }
       // Carregar avaliação se modo aluno (sem alunoId input) ou se preceptor vendo aluno (mostrar nota se existir)
       this.loadEvaluationForWeek(wk.number);
       // Caso contexto preceptor e ainda não tenha carregado info (ex: input chegou antes de subscribe), reforçar
@@ -441,6 +538,8 @@ export class ReportComponent implements OnChanges {
     const order = ['Manhã','Tarde','Noite'];
     const list = order.filter(o => used.has(o));
     week.rotationPeriod = list.length ? list.join(', ') : '—';
+  // debug temporário (pode remover depois)
+  // console.debug('[Report] Semana', week.number, 'period summary =', week.rotationPeriod);
     // Atualiza cabeçalho exibido apenas se esta é a semana selecionada (para UI interativa)
     if (this.selectedWeek && this.selectedWeek.number === week.number) {
       this.student.rotationPeriod = week.rotationPeriod;
@@ -609,5 +708,11 @@ export class ReportComponent implements OnChanges {
     const queryParams: any = { alunoId: this.alunoId || '' };
     if (this.disciplineId) queryParams.disciplineId = this.disciplineId;
     this.router.navigate(['/avaliacao'], { queryParams });
+  }
+
+  ngOnDestroy() {
+    if (isPlatformBrowser(this.platformId)) {
+      window.removeEventListener('mc:aluno-changed', this.alunoChangedHandler as any);
+    }
   }
 }

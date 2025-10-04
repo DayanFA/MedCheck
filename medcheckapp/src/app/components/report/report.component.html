@@ -1,4 +1,23 @@
 <div class="report-container container-fluid py-3">
+  <!-- Barra superior de controles (disciplina) -->
+  <div class="d-flex flex-wrap align-items-center gap-3 mb-3" *ngIf="alunoId">
+    <div class="d-flex align-items-center gap-2" *ngIf="preceptorDisciplines !== undefined">
+      <ng-container *ngIf="preceptorDisciplines === null; else discOk">
+        <div class="d-flex align-items-center gap-2 small text-muted">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Carregando...</span>
+          </div>
+          Carregando disciplinas...
+        </div>
+      </ng-container>
+      <ng-template #discOk>
+        <label class="form-label m-0 small text-nowrap">Disciplina:</label>
+        <select class="form-select form-select-sm" style="min-width:220px" [ngModel]="disciplineId" (ngModelChange)="setDisciplineForPreceptor($event)">
+          <option *ngFor="let d of preceptorDisciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
+        </select>
+      </ng-template>
+    </div>
+  </div>
   <!-- Hidden full printable wrapper for PDF generation -->
   <div class="full-report-print d-none" #fullReportRoot>
     <!-- 10 Folhas de Presença (uma por semana) -->

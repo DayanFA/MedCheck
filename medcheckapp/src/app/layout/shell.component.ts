@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 import { UserService } from '../services/user.service';
 import { AuthService } from '../services/auth.service';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { PreceptorAlunoContextService } from '../services/preceptor-aluno-context.service';
 
 @Component({
   selector: 'app-shell',
@@ -22,6 +23,10 @@ export class ShellComponent implements OnInit, OnDestroy {
   currentDisciplineLabel = '';
   private disciplines: any[] = [];
   private LOCAL_DISC_KEY = 'mc_current_discipline_id';
+  selectedAlunoName: string = '';
+  private alunoChangedListener = (e: any) => {
+    this.updateAlunoBadge();
+  };
   private storageListener = (e: StorageEvent) => {
     // Atualização de usuário ainda mantém avatar / nome
     if (e.key === 'mc_user' && e.newValue) {
@@ -34,7 +39,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   private disciplineChangedListener = (e: any) => {
     this.updateDisciplineLabel();
   };
-  constructor(private userService: UserService, private auth: AuthService, private http: HttpClient, @Inject(PLATFORM_ID) private platformId: Object) {}
+  constructor(private userService: UserService, private auth: AuthService, private http: HttpClient, private alunoCtx: PreceptorAlunoContextService, @Inject(PLATFORM_ID) private platformId: Object) {}
 
   ngOnInit(): void {
     // Restaura estado do sidebar (persistência após F5)
@@ -57,7 +62,9 @@ export class ShellComponent implements OnInit, OnDestroy {
       // Ouve alterações no usuário em cache para refletir disciplina no header
       window.addEventListener('storage', this.storageListener);
       window.addEventListener('mc:discipline-changed', this.disciplineChangedListener as any);
+      window.addEventListener('mc:aluno-changed', this.alunoChangedListener as any);
       this.loadDisciplines();
+      this.updateAlunoBadge();
     }
   }
   toggleSidebar() {
@@ -70,6 +77,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     if (isPlatformBrowser(this.platformId)) {
       window.removeEventListener('storage', this.storageListener);
       window.removeEventListener('mc:discipline-changed', this.disciplineChangedListener as any);
+      window.removeEventListener('mc:aluno-changed', this.alunoChangedListener as any);
     }
   }
 
@@ -134,6 +142,11 @@ export class ShellComponent implements OnInit, OnDestroy {
       },
       error: _ => { this.disciplines = []; this.updateDisciplineLabel(); }
     });
+  }
+
+  private updateAlunoBadge(){
+    const c = this.alunoCtx.getAluno();
+    this.selectedAlunoName = c.name || '';
   }
 
   private loadUserDetails() {

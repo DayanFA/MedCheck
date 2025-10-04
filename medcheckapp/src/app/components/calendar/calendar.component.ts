@@ -2,6 +2,8 @@ import { Component, effect, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CalendarServiceApi, CalendarDay, InternshipPlanDto } from '../../services/calendar.service';
+import { ToastService } from '../../services/toast.service';
+import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-context.service';
 import { WeekSelectionService } from '../../services/week-selection.service';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -81,7 +83,29 @@ export class UserCalendarComponent {
     return 'Visão Geral';
   });
 
-  constructor(private weekSync: WeekSelectionService) {
+  private alunoCtx = inject(PreceptorAlunoContextService);
+  private initialized = false;
+  private alunoChangedHandler = (e: any) => {
+    // Só reagir se nenhum alunoId explícito na URL (modo preceptor com contexto global)
+    if (this.alunoId()) return; // já há alunoId via query
+    const c = this.alunoCtx.getAluno();
+    if (c.id) {
+      this.alunoId.set(c.id);
+      this.load();
+    }
+  };
+
+  constructor(private weekSync: WeekSelectionService, private toast: ToastService) {
+    // Se usuário é preceptor e nenhum aluno selecionado (nem query param, nem contexto), redirecionar
+    setTimeout(() => {
+      const user: any = (this.api as any)?.auth?.getUser?.() || (window as any).mc_user_cache;
+      const role = user?.role;
+      if ((role === 'PRECEPTOR' || role === 'ADMIN') && !this.alunoId()) {
+        this.toast.show('warning', 'Por favor selecione um aluno para visualizar o calendário.');
+        this.router.navigate(['/preceptor/home'], { queryParams: { redirect: 'calendario' } });
+        return;
+      }
+    }, 50);
     this.route.queryParamMap.subscribe(mp => {
       const idStr = mp.get('alunoId');
       const idNum = idStr ? Number(idStr) : undefined;
@@ -89,10 +113,29 @@ export class UserCalendarComponent {
       const discStr = mp.get('disciplineId');
       const discNum = discStr ? Number(discStr) : undefined;
       this.disciplineId.set(discNum && Number.isFinite(discNum) ? discNum : undefined);
-      this.load();
+      if (this.initialized) {
+        // Alterações posteriores de query params recarregam normalmente
+        this.load();
+      }
     });
-  // sincroniza seleção inicial com service compartilhado
-  this.selectedWeek.set(this.weekSync.week());
+    // sincroniza seleção inicial com service compartilhado
+    this.selectedWeek.set(this.weekSync.week());
+    // Adia o primeiro load para depois de aplicar possível contexto de aluno
+    setTimeout(() => {
+      if (!this.alunoId()) {
+        const c = this.alunoCtx.getAluno();
+        if (c.id) {
+          this.alunoId.set(c.id);
+        }
+      }
+      // Limpa quaisquer disciplinas herdadas (evita mostrar lista completa de um estado anterior)
+      this.disciplines.set(null);
+      this.load();
+      this.initialized = true;
+    }, 0);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mc:aluno-changed', this.alunoChangedHandler as any);
+    }
   }
 
   pickDate(dateIso: string) {
@@ -128,6 +171,10 @@ export class UserCalendarComponent {
   }
 
   load() {
+    // Evita flicker: se estamos em contexto preceptor (alunoId definido) e ainda não carregamos disciplinas desse contexto, zera imediatamente
+    if (this.alunoId() && !this.initialized) {
+      this.disciplines.set(null);
+    }
     // Se for o próprio aluno (sem alunoId), aplicar disciplina salva localmente
     if (!this.alunoId()) {
       try {
@@ -152,21 +199,52 @@ export class UserCalendarComponent {
         .then(list => this.disciplines.set(list))
         .catch(()=>{});
     } else {
-      // Preceptor visualizando aluno: não sobrescrever disciplineId; apenas carrega lista se ainda não carregada
-      if (!this.disciplines()) {
-        const t = (this.api as any)['auth'].getToken?.();
-        const init: RequestInit = t ? { headers: { Authorization: `Bearer ${t}` } } : {};
-        fetch('/api/users/me/disciplines', init)
-          .then(r => r.ok ? r.json() : [])
-          .then(list => this.disciplines.set(list))
-          .catch(()=>{});
-      }
+      // Preceptor visualizando aluno: sempre carregar/forçar apenas disciplinas vinculadas
+      const t = (this.api as any)['auth'].getToken?.();
+      const init: RequestInit = t ? { headers: { Authorization: `Bearer ${t}` } } : {};
+      fetch('/api/users/me', init)
+        .then(r => r.ok ? r.json() : null)
+        .then(profile => {
+          if (profile && Array.isArray(profile.preceptorDisciplines)) {
+            // Evita reaplicar se já idêntico
+            const list = profile.preceptorDisciplines;
+            this.disciplines.set(list);
+            // Se disciplina atual não pertence mais (ex: trocar usuário), limpar
+            const cur = this.disciplineId();
+            if (cur != null && !list.some((d: any) => d.id === cur)) {
+              this.disciplineId.set(undefined);
+            }
+            // Auto-seleciona primeira disciplina caso nenhuma válida esteja definida
+            if ((this.disciplineId() == null) && list.length > 0) {
+              this.disciplineId.set(list[0].id);
+              // Recarregar mês imediatamente com a disciplina agora definida (sem chamar load() para evitar segundo fetch de /me)
+              this.loading.set(true);
+              this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe(res => {
+                this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
+                this.loading.set(false);
+              }, _ => this.loading.set(false));
+            }
+          } else {
+            this.disciplines.set([]);
+            this.disciplineId.set(undefined);
+          }
+        })
+        .catch(()=>{ this.disciplines.set([]); this.disciplineId.set(undefined); });
     }
   }
 
   setDisciplineForView(id: string) {
     const num = id ? Number(id) : undefined;
-    this.disciplineId.set(num && Number.isFinite(num) ? num : undefined);
+    const candidate = num && Number.isFinite(num) ? num : undefined;
+    // Se contexto preceptor (alunoId definido) validar que disciplina está na lista vinculada
+    if (this.alunoId()) {
+      const list = this.disciplines();
+      if (candidate != null && list && !list.some(d => d.id === candidate)) {
+        // Ignora seleção inválida
+        return;
+      }
+    }
+    this.disciplineId.set(candidate);
     // Atualiza query params para persistir em reload / compartilhamento de URL
     const qp: any = { disciplineId: this.disciplineId() };
     if (this.alunoId()) qp.alunoId = this.alunoId();
@@ -376,5 +454,9 @@ export class UserCalendarComponent {
     this.api.getSessions(dateIso, dateIso, this.alunoId() || undefined, this.disciplineId() || undefined).subscribe(list => {
       this.sessionsForDay.set(list);
     });
+  }
+
+  ngOnDestroy() {
+    try { window.removeEventListener('mc:aluno-changed', this.alunoChangedHandler as any); } catch {}
   }
 }

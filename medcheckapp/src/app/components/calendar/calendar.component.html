@@ -23,12 +23,21 @@
     </div>
     <div class="ms-auto small text-muted d-flex align-items-center gap-3 flex-wrap">
       <!-- Selector de disciplina NÃO aparece mais para o próprio aluno; somente para preceptor visualizando um aluno -->
-      <div *ngIf="alunoId() && disciplines()" class="d-flex align-items-center gap-2">
+      <div *ngIf="alunoId()" class="d-flex align-items-center gap-2">
         <label class="form-label m-0 small text-nowrap">Disciplina:</label>
-        <select class="form-select form-select-sm" style="min-width:220px" [ngModel]="disciplineId()" (ngModelChange)="setDisciplineForView($event)">
-          <option [ngValue]="undefined">(Todas / Geral)</option>
-          <option *ngFor="let d of disciplines()" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
-        </select>
+        <ng-container *ngIf="disciplines(); else discLoading">
+          <select class="form-select form-select-sm" style="min-width:220px" [ngModel]="disciplineId()" (ngModelChange)="setDisciplineForView($event)">
+            <option *ngFor="let d of disciplines()" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
+          </select>
+        </ng-container>
+        <ng-template #discLoading>
+          <div class="d-flex align-items-center gap-2" style="min-width:220px;">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+              <span class="visually-hidden">Carregando...</span>
+            </div>
+            <span class="small text-muted">Carregando...</span>
+          </div>
+        </ng-template>
       </div>
       <span class="me-2"><span class="legend legend-blue"></span> Futuro</span>
       <span class="me-2"><span class="legend legend-red"></span> Faltou</span>

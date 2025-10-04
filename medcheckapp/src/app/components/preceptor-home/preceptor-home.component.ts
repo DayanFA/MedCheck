@@ -6,6 +6,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { Router } from '@angular/router';
+import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-context.service';
 
 @Component({
   selector: 'app-preceptor-home',
@@ -68,7 +69,7 @@ import { Router } from '@angular/router';
     <div class="container pb-4">
       <div class="row g-4">
         <div class="col-12 col-lg-6" *ngFor="let a of items">
-          <div class="student-card card border-0 shadow-sm p-3 h-100 clickable" (click)="openCalendar(a)">
+          <div class="student-card card border-0 shadow-sm p-3 h-100" [class.selected]="isSelecionado(a)">
             <div class="row g-3 align-items-center">
               <div class="col-auto">
                 <div aria-label="Avatar" class="rounded-circle bg-secondary-subtle user-avatar d-flex align-items-center justify-content-center overflow-hidden">
@@ -97,7 +98,11 @@ import { Router } from '@angular/router';
                 <span class="status badge px-3 py-2 w-100 w-sm-auto d-inline-block text-center" [class.in-service]="a.inService" [class.off-service]="!a.inService">
                   {{ a.inService ? 'Em Serviço' : 'Fora de Serviço' }}
                 </span>
-                <button class="btn btn-success btn-sm w-100 w-sm-auto" type="button" (click)="$event.stopPropagation(); avaliar(a)">Avaliar</button>
+                <button class="btn btn-outline-primary btn-sm w-100" type="button"
+                        (click)="$event.stopPropagation(); visualizar(a)"
+                        [class.active]="isSelecionado(a)">
+                  {{ isSelecionado(a) ? 'Selecionado' : 'Visualizar' }}
+                </button>
               </div>
             </div>
           </div>
@@ -124,9 +129,9 @@ import { Router } from '@angular/router';
     .topbar .search-group{min-width: 260px; max-width: 540px; background:#fff;border-radius:8px; border:1px solid #e9ecef;}
     .topbar .search-group .form-control{height:40px;}
     .year-select{width: 120px;}
-  .student-card{border-radius:14px; background:#f8f9fc;}
-  .student-card.clickable{cursor:pointer; transition:transform .06s ease, box-shadow .1s ease;}
-  .student-card.clickable:hover{transform: translateY(-1px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.12)!important;}
+  .student-card{border-radius:14px; background:#f8f9fc; transition:box-shadow .12s ease, border-color .12s ease;}
+  .student-card.selected{border:2px solid #0d6efd !important; box-shadow:0 0 0 .25rem rgba(13,110,253,.25)!important;}
+  .btn-outline-primary.active{background:#0d6efd; color:#fff;}
   .user-avatar{width:64px;height:64px;}
   .user-avatar i{font-size:2rem;}
     .status{border-radius:16px;}
@@ -157,7 +162,7 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
 
   private avatarObjectUrls: string[] = [];
 
-  constructor(private svc: PreceptorService, private http: HttpClient, private auth: AuthService, private toast: ToastService, private router: Router) {}
+  constructor(private svc: PreceptorService, private http: HttpClient, private auth: AuthService, private toast: ToastService, private router: Router, private alunoCtx: PreceptorAlunoContextService) {}
 
   ngOnInit(): void { this.load(); }
 
@@ -245,13 +250,19 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
     this.avatarObjectUrls = [];
   }
 
-  avaliar(a: any){
+  visualizar(a: any){
     if (!a?.id) return;
-    this.router.navigate(['/relatorio'], { queryParams: { alunoId: a.id } });
+    if (this.isSelecionado(a)) {
+      // Toggle off
+      this.alunoCtx.clear();
+      return;
+    }
+    const displayName = a.name || a.nome || a.fullName || a.email || 'Aluno';
+    this.alunoCtx.setAluno(a.id, displayName);
   }
 
-  openCalendar(a: any){
-    if (!a?.id) return;
-    this.router.navigate(['/calendario'], { queryParams: { alunoId: a.id } });
+  isSelecionado(a: any): boolean {
+    const current = this.alunoCtx.getAluno();
+    return !!current.id && current.id === a.id;
   }
 }

@@ -2,16 +2,24 @@
   <h5 class="mb-3">Check-In do Aluno</h5>
   <div class="card p-3 mb-4">
     <div class="row g-3 align-items-end">
-      <div class="col-md-4">
+      <div class="col-md-3">
+        <label class="form-label small">Disciplina</label>
+        <select class="form-select" [ngModel]="disciplineId" (ngModelChange)="onSelectDiscipline($event)">
+          <option *ngFor="let d of disciplines" [ngValue]="d.id">
+            {{ (d.code ? d.code + ' - ' : '') + (d.name || ('ID '+d.id)) }}
+          </option>
+        </select>
+      </div>
+      <div class="col-md-3">
         <label class="form-label small">ID do Preceptor</label>
         <input type="number" class="form-control" [(ngModel)]="preceptorId" placeholder="Ex: 2" />
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label class="form-label small">Código</label>
         <input type="text" class="form-control" [(ngModel)]="code" placeholder="ABC123" />
       </div>
-      <div class="col-md-4 d-grid">
-        <button class="btn btn-primary" (click)="submit()">Validar & Check-In</button>
+      <div class="col-md-3 d-grid">
+        <button class="btn btn-primary" [disabled]="submitting" (click)="submit()">{{ submitting ? 'Enviando...' : 'Validar & Check-In' }}</button>
       </div>
     </div>
     <div class="small mt-2 text-muted">Informe o código exibido pelo preceptor (ou escaneie QR futuramente).</div>

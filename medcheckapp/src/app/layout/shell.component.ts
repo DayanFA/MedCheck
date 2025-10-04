@@ -20,18 +20,19 @@ export class ShellComponent implements OnInit, OnDestroy {
   avatarUrl = '';
   private avatarObjectUrl: string | null = null;
   currentDisciplineLabel = '';
+  private disciplines: any[] = [];
+  private LOCAL_DISC_KEY = 'mc_current_discipline_id';
   private storageListener = (e: StorageEvent) => {
+    // Atualização de usuário ainda mantém avatar / nome
     if (e.key === 'mc_user' && e.newValue) {
-      try {
-        const u = JSON.parse(e.newValue);
-        this.applyDisciplineFromUser(u);
-        // Reload avatar when user cache changes (e.g., after updating profile photo)
-        this.loadAvatarIfAny();
-      } catch {}
+      try { this.loadAvatarIfAny(); } catch {}
+    }
+    if (e.key === this.LOCAL_DISC_KEY) {
+      this.updateDisciplineLabel();
     }
   };
-  private userUpdatedListener = (e: any) => {
-    try { this.applyDisciplineFromUser(e?.detail); this.loadAvatarIfAny(); } catch {}
+  private disciplineChangedListener = (e: any) => {
+    this.updateDisciplineLabel();
   };
   constructor(private userService: UserService, private auth: AuthService, private http: HttpClient, @Inject(PLATFORM_ID) private platformId: Object) {}
 
@@ -45,12 +46,9 @@ export class ShellComponent implements OnInit, OnDestroy {
     const cached: any = (this.auth as any).getUser?.();
     if (cached && cached.name) {
       this.userName = (cached.name || '').split(' ')[0];
-      this.applyDisciplineFromUser(cached);
     } else {
-      // Fallback antigo
       const u = this.userService.getCurrentUser();
       this.userName = (u.name || '').split(' ')[0];
-      this.applyDisciplineFromUser(u as any);
     }
     // Carrega avatar apenas no browser (evita SSR sem token)
     if (isPlatformBrowser(this.platformId)) {
@@ -58,7 +56,8 @@ export class ShellComponent implements OnInit, OnDestroy {
       setTimeout(() => { this.loadAvatarIfAny(); this.loadUserDetails(); }, 0);
       // Ouve alterações no usuário em cache para refletir disciplina no header
       window.addEventListener('storage', this.storageListener);
-      window.addEventListener('mc:user-updated', this.userUpdatedListener as any);
+      window.addEventListener('mc:discipline-changed', this.disciplineChangedListener as any);
+      this.loadDisciplines();
     }
   }
   toggleSidebar() {
@@ -70,7 +69,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     this.clearAvatarUrl();
     if (isPlatformBrowser(this.platformId)) {
       window.removeEventListener('storage', this.storageListener);
-      window.removeEventListener('mc:user-updated', this.userUpdatedListener as any);
+      window.removeEventListener('mc:discipline-changed', this.disciplineChangedListener as any);
     }
   }
 
@@ -111,36 +110,30 @@ export class ShellComponent implements OnInit, OnDestroy {
     this.avatarUrl = '';
   }
 
-  private applyDisciplineFromUser(u: any) {
-    const code = u?.currentDisciplineCode;
-    const name = u?.currentDisciplineName;
-    if (code && name) {
-      this.currentDisciplineLabel = `${code} - ${name}`;
-      return;
-    }
-    // Se for preceptor e tiver disciplinas vinculadas, exibir também no cabeçalho (mesmo formato: CODE - Nome)
-    if (u?.role === 'PRECEPTOR' && Array.isArray(u?.preceptorDisciplines) && u.preceptorDisciplines.length > 0) {
-      const discs = u.preceptorDisciplines as Array<any>;
-      if (discs.length === 1) {
-        const d = discs[0];
-        if (d?.code && d?.name) {
+  private updateDisciplineLabel() {
+    try {
+      const stored = localStorage.getItem(this.LOCAL_DISC_KEY);
+      const id = stored ? parseInt(stored, 10) : null;
+      if (id && this.disciplines.length) {
+        const d = this.disciplines.find(x => x.id === id);
+        if (d) {
           this.currentDisciplineLabel = `${d.code} - ${d.name}`;
           return;
         }
       }
-      // múltiplas: lista todos como "CODE - Nome"
-      const pairs = discs
-        .filter(d => d && d.code && d.name)
-        .map(d => `${d.code} - ${d.name}`);
-      this.currentDisciplineLabel = pairs.join(' | ');
-      return;
-    }
-    if (u?.role === 'PRECEPTOR') {
-      // Não exibir badge quando não houver vínculo
+      // Sem seleção ou não encontrada => limpa badge
       this.currentDisciplineLabel = '';
-      return;
-    }
-    this.currentDisciplineLabel = '';
+    } catch { this.currentDisciplineLabel = ''; }
+  }
+
+  private loadDisciplines() {
+    this.http.get('/api/users/me/disciplines').subscribe({
+      next: (list: any) => {
+        this.disciplines = Array.isArray(list) ? list : [];
+        this.updateDisciplineLabel();
+      },
+      error: _ => { this.disciplines = []; this.updateDisciplineLabel(); }
+    });
   }
 
   private loadUserDetails() {
@@ -156,11 +149,11 @@ export class ShellComponent implements OnInit, OnDestroy {
           localStorage.removeItem('mc_user');
           sessionStorage.removeItem('mc_user');
           if (remember) localStorage.setItem('mc_user', JSON.stringify(merged)); else sessionStorage.setItem('mc_user', JSON.stringify(merged));
-          window.dispatchEvent(new CustomEvent('mc:user-updated', { detail: merged }));
+          // Disciplinas do preceptor ainda podem ser mostradas (fora do escopo atual do aluno)
           // tenta carregar avatar se perfil indica que há
           if (isPlatformBrowser(this.platformId)) this.loadAvatarIfAny();
-          // aplica imediatamente no header
-          this.applyDisciplineFromUser(merged);
+          // Atualiza label (se for preceptor não dependemos mais do currentDisciplineCode)
+          this.updateDisciplineLabel();
         } catch {}
       },
       error: _ => {}

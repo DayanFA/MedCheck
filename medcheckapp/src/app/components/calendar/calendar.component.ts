@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CalendarServiceApi, CalendarDay, InternshipPlanDto } from '../../services/calendar.service';
 import { WeekSelectionService } from '../../services/week-selection.service';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-calendar',
@@ -15,11 +15,14 @@ import { ActivatedRoute } from '@angular/router';
 export class UserCalendarComponent {
   private api = inject(CalendarServiceApi);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   today = new Date();
   year = signal(this.today.getFullYear());
   month = signal(this.today.getMonth() + 1); // 1-12
   alunoId = signal<number|undefined>(undefined);
-  data = signal<{ days: CalendarDay[]; plans:any[]; justifications:any[] }|null>(null);
+  disciplineId = signal<number|undefined>(undefined); // disciplina forçada (preceptor) ou escolhida (aluno)
+  disciplines = signal<any[]|null>(null); // lista para aluno escolher na criação de plano/justificativa
+  data = signal<{ days: CalendarDay[]; plans:any[]; justifications:any[]; forcedDiscipline?: any }|null>(null);
   loading = signal(false);
   // day history
   selectedDate = signal<string>('');
@@ -72,11 +75,20 @@ export class UserCalendarComponent {
     return weeks;
   });
 
+  filteredDisciplineLabel = computed(() => {
+    const d = this.data()?.forcedDiscipline;
+    if (d && d.code) return `${d.code} — ${d.name}`;
+    return 'Visão Geral';
+  });
+
   constructor(private weekSync: WeekSelectionService) {
     this.route.queryParamMap.subscribe(mp => {
       const idStr = mp.get('alunoId');
       const idNum = idStr ? Number(idStr) : undefined;
       this.alunoId.set(idNum && Number.isFinite(idNum) ? idNum : undefined);
+      const discStr = mp.get('disciplineId');
+      const discNum = discStr ? Number(discStr) : undefined;
+      this.disciplineId.set(discNum && Number.isFinite(discNum) ? discNum : undefined);
       this.load();
     });
   // sincroniza seleção inicial com service compartilhado
@@ -94,10 +106,11 @@ export class UserCalendarComponent {
     if (y !== prevYear || m !== prevMonth) {
       this.year.set(y);
       this.month.set(m);
-      // Load month, then open the day after data arrives
       this.loading.set(true);
-      this.api.getMonth(y, m, this.alunoId()).subscribe(res => {
-        this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications });
+      // IMPORTANTE: preservar disciplina selecionada ao recarregar mês
+      this.api.getMonth(y, m, this.alunoId(), this.disciplineId()).subscribe(res => {
+        // Preserva metadata de disciplina forçada
+        this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
         this.loading.set(false);
         this.openPlan(dateIso);
       }, _ => this.loading.set(false));
@@ -115,11 +128,50 @@ export class UserCalendarComponent {
   }
 
   load() {
+    // Se for o próprio aluno (sem alunoId), aplicar disciplina salva localmente
+    if (!this.alunoId()) {
+      try {
+        const stored = localStorage.getItem('mc_current_discipline_id');
+        if (stored) {
+          const parsed = parseInt(stored, 10);
+          if (!Number.isNaN(parsed)) this.disciplineId.set(parsed);
+        }
+      } catch {}
+    }
     this.loading.set(true);
-    this.api.getMonth(this.year(), this.month(), this.alunoId()).subscribe(res => {
-      this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications });
+    this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe(res => {
+      this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
       this.loading.set(false);
     }, _ => this.loading.set(false));
+    // se for aluno (sem alunoId) carregar disciplinas para seleção local
+    if (!this.alunoId()) {
+      const t = (this.api as any)['auth'].getToken?.();
+      const init: RequestInit = t ? { headers: { Authorization: `Bearer ${t}` } } : {};
+      fetch('/api/users/me/disciplines', init)
+        .then(r => r.ok ? r.json() : [])
+        .then(list => this.disciplines.set(list))
+        .catch(()=>{});
+    } else {
+      // Preceptor visualizando aluno: não sobrescrever disciplineId; apenas carrega lista se ainda não carregada
+      if (!this.disciplines()) {
+        const t = (this.api as any)['auth'].getToken?.();
+        const init: RequestInit = t ? { headers: { Authorization: `Bearer ${t}` } } : {};
+        fetch('/api/users/me/disciplines', init)
+          .then(r => r.ok ? r.json() : [])
+          .then(list => this.disciplines.set(list))
+          .catch(()=>{});
+      }
+    }
+  }
+
+  setDisciplineForView(id: string) {
+    const num = id ? Number(id) : undefined;
+    this.disciplineId.set(num && Number.isFinite(num) ? num : undefined);
+    // Atualiza query params para persistir em reload / compartilhamento de URL
+    const qp: any = { disciplineId: this.disciplineId() };
+    if (this.alunoId()) qp.alunoId = this.alunoId();
+    this.router.navigate([], { relativeTo: this.route, queryParams: qp, queryParamsHandling: 'merge' });
+    this.load();
   }
 
   nextMonth(delta: number) {
@@ -177,6 +229,7 @@ export class UserCalendarComponent {
       location: this.formLocation(),
       note: this.formNote() || undefined,
       weekNumber: this.selectedWeek(),
+      disciplineId: this.disciplineId() // para aluno, disciplineId será o selecionado via selector (ajustado no template)
     };
     // atualizar semana global selecionada
     this.weekSync.setWeek(this.selectedWeek());
@@ -206,6 +259,7 @@ export class UserCalendarComponent {
       this.selectedWeek.set(p.weekNumber);
       this.weekSync.setWeek(p.weekNumber);
     }
+    // Select de disciplina removido para aluno; não alteramos disciplineId ao editar plano.
   }
 
   deletePlan(id: number) {
@@ -244,7 +298,7 @@ export class UserCalendarComponent {
   }
 
   saveJustify() {
-    this.api.justify({ date: this.justDate(), planId: this.justPlanId(), type: this.justType(), reason: this.justReason() })
+    this.api.justify({ date: this.justDate(), planId: this.justPlanId(), type: this.justType(), reason: this.justReason(), disciplineId: this.disciplineId() })
       .subscribe(() => this.load());
   }
 
@@ -319,8 +373,7 @@ export class UserCalendarComponent {
   }
 
   private loadDaySessions(dateIso: string) {
-    // backend expects start/end as YYYY-MM-DD
-    this.api.getSessions(dateIso, dateIso, this.alunoId() || undefined).subscribe(list => {
+    this.api.getSessions(dateIso, dateIso, this.alunoId() || undefined, this.disciplineId() || undefined).subscribe(list => {
       this.sessionsForDay.set(list);
     });
   }

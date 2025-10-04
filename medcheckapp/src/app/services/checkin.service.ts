@@ -13,9 +13,17 @@ export class CheckInService {
   }
 
   currentCode(): Observable<any> { return this.http.get(`${this.base}/code`, { headers: this.authHeaders() }); }
-  checkIn(preceptorId: number, code: string): Observable<any> { return this.http.post(`${this.base}/in`, { preceptorId, code }, { headers: this.authHeaders() }); }
+  checkIn(preceptorId: number, code: string, disciplineId?: number): Observable<any> {
+    const body: any = { preceptorId, code };
+    if (disciplineId) body.disciplineId = disciplineId;
+    return this.http.post(`${this.base}/in`, body, { headers: this.authHeaders() });
+  }
   checkOut(): Observable<any> { return this.http.post(`${this.base}/out`, {}, { headers: this.authHeaders() }); }
-  sessions(start: string, end: string): Observable<any> { return this.http.get(`${this.base}/sessions`, { headers: this.authHeaders(), params: new HttpParams().set('start', start).set('end', end) }); }
+  sessions(start: string, end: string, disciplineId?: number): Observable<any> {
+    let params = new HttpParams().set('start', start).set('end', end);
+    if (disciplineId) params = params.set('disciplineId', String(disciplineId));
+    return this.http.get(`${this.base}/sessions`, { headers: this.authHeaders(), params });
+  }
   status(): Observable<any> { return this.http.get(`${this.base}/status`, { headers: this.authHeaders() }); }
   myDisciplines(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/my-disciplines`, { headers: this.authHeaders() }); }
 }

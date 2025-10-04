@@ -19,21 +19,33 @@ public class CalendarService {
         this.planRepo = planRepo; this.justRepo = justRepo; this.sessionRepo = sessionRepo;
     }
 
+    // Backward compatible adapter (deprecated use with forced discipline param)
+    @Deprecated
     public Map<String,Object> monthView(User aluno, int year, int month) {
+        return monthView(aluno, year, month, null);
+    }
+
+    public Map<String,Object> monthView(User aluno, int year, int month, Discipline forced) {
         YearMonth ym = YearMonth.of(year, month);
         LocalDate start = ym.atDay(1);
         LocalDate end = ym.atEndOfMonth();
-
-        Discipline current = aluno.getCurrentDiscipline();
+        // Regra: se for forçado usa forçado; SENÃO
+        //  - se o solicitante (aluno) está vendo seu próprio calendário -> herda current_discipline (comportamento antigo)
+        //  - se for preceptor/admin consultando aluno e não passou disciplineId => visão geral (effective = null)
+        Discipline effective;
+        effective = forced; // null => visão geral (não usa current_discipline implicitamente)
+        // Novo ajuste:
+        //  - effective == null => visão geral: retorna todos os planos (todas as disciplinas + NULL)
+        //  - effective != null (filtragem explícita) => retorna apenas planos daquela disciplina (SEM incluir NULL)
         List<InternshipPlan> plans = planRepo.findByAlunoAndDateBetweenOrderByDateAsc(aluno, start, end)
-            .stream().filter(p -> current == null || (p.getDiscipline() != null && p.getDiscipline().getId().equals(current.getId())))
+            .stream().filter(p -> effective == null || (p.getDiscipline() != null && p.getDiscipline().getId().equals(effective.getId())))
             .toList();
         List<InternshipJustification> justs = justRepo.findByAlunoAndDateBetweenOrderByDateAsc(aluno, start, end)
-            .stream().filter(j -> current == null || (j.getDiscipline() != null && j.getDiscipline().getId().equals(current.getId())))
+            .stream().filter(j -> effective == null || (j.getDiscipline() != null && j.getDiscipline().getId().equals(effective.getId())))
             .toList();
-        List<CheckSession> sessions = (current == null)
+        List<CheckSession> sessions = (effective == null)
             ? sessionRepo.findByAlunoAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, start.atStartOfDay(), end.atTime(23,59,59))
-            : sessionRepo.findByAlunoAndDisciplineAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, current, start.atStartOfDay(), end.atTime(23,59,59));
+            : sessionRepo.findByAlunoAndDisciplineAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, effective, start.atStartOfDay(), end.atTime(23,59,59));
 
         Map<LocalDate, Long> plannedByDay = plans.stream().collect(Collectors.groupingBy(InternshipPlan::getDate, Collectors.summingLong(InternshipPlan::getPlannedSeconds)));
         Map<LocalDate, Long> workedByDay = computeWorkedByDay(sessions, start, end);
@@ -62,6 +74,13 @@ public class CalendarService {
         out.put("days", days);
         out.put("plans", plans.stream().map(this::planToMap).toList());
         out.put("justifications", justs.stream().map(this::justToMap).toList());
+        if (effective != null) {
+            out.put("forcedDiscipline", Map.of(
+                "id", effective.getId(),
+                "code", effective.getCode(),
+                "name", effective.getName()
+            ));
+        }
         return out;
     }
 
@@ -90,6 +109,13 @@ public class CalendarService {
         }
         m.put("plannedSeconds", secs);
         if (p.getWeekNumber() != null) m.put("weekNumber", p.getWeekNumber());
+        if (p.getDiscipline() != null) {
+            m.put("discipline", Map.of(
+                "id", p.getDiscipline().getId(),
+                "code", p.getDiscipline().getCode(),
+                "name", p.getDiscipline().getName()
+            ));
+        }
         return m;
     }
 
@@ -102,6 +128,13 @@ public class CalendarService {
         m.put("status", j.getStatus());
         m.put("reviewNote", j.getReviewNote());
         m.put("planId", j.getPlan() == null ? null : j.getPlan().getId());
+        if (j.getDiscipline() != null) {
+            m.put("discipline", Map.of(
+                "id", j.getDiscipline().getId(),
+                "code", j.getDiscipline().getCode(),
+                "name", j.getDiscipline().getName()
+            ));
+        }
         return m;
     }
 

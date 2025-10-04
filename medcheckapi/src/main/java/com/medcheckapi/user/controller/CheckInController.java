@@ -60,8 +60,12 @@ public class CheckInController {
         User me = currentUser(principal);
         Long preceptorId = Long.valueOf(body.getOrDefault("preceptorId", "0"));
         String code = body.getOrDefault("code", "");
+        Long disciplineId = null;
+        if (body.containsKey("disciplineId")) {
+            try { disciplineId = Long.valueOf(body.get("disciplineId")); } catch (Exception ignored) { disciplineId = null; }
+        }
         try {
-            return ResponseEntity.ok(checkInService.performCheckIn(me.getId(), preceptorId, code));
+            return ResponseEntity.ok(checkInService.performCheckIn(me.getId(), preceptorId, code, disciplineId));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -80,7 +84,8 @@ public class CheckInController {
     @GetMapping("/sessions")
     public ResponseEntity<?> sessions(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
                                       @RequestParam String start, @RequestParam String end,
-                                      @RequestParam(required = false) Long alunoId) {
+                                      @RequestParam(required = false) Long alunoId,
+                                      @RequestParam(required = false) Long disciplineId) {
         User me = currentUser(principal);
         LocalDate s = LocalDate.parse(start);
         LocalDate e = LocalDate.parse(end);
@@ -88,7 +93,7 @@ public class CheckInController {
         if (alunoId != null && (me.getRole() == com.medcheckapi.user.model.Role.PRECEPTOR || me.getRole() == com.medcheckapi.user.model.Role.ADMIN)) {
             targetId = alunoId;
         }
-        return ResponseEntity.ok(checkInService.listSessionsForAluno(targetId, s, e));
+        return ResponseEntity.ok(checkInService.listSessionsForAluno(targetId, s, e, disciplineId));
     }
 
     // ALUNO: status (open or not + worked seconds today)

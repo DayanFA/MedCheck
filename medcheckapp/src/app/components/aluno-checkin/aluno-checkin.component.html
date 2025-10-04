@@ -27,6 +27,12 @@
           <div class="small text-muted">Aponte para o QR do preceptor para preencher automaticamente.</div>
         </div>
         <div class="row g-2 align-items-end">
+          <div class="col-12">
+            <label class="form-label small">Disciplina</label>
+            <select class="form-select form-select-sm" [ngModel]="disciplineId" (ngModelChange)="onSelectDiscipline($event)">
+              <option *ngFor="let d of disciplines" [ngValue]="d.id">{{ (d.code ? d.code + ' - ' : '') + (d.name || ('ID '+d.id)) }}</option>
+            </select>
+          </div>
           <div class="col-6">
             <label class="form-label small">ID Preceptor</label>
             <input type="number" class="form-control form-control-sm" [(ngModel)]="preceptorId" />

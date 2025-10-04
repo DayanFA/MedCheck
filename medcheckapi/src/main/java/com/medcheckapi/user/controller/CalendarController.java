@@ -13,9 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/calendar")
@@ -41,6 +39,13 @@ public class CalendarController {
         if (p.getWeekNumber() != null) m.put("weekNumber", p.getWeekNumber());
         // opcional: incluir plannedSeconds
         m.put("plannedSeconds", p.getPlannedSeconds());
+        if (p.getDiscipline() != null) {
+            m.put("discipline", Map.of(
+                "id", p.getDiscipline().getId(),
+                "code", p.getDiscipline().getCode(),
+                "name", p.getDiscipline().getName()
+            ));
+        }
         return m;
     }
 
@@ -68,13 +73,27 @@ public class CalendarController {
     @GetMapping("/month")
     public ResponseEntity<?> month(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
                                    @RequestParam int year, @RequestParam int month,
-                                   @RequestParam(required = false) Long alunoId) {
+                                   @RequestParam(required = false) Long alunoId,
+                                   @RequestParam(required = false) Long disciplineId) {
         User me = currentUser(principal);
         User target = me;
         if (alunoId != null && (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN)) {
             target = userRepo.findById(alunoId).orElse(me);
         }
-        return ResponseEntity.ok(calendarService.monthView(target, year, month));
+        Discipline forced;
+        if (disciplineId == null) {
+            forced = null; // visão geral (todas as disciplinas planejadas) ou current_discipline somente para status agregado
+        } else {
+            // Novo comportamento: PRECEPTOR ou ADMIN podem forçar QUALQUER disciplina existente
+            if (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN) {
+                forced = discRepo.findById(disciplineId).orElse(null); // se inexistente -> null (sem erro explícito)
+            } else if (!Objects.equals(target.getId(), me.getId())) {
+                return ResponseEntity.status(403).body(Map.of("error", "Sem permissão para disciplina forçada"));
+            } else {
+                forced = discRepo.findById(disciplineId).orElse(null);
+            }
+        }
+        return ResponseEntity.ok(calendarService.monthView(target, year, month, forced));
     }
 
     // Planos do aluno logado filtrados por weekNumber (1..10)
@@ -93,16 +112,15 @@ public class CalendarController {
         }
     Discipline current = target.getCurrentDiscipline();
     Discipline forced = null;
-    if (disciplineId != null && (me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN)) {
-        Discipline fetched = discRepo.findById(disciplineId).orElse(null);
-        // security: if preceptor (not admin) ensure linkage (usa disciplineId direto para evitar var não final no lambda)
-        if (fetched != null && me.getRole() == Role.PRECEPTOR) {
-            boolean belongs = discRepo.findByPreceptors_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(disciplineId));
-            if (!belongs) {
-                return ResponseEntity.status(403).body(Map.of("error", "Preceptor não vinculado à disciplina"));
-            }
+    if (disciplineId != null) {
+        // Permitir força de disciplina quando:
+        // - PRECEPTOR / ADMIN visualizando qualquer aluno
+        // - Aluno visualizando a si mesmo (target == me)
+        if ((me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN) || Objects.equals(target.getId(), me.getId())) {
+            forced = discRepo.findById(disciplineId).orElse(null); // se inexistente, permanece null (resultará em visão geral ou current)
+        } else {
+            return ResponseEntity.status(403).body(Map.of("error", "Sem permissão para disciplina forçada"));
         }
-        forced = fetched; // atribui após validação
     }
     Discipline effective = (forced != null) ? forced : current;
     List<InternshipPlan> list = (effective == null)
@@ -147,8 +165,13 @@ public class CalendarController {
         p.setLocation(location);
         p.setNote(note);
         p.setWeekNumber(weekNumber);
-        // Disciplina atual do aluno vincula o plano
-        p.setDiscipline(me.getCurrentDiscipline());
+        // Disciplina explícita (disciplineId) tem prioridade; fallback para current_discipline
+        Discipline disc = null;
+        if (body.containsKey("disciplineId")) {
+            try { disc = discRepo.findById(Long.valueOf(body.get("disciplineId"))).orElse(null); } catch (Exception ignored) {}
+        }
+        if (disc == null) disc = me.getCurrentDiscipline();
+        p.setDiscipline(disc);
         p = planRepo.save(p);
         Map<String,Object> resp = new HashMap<>();
         resp.put("plan", planDto(p));
@@ -188,7 +211,12 @@ public class CalendarController {
         j.setReason(body.getOrDefault("reason", ""));
         // Sempre reseta para PENDING quando o aluno cria/edita
         j.setStatus("PENDING");
-        j.setDiscipline(me.getCurrentDiscipline());
+        Discipline disc = null;
+        if (body.containsKey("disciplineId")) {
+            try { disc = discRepo.findById(Long.valueOf(body.get("disciplineId"))).orElse(null); } catch (Exception ignored) {}
+        }
+        if (disc == null) disc = me.getCurrentDiscipline();
+        j.setDiscipline(disc);
         j = justRepo.save(j);
         Map<String,Object> resp = new HashMap<>();
         resp.put("id", j.getId());
@@ -197,6 +225,13 @@ public class CalendarController {
         resp.put("reason", j.getReason());
         resp.put("status", j.getStatus());
         resp.put("planId", j.getPlan() == null ? null : j.getPlan().getId());
+        if (j.getDiscipline() != null) {
+            resp.put("discipline", Map.of(
+                "id", j.getDiscipline().getId(),
+                "code", j.getDiscipline().getCode(),
+                "name", j.getDiscipline().getName()
+            ));
+        }
         return ResponseEntity.ok(resp);
     }
 

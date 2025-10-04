@@ -1,4 +1,5 @@
 import { Component, HostListener, Input, OnChanges, SimpleChanges, Inject, PLATFORM_ID, ViewChild, ElementRef } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { CalendarServiceApi } from '../../services/calendar.service';
@@ -7,6 +8,7 @@ import { CommonModule, DatePipe, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PreceptorService } from '../../services/preceptor.service';
 import { EvaluationService } from '../../services/evaluation.service';
+import { DisciplineService } from '../../services/discipline.service';
 // Removido import estático de jsPDF para evitar erro em SSR; será carregado dinamicamente dentro de onGeneratePdf.
 
 interface PeriodInterval { start: string; end: string; }
@@ -91,6 +93,8 @@ export class ReportComponent implements OnChanges {
   private globalShiftSet: Set<string> = new Set<string>();
   globalRotationPeriod: string = '—';
 
+  private disciplineCache: any[] = [];
+
   constructor(private auth: AuthService,
               private calApi: CalendarServiceApi,
               private weekSync: WeekSelectionService,
@@ -98,18 +102,16 @@ export class ReportComponent implements OnChanges {
               private preceptorService: PreceptorService,
               private router: Router,
               private evalService: EvaluationService,
+              private http: HttpClient,
+              private disciplineService: DisciplineService,
               @Inject(PLATFORM_ID) private platformId: Object) {
     this.initWeeks();
     this.updatePaginationMode();
     this.ensureGroupForSelected();
     const u = this.auth.getUser();
     if (u?.name) this.student.name = u.name;
-    if (u?.currentDisciplineName) {
-      const code = u.currentDisciplineCode ? u.currentDisciplineCode + ' - ' : '';
-      this.disciplineLabel = `CURSO DE MEDICINA - ${code}${u.currentDisciplineName}`;
-    } else {
-      this.disciplineLabel = 'CURSO DE MEDICINA';
-    }
+    // Disciplina passa a ser derivada de preference local do aluno (mc_current_discipline_id) ou parâmetro disciplineId quando preceptor.
+    this.setupInitialDisciplineContext();
     this.calApi.getCurrentPreceptor().subscribe(p => {
       if (p?.name) this.student.preceptorName = p.name;
     });
@@ -159,17 +161,127 @@ export class ReportComponent implements OnChanges {
     }
   }
 
+  private setupInitialDisciplineContext() {
+    // Preceptor / admin visualizando aluno: disciplineId já pode vir por @Input ou query param; label será ajustado em fetchStudentInfo
+    if (this.alunoId) {
+      this.disciplineLabel = 'CURSO DE MEDICINA';
+      return;
+    }
+    // Contexto aluno: tentar carregar preference local
+    if (isPlatformBrowser(this.platformId)) {
+      try {
+        const stored = localStorage.getItem('mc_current_discipline_id');
+        if (stored) {
+          const parsed = parseInt(stored, 10);
+          if (!Number.isNaN(parsed)) this.disciplineId = parsed;
+        }
+      } catch {}
+    }
+    // Se há disciplineId carregada localmente, label será atualizado após primeira carga de semana (metadado retornado) ou via avaliação.
+    this.disciplineLabel = 'CURSO DE MEDICINA';
+    // Carregar lista das disciplinas do aluno para permitir exibir label imediatamente sem esperar weekPlans
+    this.fetchOwnDisciplines();
+    // Escuta mudanças de disciplina (evento global disparado pela Home)
+    if (isPlatformBrowser(this.platformId)) {
+      window.addEventListener('mc:discipline-changed', this.onDisciplineChanged as any);
+    }
+    // Buscar metadados detalhados da disciplina (preceptores) se já temos uma id
+    if (this.disciplineId) this.fetchDisciplineDetail();
+  }
+
+  private fetchOwnDisciplines() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    this.http.get<any[]>('/api/users/me/disciplines').subscribe({
+      next: list => {
+        this.disciplineCache = Array.isArray(list) ? list : [];
+        this.applyDisciplineLabelFromCache();
+      },
+      error: _ => { /* silencioso */ }
+    });
+  }
+
+  private applyDisciplineLabelFromCache() {
+    if (!this.disciplineId) return;
+    const d = this.disciplineCache.find(x => x.id === this.disciplineId);
+    if (d) this.disciplineLabel = `CURSO DE MEDICINA - ${d.code} - ${d.name}`;
+  }
+
+  private onDisciplineChanged = (e: any) => {
+    if (this.alunoId) return; // ignore se preceptor
+    let id: number | undefined = undefined;
+    if (e?.detail?.id != null) id = e.detail.id;
+    else if (isPlatformBrowser(this.platformId)) {
+      try {
+        const stored = localStorage.getItem('mc_current_discipline_id');
+        if (stored) {
+          const parsed = parseInt(stored, 10);
+          if (!Number.isNaN(parsed)) id = parsed;
+        }
+      } catch {}
+    }
+    this.disciplineId = id;
+    // Limpa label até nova resposta chegar
+    this.disciplineLabel = 'CURSO DE MEDICINA';
+    // Resetar cabeçalho dependente da disciplina para evitar mostrar dados antigos
+    this.student.preceptorName = '—';
+    this.student.rotationPeriod = '—';
+    // Invalida cache das semanas e avaliação para evitar exibir dado da disciplina anterior
+    this.weeks.forEach(w => { w.loaded = false; w.evaluation = null; w.days = []; });
+    this.evaluationDetails = null;
+    // Tenta aplicar label instantâneo caso já esteja em cache
+    this.applyDisciplineLabelFromCache();
+    // Se ainda não temos a disciplina no cache, refaz fetch
+    if (this.disciplineId && !this.disciplineCache.some(d => d.id === this.disciplineId)) {
+      this.fetchOwnDisciplines();
+    }
+    // Carregar detalhes (preceptores) da nova disciplina
+    if (this.disciplineId) this.fetchDisciplineDetail();
+    // Recarrega semana selecionada (sem atraso) com novo filtro
+    this.loadWeek(this.selectedWeek.number);
+  };
+
   private fetchStudentInfo() {
     if (!this.alunoId) return;
     this.preceptorService.studentInfo(this.alunoId, this.disciplineId).subscribe(info => {
       if (info?.name) this.student.name = info.name;
-      if (info?.preceptor?.name) this.student.preceptorName = info.preceptor.name;
+      // Em contexto de preceptor, queremos exibir os preceptores vinculados à disciplina (se houver)
+      // Limpa qualquer nome antigo até disciplina detalhada chegar
+      this.student.preceptorName = '—';
+      if (!this.disciplineId && info?.preceptor?.name) {
+        // Caso sem disciplina específica, manter o preceptor "avaliador" como fallback
+        this.student.preceptorName = info.preceptor.name;
+      }
       if (info?.discipline) {
         this.disciplineLabel = `CURSO DE MEDICINA - ${info.discipline.code} - ${info.discipline.name}`;
       } else {
         // Sem disciplina específica: manter curso genérico
         this.disciplineLabel = 'CURSO DE MEDICINA';
       }
+      // Se não temos nome de preceptor (pode acontecer se não há sessão atual), tentar disciplina
+      if (!this.student.preceptorName && this.disciplineId) {
+        this.fetchDisciplineDetail();
+      }
+      // Ajustar período do rodízio para ser recalculado após a semana carregar
+      this.student.rotationPeriod = '—';
+    });
+  }
+
+  private fetchDisciplineDetail() {
+    if (!this.disciplineId) return;
+    this.disciplineService.get(this.disciplineId).subscribe({
+      next: detail => {
+        // Atualiza label padronizado (garante consistência mesmo se outras fontes não vierem)
+        if (detail?.code && detail?.name) {
+          this.disciplineLabel = `CURSO DE MEDICINA - ${detail.code} - ${detail.name}`;
+        }
+        // Preencher preceptorName caso esteja vazio e haja preceptores vinculados
+        if (detail?.preceptors?.length) {
+          // Se houver múltiplos, concatenar
+          const names = detail.preceptors.map(p => p.name).filter(Boolean);
+          if (names.length) this.student.preceptorName = names.join(', ');
+        }
+      },
+      error: _ => { /* silencioso */ }
     });
   }
 

@@ -40,9 +40,11 @@ export class HomeComponent implements OnInit, OnDestroy {
   loading = true;
   avatarUrl = '';
   private avatarObjectUrl: string | null = null;
-  // Disciplina atual do aluno
+  // Disciplinas do aluno (somente para filtro visual de calendário / relatórios / check-in)
   disciplines: any[] = [];
+  // Mantemos somente localmente; não enviamos mais para backend para não afetar entidades.
   selectedDisciplineId: number | null = null;
+  private LOCAL_DISC_KEY = 'mc_current_discipline_id';
   constructor(private userService: UserService, private auth: AuthService, private router: Router, private check: CheckInService, private http: HttpClient, @Inject(PLATFORM_ID) private platformId: Object, private zone: NgZone) {}
 
   private userUpdatedListener = (e: any) => {
@@ -65,10 +67,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         status: 'Em serviço',
         performedHours: '00:00:00'
       };
-      // Se cache já tiver disciplina, seta no seletor
-      if (cached.currentDisciplineId != null) {
-        this.selectedDisciplineId = cached.currentDisciplineId;
-      }
+      // Não usamos mais currentDisciplineId do backend para não influenciar banco – carregaremos de storage local.
   this.role = cached.role || null;
   this.updateCacheKeyWithUser();
       // Recarrega cache (agora com chave específica do usuário)
@@ -91,8 +90,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             performedHours: '00:00:00'
           };
           this.role = data?.role || null;
-          // tenta aplicar disciplina atual vinda do backend (se /auth/me expuser)
-          try { this.selectedDisciplineId = (data as any)?.currentDisciplineId ?? this.selectedDisciplineId; } catch {}
+          // Ignoramos currentDisciplineId do backend; seleção é puramente local.
             // Persistimos no cache também (para manter após F5)
             try {
               const cachedPrev = (this.auth as any).getUser?.() || {};
@@ -302,9 +300,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.http.get('/api/users/me/disciplines').subscribe({
       next: (list: any) => {
         this.disciplines = Array.isArray(list) ? list : [];
-        const cached = (this.auth as any).getUser?.();
+        // Seleção vem do localStorage (preferência do usuário)
         if (this.selectedDisciplineId == null) {
-          this.selectedDisciplineId = cached?.currentDisciplineId || null;
+          try {
+            const stored = localStorage.getItem(this.LOCAL_DISC_KEY);
+            if (stored) this.selectedDisciplineId = parseInt(stored, 10);
+          } catch {}
+        }
+        // Se ainda não há seleção válida, auto seleciona primeira disciplina disponível
+        if ((this.selectedDisciplineId == null || !this.disciplines.some(d => d.id === this.selectedDisciplineId)) && this.disciplines.length > 0) {
+          this.selectedDisciplineId = this.disciplines[0].id;
+          this.persistLocalDiscipline();
         }
       },
       error: err => { console.error('Falha ao carregar disciplinas', err); this.disciplines = []; }
@@ -312,28 +318,18 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   onChangeDiscipline() {
-    const body = this.selectedDisciplineId ? { disciplineId: this.selectedDisciplineId } : { disciplineId: null } as any;
-    this.http.put('/api/users/me/discipline', body).subscribe({
-      next: (res: any) => {
-        // Atualiza usuário em cache para refletir a disciplina atual (id, code, name)
-        try {
-          const cached = (this.auth as any).getUser?.() || {};
-          const updated = {
-            ...cached,
-            currentDisciplineId: res?.currentDisciplineId ?? null,
-            currentDisciplineName: res?.currentDisciplineName ?? null,
-            currentDisciplineCode: res?.currentDisciplineCode ?? null
-          };
-          // mantemos preferência de persistência (localStorage se token estiver lá)
-          const remember = !!window.localStorage.getItem('token');
-          this.auth.setUser(updated, remember);
-          window.dispatchEvent(new StorageEvent('storage', { key: 'mc_user', newValue: JSON.stringify(updated) }));
-        } catch {}
-        // Recarrega status e deixa histórico/calendário serem filtrados por backend
-        this.loadStatus();
-      },
-      error: _ => {}
-    });
+    // Apenas persistir localmente; não chama backend
+    this.persistLocalDiscipline();
+    // Status não depende mais de disciplina, mas calendário/relatórios externos usarão disciplineId explicitamente.
+  }
+
+  private persistLocalDiscipline() {
+    try {
+      if (this.selectedDisciplineId != null) localStorage.setItem(this.LOCAL_DISC_KEY, String(this.selectedDisciplineId));
+      else localStorage.removeItem(this.LOCAL_DISC_KEY);
+    } catch {}
+    // Notifica shell/header para atualizar badge
+    try { window.dispatchEvent(new CustomEvent('mc:discipline-changed', { detail: { id: this.selectedDisciplineId } })); } catch {}
   }
 }
 

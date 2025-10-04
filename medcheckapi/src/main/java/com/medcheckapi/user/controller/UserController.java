@@ -26,4 +26,5 @@ public class UserController {
                 .contentType(u.getAvatarContentType() != null ? MediaType.parseMediaType(u.getAvatarContentType()) : MediaType.IMAGE_JPEG)
                 .body(u.getAvatar());
     }
+
 }

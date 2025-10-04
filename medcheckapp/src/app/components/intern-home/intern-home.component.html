@@ -36,7 +36,6 @@
       <div class="col-12 col-md-6">
         <label class="form-label small fw-semibold">Internato Atual</label>
         <select class="form-select form-select-sm" [(ngModel)]="selectedDisciplineId" (ngModelChange)="onChangeDiscipline()">
-          <option [ngValue]="null">Selecione...</option>
           <option *ngFor="let d of disciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
         </select>
         <div class="form-text">O histórico, calendário e validação de check-in serão filtrados por esta disciplina.</div>

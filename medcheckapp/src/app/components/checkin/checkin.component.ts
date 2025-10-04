@@ -16,27 +16,120 @@ export class CheckInComponent implements OnInit {
   history: any[] = [];
   message = '';
   loadingHistory = false;
+  submitting = false;
+  disciplineName?: string;
+  disciplines: { id:number; code?:string; name?:string; hours?:number; ciclo?:number }[] = [];
+  private LOCAL_DISC_KEY = 'mc_current_discipline_id';
+  disciplineId: number | undefined; // público para binding no template
 
   constructor(private check: CheckInService) {}
 
   ngOnInit(): void {
-    // default date range today
+    this.readDisciplineFromLocal();
+    window.addEventListener('mc:discipline-changed', this.onDisciplineChanged as any);
+    this.loadDisciplines();
+    this.resolveDisciplineName();
     this.loadHistory();
   }
 
+  private onDisciplineChanged = (e: CustomEvent) => {
+    if (e?.detail?.id != null) {
+      this.disciplineId = e.detail.id;
+    } else {
+      this.readDisciplineFromLocal();
+    }
+    this.resolveDisciplineName();
+    this.loadHistory();
+  };
+
+  private readDisciplineFromLocal() {
+    try {
+      const stored = localStorage.getItem(this.LOCAL_DISC_KEY);
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        this.disciplineId = Number.isNaN(parsed) ? undefined : parsed;
+      } else {
+        this.disciplineId = undefined;
+      }
+    } catch { this.disciplineId = undefined; }
+  }
+
+  private resolveDisciplineName() {
+    // Estratégia simples: se houver cache em outra parte poderíamos injetar um serviço.
+    // Agora monta rótulo codificado (code - name) com fallbacks.
+    if (this.disciplineId) {
+      const found = this.disciplines.find(d => d.id === this.disciplineId);
+      if (found) {
+        const parts = [] as string[];
+        if (found.code) parts.push(found.code);
+        if (found.name) parts.push(found.name);
+        this.disciplineName = parts.length ? parts.join(' - ') : `ID ${this.disciplineId}`;
+      } else {
+        this.disciplineName = `ID ${this.disciplineId}`;
+      }
+    } else {
+      this.disciplineName = undefined;
+    }
+  }
+
+  private loadDisciplines() {
+    this.check.myDisciplines().subscribe({
+      next: (list) => {
+        this.disciplines = list || [];
+        // Se não houver disciplina selecionada ainda, selecionar a primeira
+        if (!this.disciplineId && this.disciplines.length) {
+          this.setDiscipline(this.disciplines[0].id, false);
+        } else {
+          // garantir que a atual ainda existe; se não, escolher primeira
+          if (this.disciplineId && !this.disciplines.some(d => d.id === this.disciplineId)) {
+            if (this.disciplines.length) this.setDiscipline(this.disciplines[0].id, false);
+            else this.setDiscipline(undefined, false);
+          }
+        }
+        this.resolveDisciplineName();
+      },
+      error: _ => {}
+    });
+  }
+
+  onSelectDiscipline(ev: Event) {
+    const val = (ev.target as HTMLSelectElement).value;
+    const id = val ? parseInt(val,10) : undefined;
+    this.setDiscipline(id, true);
+  }
+
+  private setDiscipline(id: number | undefined, fireEvent: boolean) {
+    this.disciplineId = id;
+    if (id != null) localStorage.setItem(this.LOCAL_DISC_KEY, String(id)); else localStorage.removeItem(this.LOCAL_DISC_KEY);
+    if (fireEvent) {
+      window.dispatchEvent(new CustomEvent('mc:discipline-changed', { detail: { id } }));
+    }
+    this.resolveDisciplineName();
+    this.loadHistory();
+  }
+
+  ngOnDestroy(): void {
+    try { window.removeEventListener('mc:discipline-changed', this.onDisciplineChanged as any); } catch {}
+  }
+
   submit() {
-    if (!this.preceptorId || !this.code) { this.message = 'Informe preceptor e código'; return; }
+    if (!this.disciplineId) { this.message = 'Selecione uma disciplina na Home antes.'; return; }
+    if (!this.preceptorId || !this.code) { this.message = 'Informe ID do preceptor e código.'; return; }
+    const normCode = this.code.trim().toUpperCase();
+    if (!normCode) { this.message = 'Código inválido.'; return; }
+    this.submitting = true;
     this.message = 'Validando...';
-    this.check.checkIn(this.preceptorId, this.code.trim()).subscribe({
+    this.check.checkIn(this.preceptorId, normCode, this.disciplineId).subscribe({
       next: _ => { this.message = 'Check-In realizado'; this.code = ''; this.loadHistory(); },
-      error: err => { this.message = err?.error?.error || 'Falha ao validar'; }
+      error: err => { this.message = err?.error?.error || 'Falha ao validar'; },
+      complete: () => { this.submitting = false; }
     });
   }
 
   loadHistory() {
     this.loadingHistory = true;
     const today = new Date().toISOString().substring(0,10);
-    this.check.sessions(today, today).subscribe({
+    this.check.sessions(today, today, this.disciplineId).subscribe({
       next: list => { this.history = list; this.loadingHistory = false; },
       error: _ => { this.loadingHistory = false; }
     });

@@ -10,6 +10,7 @@ import java.security.SecureRandom;
 import java.time.*;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class CheckInService {
@@ -70,22 +71,31 @@ public class CheckInService {
     }
 
     @Transactional
-    public Map<String,Object> performCheckIn(Long alunoId, Long preceptorId, String code) {
+    public Map<String,Object> performCheckIn(Long alunoId, Long preceptorId, String code, Long disciplineId) {
     User aluno = userRepo.findById(alunoId).orElseThrow();
         User preceptor = userRepo.findById(preceptorId).orElseThrow();
         if (aluno.getRole() != Role.ALUNO) throw new IllegalStateException("Usuário não é aluno");
-    // Disciplina atual do aluno é obrigatória para validar o fluxo
-    Discipline selected = aluno.getCurrentDiscipline();
-    if (selected == null) throw new IllegalStateException("Selecione uma disciplina na Home antes de realizar o Check-In");
-    // Preceptor deve pertencer à disciplina selecionada
-    boolean belongs = disciplineRepo.findByPreceptors_Id(preceptor.getId())
-        .stream().anyMatch(d -> Objects.equals(d.getId(), selected.getId()));
-        if (!belongs) {
-            // Descobre disciplinas do preceptor para mensagem (pode haver mais de uma)
-            List<Discipline> preceptorDiscs = disciplineRepo.findByPreceptors_Id(preceptor.getId());
-            String names = preceptorDiscs.isEmpty() ? "outra disciplina" : preceptorDiscs.stream().map(Discipline::getName).distinct().limit(3).reduce((a,b) -> a + ", " + b).orElse("");
-            throw new IllegalStateException("Preceptor pertence a outro Internato {" + names + "}");
+    // Nova regra: disciplineId é obrigatório e não há mais fallback em currentDiscipline legado
+    if (disciplineId == null) {
+        throw new IllegalStateException("Disciplina obrigatória para Check-In (não enviada)");
+    }
+    Discipline selected = disciplineRepo.findById(disciplineId).orElseThrow(() -> new IllegalStateException("Disciplina informada não encontrada"));
+    // Validação de vínculo: ADMIN pode passar em qualquer disciplina; PRECEPTOR precisa estar vinculado
+    if (preceptor.getRole() != Role.ADMIN) {
+        boolean belongs = false;
+        try {
+            if (selected.getPreceptors() != null) {
+                belongs = selected.getPreceptors().stream().anyMatch(p -> Objects.equals(p.getId(), preceptor.getId()));
+            }
+        } catch (Exception ignored) {
+            // fallback seguro caso coleção seja lazy e não inicialize corretamente
+            List<Discipline> discs = disciplineRepo.findByPreceptors_Id(preceptor.getId());
+            belongs = discs.stream().anyMatch(d -> Objects.equals(d.getId(), selected.getId()));
         }
+        if (!belongs) {
+            throw new IllegalStateException("Preceptor não vinculado à disciplina selecionada");
+        }
+    }
     LocalDateTime now = fixedNow();
         // code validation (case-insensitive)
     CheckCode usedCode = codeRepo.findFirstByPreceptorAndCodeIgnoreCaseAndExpiresAtGreaterThanOrderByGeneratedAtDesc(preceptor, code, now)
@@ -115,12 +125,17 @@ public class CheckInService {
         return sessionToMap(open);
     }
 
-    public List<Map<String,Object>> listSessionsForAluno(Long alunoId, LocalDate start, LocalDate end) {
+    public List<Map<String,Object>> listSessionsForAluno(Long alunoId, LocalDate start, LocalDate end, Long disciplineId) {
         User aluno = userRepo.findById(alunoId).orElseThrow();
         LocalDateTime from = start.atStartOfDay();
         LocalDateTime to = end.atTime(23,59,59);
-        Discipline selected = aluno.getCurrentDiscipline();
-        List<CheckSession> list = selected == null
+        Discipline selected = null;
+        if (disciplineId != null) {
+            selected = disciplineRepo.findById(disciplineId).orElse(null);
+        } else {
+            selected = aluno.getCurrentDiscipline();
+        }
+        List<CheckSession> list = (selected == null)
                 ? sessionRepo.findByAlunoAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, from, to)
                 : sessionRepo.findByAlunoAndDisciplineAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, selected, from, to);
         List<Map<String,Object>> out = new ArrayList<>();
@@ -133,6 +148,13 @@ public class CheckInService {
         m.put("id", cs.getId());
         m.put("alunoId", cs.getAluno().getId());
         m.put("preceptorId", cs.getPreceptor().getId());
+    if (cs.getDiscipline() != null) {
+        m.put("discipline", Map.of(
+            "id", cs.getDiscipline().getId(),
+            "code", cs.getDiscipline().getCode(),
+            "name", cs.getDiscipline().getName()
+        ));
+    }
     m.put("checkInTime", cs.getCheckInTime().atZone(ACRE_ZONE).toOffsetDateTime().toString());
     m.put("checkOutTime", cs.getCheckOutTime() == null ? null : cs.getCheckOutTime().atZone(ACRE_ZONE).toOffsetDateTime().toString());
         m.put("validated", cs.isValidated());

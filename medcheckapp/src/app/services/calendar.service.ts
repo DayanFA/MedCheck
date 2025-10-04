@@ -18,6 +18,7 @@ export interface InternshipPlanDto {
   location?: string;
   note?: string;
   weekNumber?: number;
+  disciplineId?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -25,11 +26,12 @@ export class CalendarServiceApi {
   private http = inject(HttpClient);
   private auth = inject(AuthService);
 
-  getMonth(year: number, month: number, alunoId?: number) {
+  getMonth(year: number, month: number, alunoId?: number, disciplineId?: number) {
     const token = this.auth.getToken();
     const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
     const params: any = { year, month };
     if (alunoId) params.alunoId = alunoId;
+    if (disciplineId) params.disciplineId = disciplineId;
     return this.http.get<{ year:number; month:number; days: CalendarDay[]; plans: any[]; justifications: any[] }>(`/api/calendar/month`, { params, headers });
   }
 
@@ -45,7 +47,7 @@ export class CalendarServiceApi {
     return this.http.delete<{ deleted: boolean }>(`/api/calendar/plan/${id}`, { headers });
   }
 
-  justify(payload: { date: string; planId?: number; type?: string; reason: string; }) {
+  justify(payload: { date: string; planId?: number; type?: string; reason: string; disciplineId?: number; }) {
     const token = this.auth.getToken();
     const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
     return this.http.post(`/api/calendar/justify`, payload, { headers });
@@ -63,11 +65,12 @@ export class CalendarServiceApi {
     return this.http.delete<{ deleted: boolean }>(`/api/calendar/justify`, { headers, params: { date: dateIso } as any });
   }
 
-  getSessions(startIso: string, endIso: string, alunoId?: number) {
+  getSessions(startIso: string, endIso: string, alunoId?: number, disciplineId?: number) {
     const token = this.auth.getToken();
     const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
     const params: any = { start: startIso, end: endIso };
     if (alunoId) params.alunoId = alunoId;
+    if (disciplineId) params.disciplineId = disciplineId;
     return this.http.get<any[]>(`/api/check/sessions`, { params, headers });
   }
 

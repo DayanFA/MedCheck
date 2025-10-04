@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, ViewChild, ElementRef, AfterViewInit } fr
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CheckInService } from '../../services/checkin.service';
+import { HttpClient } from '@angular/common/http';
 // Nota: Para leitura de QR sem lib pesada, usamos um placeholder que pode ser trocado depois por 'jsqr'
 // ou outra lib. Aqui fica apenas estrutura inicial (captura de vídeo) para integração posterior.
 
@@ -47,6 +48,10 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   private baselineCaptureTs = 0; // timestamp em ms de quando baseline foi definido
   private todayDate = new Date().toISOString().substring(0,10);
   private cacheKey = 'mc_worked_cache_home'; // será ajustado após primeira resposta de status (CPF não está aqui diretamente)
+  private LOCAL_DISC_KEY = 'mc_current_discipline_id';
+  disciplineId?: number;
+  disciplines: { id:number; code?:string; name?:string }[] = [];
+  disciplineLoading = false;
 
   get workedToday(): string {
     if (!this.status && (this as any)._initialWorkedDisplay) return (this as any)._initialWorkedDisplay;
@@ -55,15 +60,18 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // Futuro: integrar decodificação real de QR (ex: jsQR). Por enquanto, placeholder para mostrar câmera.
 
-  constructor(private check: CheckInService) {}
+  constructor(private check: CheckInService, private http: HttpClient) {}
 
   ngOnInit(): void {
+    this.readDisciplineFromLocal();
+    window.addEventListener('mc:discipline-changed', this.onDisciplineChanged as any);
     this.loadWorkedCache();
     this.refreshStatus();
+    this.loadDisciplines();
     this.loadHistory('today');
     this.timerId = setInterval(()=> this.tick(), 1000);
   }
-  ngOnDestroy(): void { if (this.timerId) clearInterval(this.timerId); this.stopScan(); }
+  ngOnDestroy(): void { if (this.timerId) clearInterval(this.timerId); this.stopScan(); try { window.removeEventListener('mc:discipline-changed', this.onDisciplineChanged as any);} catch {} }
 
   ngAfterViewInit(): void {
     // Caso stream já exista quando o template aparecer
@@ -135,9 +143,10 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
 
   submitCheckIn() {
     if (this.submitting) return;
+    if (!this.disciplineId) { this.message = 'Selecione uma disciplina antes.'; return; }
     if (!this.preceptorId || !this.code) { this.message='Informe Preceptor e Código'; return; }
     this.submitting=true; this.message='Validando...';
-    this.check.checkIn(this.preceptorId, this.code.trim()).subscribe({
+    this.check.checkIn(this.preceptorId, this.code.trim().toUpperCase(), this.disciplineId).subscribe({
       next: _ => { this.message='Check-In realizado'; this.code=''; this.refreshStatus(); this.loadHistory('today'); this.submitting=false; },
       error: err => { this.message = err?.error?.error || 'Falha no Check-In'; this.submitting=false; }
     });
@@ -173,7 +182,7 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       sStr = customStart!; eStr = customEnd!;
     }
-    this.check.sessions(sStr, eStr).subscribe({
+    this.check.sessions(sStr, eStr, this.disciplineId).subscribe({
       next: list => {
         this.history = list;
         this.currentPage = 1; // reset página a cada novo carregamento
@@ -182,6 +191,68 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
       },
       error: _ => { this.loadingHistory=false; this.filterMessage='Falha ao buscar histórico'; }
     });
+  }
+
+  private readDisciplineFromLocal() {
+    try {
+      const stored = localStorage.getItem(this.LOCAL_DISC_KEY);
+      if (stored) {
+        const v = parseInt(stored,10); if (!Number.isNaN(v)) this.disciplineId = v;
+      }
+    } catch {}
+  }
+
+  private onDisciplineChanged = (e: CustomEvent) => {
+    if (e?.detail?.id != null) this.disciplineId = e.detail.id; else this.readDisciplineFromLocal();
+    this.loadHistory('today');
+  };
+
+  onSelectDiscipline(ev: Event) {
+    const val = (ev.target as HTMLSelectElement).value;
+    const id = val ? parseInt(val,10) : undefined;
+    this.setDiscipline(id);
+  }
+
+  private setDiscipline(id?: number) {
+    this.disciplineId = id;
+    if (id != null) localStorage.setItem(this.LOCAL_DISC_KEY, String(id)); else localStorage.removeItem(this.LOCAL_DISC_KEY);
+    window.dispatchEvent(new CustomEvent('mc:discipline-changed', { detail: { id } }));
+    this.loadHistory('today');
+  }
+
+  private loadDisciplines() {
+    this.disciplineLoading = true;
+    this.http.get<any[]>('/api/users/me/disciplines').subscribe({
+      next: list => {
+        let arr = Array.isArray(list) ? list : [];
+        if (!arr.length) {
+          // fallback para endpoint antigo
+          this.check.myDisciplines().subscribe({
+            next: legacy => { this.applyLoadedDisciplines(Array.isArray(legacy) ? legacy : []); },
+            error: _ => { this.applyLoadedDisciplines([]); }
+          });
+          return;
+        }
+        this.applyLoadedDisciplines(arr);
+      },
+      error: _ => {
+        // fallback direto
+        this.check.myDisciplines().subscribe({
+          next: legacy => { this.applyLoadedDisciplines(Array.isArray(legacy) ? legacy : []); },
+          error: _2 => { this.applyLoadedDisciplines([]); }
+        });
+      }
+    });
+  }
+
+  private applyLoadedDisciplines(arr: any[]) {
+    this.disciplines = arr || [];
+    if (!this.disciplineId && this.disciplines.length) {
+      this.setDiscipline(this.disciplines[0].id);
+    } else if (this.disciplineId && !this.disciplines.some(d => d.id === this.disciplineId)) {
+      if (this.disciplines.length) this.setDiscipline(this.disciplines[0].id); else this.setDiscipline(undefined);
+    }
+    this.disciplineLoading = false;
   }
 
   applyDateFilter() {

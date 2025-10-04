@@ -270,7 +270,9 @@
         <label class="form-label mb-0 me-2">Avaliação do(a) Preceptor(a) (0 a 10):</label>
         <ng-container *ngIf="weeks && weeks[selectedWeekIndex]?.evaluation !== undefined && weeks[selectedWeekIndex]?.evaluation !== null; else semAvaliacao">
           <span class="evaluation-inline-score">{{ weeks[selectedWeekIndex].evaluation | number:'1.0-1' }}</span>
-          <button *ngIf="!isPreceptorViewingStudent()" type="button" class="eval-inline-details-btn ms-2" (click)="openEvaluationDetails()" title="Ver detalhes da avaliação">!</button>
+          <!-- Botão detalhes agora aparece para Coordenador e Admin/Preceptor (quando não é o próprio aluno) -->
+          <!-- Mostrar detalhes apenas para: aluno (sem alunoId em contexto de input) ou coordenador. Esconder para preceptor. -->
+          <button *ngIf="(!alunoId && !isPreceptorViewingStudent()) || (isCoordinator && alunoId)" type="button" class="eval-inline-details-btn ms-2" (click)="openEvaluationDetails()" title="Ver detalhes da avaliação">!</button>
         </ng-container>
         <ng-template #semAvaliacao>
           <span class="text-muted fst-italic">(não enviada)</span>

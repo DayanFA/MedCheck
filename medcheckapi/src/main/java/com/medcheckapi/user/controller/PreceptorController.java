@@ -238,11 +238,21 @@ public class PreceptorController {
         }
         boolean isAluno = me.getId().equals(aluno.getId());
         boolean isPreceptor = me.getRole() == Role.PRECEPTOR || me.getRole() == Role.ADMIN;
-        if (!isAluno && !isPreceptor) return ResponseEntity.status(403).body(Map.of("error","Forbidden"));
-        if (isPreceptor && discipline != null && me.getRole() == Role.PRECEPTOR) {
+        boolean isCoordinator = me.getRole() == Role.COORDENADOR;
+        if (!isAluno && !isPreceptor && !isCoordinator) {
+            return ResponseEntity.status(403).body(Map.of("error","Forbidden"));
+        }
+        // Valida vínculo da disciplina conforme o papel
+        if (discipline != null) {
             final Long dId = discipline.getId();
-            boolean belongs = disciplineRepository.findByPreceptors_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(dId));
-            if (!belongs) return ResponseEntity.status(403).body(Map.of("error","Preceptor não vinculado à disciplina"));
+            if (isPreceptor && me.getRole() == Role.PRECEPTOR) {
+                boolean belongs = disciplineRepository.findByPreceptors_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(dId));
+                if (!belongs) return ResponseEntity.status(403).body(Map.of("error","Preceptor não vinculado à disciplina"));
+            }
+            if (isCoordinator) {
+                boolean coordLinked = disciplineRepository.findByCoordinators_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(dId));
+                if (!coordLinked) return ResponseEntity.status(403).body(Map.of("error","Coordenador não vinculado à disciplina"));
+            }
         }
         PreceptorEvaluation eval;
         if (discipline != null) {

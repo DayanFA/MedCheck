@@ -68,7 +68,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         performedHours: '00:00:00'
       };
       // Não usamos mais currentDisciplineId do backend para não influenciar banco – carregaremos de storage local.
-  this.role = cached.role || null;
+  this.role = cached.role ? String(cached.role).toUpperCase() : null;
+  this.afterRoleSet();
   this.updateCacheKeyWithUser();
       // Recarrega cache (agora com chave específica do usuário)
       this.loadWorkedCache();
@@ -89,7 +90,8 @@ export class HomeComponent implements OnInit, OnDestroy {
             status: 'Em serviço',
             performedHours: '00:00:00'
           };
-          this.role = data?.role || null;
+          this.role = data?.role ? String(data.role).toUpperCase() : null;
+          this.afterRoleSet();
           // Ignoramos currentDisciplineId do backend; seleção é puramente local.
             // Persistimos no cache também (para manter após F5)
             try {
@@ -132,6 +134,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   if (isPlatformBrowser(this.platformId)) {
     window.addEventListener('mc:user-updated', this.userUpdatedListener as any);
   }
+  // Fallback: caso role seja atribuída após micro-task ou cache não disponível de imediato
+  setTimeout(() => this.ensureAdminDataLoaded(), 200);
   }
 
   ngOnDestroy(): void {
@@ -331,6 +335,79 @@ export class HomeComponent implements OnInit, OnDestroy {
     // Notifica shell/header para atualizar badge
     try { window.dispatchEvent(new CustomEvent('mc:discipline-changed', { detail: { id: this.selectedDisciplineId } })); } catch {}
   }
+
+  /* ===================== BLOCO ADMIN: LISTAGEM DE USUÁRIOS ===================== */
+  adminUsers: any[] = [];
+  adminDisciplines: any[] = [];
+  adminLoading = false;
+  adminMsg = '';
+  adminDisciplineId: string | number = '';
+  adminQ = '';
+  adminPage = 0; adminSize = 20; adminTotalPages = 0; adminTotalItems = 0;
+  private adminInitDone = false;
+
+  private ensureAdminDataLoaded() {
+    if (this.role !== 'ADMIN') return;
+    if (!this.adminInitDone) {
+      // Debug rápido
+      try { console.debug('[Home ADMIN] Carregando disciplinas/usuários (init)'); } catch {}
+      this.fetchAdminDisciplines();
+      this.loadAdminUsers(true);
+      this.adminInitDone = true;
+    }
+  }
+
+  private fetchAdminDisciplines() {
+    this.http.get<any[]>('/api/admin/disciplines').subscribe({
+      next: list => { this.adminDisciplines = Array.isArray(list) ? list : []; },
+      error: _ => { this.adminDisciplines = []; }
+    });
+  }
+
+  loadAdminUsers(reset: boolean = false) {
+    if (this.role !== 'ADMIN') return;
+    if (reset) this.adminPage = 0;
+    this.adminLoading = true;
+    try { console.debug('[Home ADMIN] loadAdminUsers', { reset, page: this.adminPage }); } catch {}
+    const params: any = { page: this.adminPage, size: this.adminSize };
+    if (this.adminDisciplineId) params.disciplineId = this.adminDisciplineId;
+    if (this.adminQ && this.adminQ.trim()) params.q = this.adminQ.trim();
+    this.http.get<any>('/api/admin/users', { params }).subscribe({
+      next: data => {
+        try { console.debug('[Home ADMIN] resposta users', data); } catch {}
+        this.adminUsers = data.items || [];
+        this.adminPage = data.page || 0;
+        this.adminSize = data.size || this.adminSize;
+        this.adminTotalPages = data.totalPages || 0;
+        this.adminTotalItems = data.totalItems || 0;
+        this.adminLoading = false;
+      },
+      error: _ => { this.adminMsg = 'Falha ao carregar usuários'; this.adminLoading = false; }
+    });
+  }
+
+  adminChangeRole(u: any, role: string) {
+    this.http.put(`/api/admin/users/${u.id}/role`, { role }).subscribe({
+      next: _ => { u.role = role; this.adminMsg = 'Role atualizada'; },
+      error: _ => { this.adminMsg = 'Erro ao atualizar role'; }
+    });
+  }
+  adminDeleteUser(u: any) {
+    if (!confirm(`Excluir usuário ${u.name}?`)) return;
+    this.http.delete(`/api/admin/users/${u.id}`).subscribe({
+      next: _ => { this.adminUsers = this.adminUsers.filter(x => x.id !== u.id); this.adminMsg='Usuário excluído'; },
+      error: _ => { this.adminMsg = 'Erro ao excluir'; }
+    });
+  }
+  adminSearchEnter(ev: KeyboardEvent) { if (ev.key === 'Enter') this.loadAdminUsers(true); }
+  adminClearSearch() { this.adminQ=''; this.loadAdminUsers(true); }
+  adminNextPage() { if (this.adminPage +1 < this.adminTotalPages) { this.adminPage++; this.loadAdminUsers(); } }
+  adminPrevPage() { if (this.adminPage>0) { this.adminPage--; this.loadAdminUsers(); } }
+  adminFirstPage() { if (this.adminPage!==0) { this.adminPage=0; this.loadAdminUsers(); } }
+  adminLastPage() { if (this.adminPage+1 < this.adminTotalPages) { this.adminPage=this.adminTotalPages-1; this.loadAdminUsers(); } }
+
+  // Hook após role carregada
+  private afterRoleSet() { this.ensureAdminDataLoaded(); }
 }
 
 // Backwards compatibility alias (remove later if unused)

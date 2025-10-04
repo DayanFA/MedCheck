@@ -32,15 +32,16 @@
         <div class="hours-display">{{workedToday}}</div>
       </div>
     </div>
-    <div class="row mb-3" *ngIf="role==='ALUNO'">
+    <div class="row mb-3" *ngIf="role==='ALUNO' || role==='ADMIN'">
       <div class="col-12 col-md-6">
-        <label class="form-label small fw-semibold">Internato Atual</label>
+        <label class="form-label small fw-semibold">Disciplina de Contexto</label>
         <select class="form-select form-select-sm" [(ngModel)]="selectedDisciplineId" (ngModelChange)="onChangeDiscipline()">
           <option *ngFor="let d of disciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
         </select>
-        <div class="form-text">O histórico, calendário e validação de check-in serão filtrados por esta disciplina.</div>
+        <div class="form-text" *ngIf="role==='ALUNO'">O histórico, calendário e validação de check-in serão filtrados por esta disciplina.</div>
+        <div class="form-text" *ngIf="role==='ADMIN'">Usada como disciplina padrão em relatórios e futuras ações administrativas contextuais.</div>
         <div *ngIf="disciplines.length === 0" class="text-warning small mt-1">
-          Nenhum internato disponível. Verifique com o coordenador ou tente novamente mais tarde.
+          Nenhuma disciplina disponível para este usuário.
         </div>
       </div>
     </div>
@@ -65,6 +66,77 @@
         <div class="d-flex flex-wrap gap-2 justify-content-end">
           <button class="btn btn-outline-secondary btn-sm" (click)="showCheckoutConfirm=false" [disabled]="submitting">Cancelar</button>
           <button class="btn btn-warning btn-sm" (click)="confirmCheckout()" [disabled]="submitting">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Bloco administrativo: listagem de usuários -->
+  <div *ngIf="role==='ADMIN'" class="content-box mx-auto mt-4">
+    <div class="d-flex flex-wrap align-items-end justify-content-between mb-3 gap-3">
+      <div>
+        <h6 class="m-0">Usuários do Sistema</h6>
+        <small class="text-muted">Gestão rápida (filtro por disciplina)</small>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+        <div class="d-flex flex-column">
+          <label class="form-label small mb-1">Disciplina</label>
+          <select class="form-select form-select-sm" [(ngModel)]="adminDisciplineId" (ngModelChange)="loadAdminUsers(true)" style="min-width:200px">
+            <option value="">Todas</option>
+            <option *ngFor="let d of adminDisciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
+          </select>
+        </div>
+        <div class="d-flex flex-column">
+          <label class="form-label small mb-1">Buscar</label>
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control" [(ngModel)]="adminQ" (keydown)="adminSearchEnter($event)" placeholder="Nome, CPF, email...">
+            <button class="btn btn-outline-secondary" (click)="loadAdminUsers(true)" [disabled]="adminLoading"><i class="bi bi-search"></i></button>
+            <button class="btn btn-outline-light border" (click)="adminClearSearch()" [disabled]="!adminQ"><i class="bi bi-x"></i></button>
+          </div>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm align-self-end" (click)="loadAdminUsers()" [disabled]="adminLoading"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
+    </div>
+    <div *ngIf="adminMsg" class="alert alert-info py-2">{{ adminMsg }}</div>
+    <div *ngIf="adminLoading" class="text-center py-4"><div class="spinner-border text-primary"></div></div>
+    <div *ngIf="!adminLoading" class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>Nome</th><th>CPF</th><th>Email</th><th>Role</th><th>Disciplina Atual</th><th class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let u of adminUsers">
+            <td>{{u.name}}</td>
+            <td>{{ formatCpf(u.cpf) }}</td>
+            <td>{{u.email}}</td>
+            <td>
+              <select class="form-select form-select-sm w-auto" [ngModel]="u.role" (ngModelChange)="adminChangeRole(u,$event)">
+                <option value="ALUNO">ALUNO</option>
+                <option value="PRECEPTOR">PRECEPTOR</option>
+                <option value="COORDENADOR">COORDENADOR</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+            </td>
+            <td>
+              <span *ngIf="u.currentDiscipline; else nd">{{u.currentDiscipline.code}} - {{u.currentDiscipline.name}}</span>
+              <ng-template #nd><span class="text-muted">—</span></ng-template>
+            </td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-danger" (click)="adminDeleteUser(u)"><i class="bi bi-trash"></i></button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="d-flex flex-wrap align-items-center justify-content-between mt-3 gap-2">
+        <div class="small text-muted">Página {{ adminPage + 1 }} de {{ adminTotalPages || 1 }} • {{ adminTotalItems }} registros</div>
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-secondary" (click)="adminFirstPage()" [disabled]="adminPage===0">«</button>
+          <button class="btn btn-outline-secondary" (click)="adminPrevPage()" [disabled]="adminPage===0">‹</button>
+          <button class="btn btn-outline-secondary" (click)="adminNextPage()" [disabled]="adminPage+1>=adminTotalPages">›</button>
+          <button class="btn btn-outline-secondary" (click)="adminLastPage()" [disabled]="adminPage+1>=adminTotalPages">»</button>
         </div>
       </div>
     </div>

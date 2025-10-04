@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { AdminPreceptorCodesComponent } from './components/admin/admin-preceptor-codes.component';
 import { LoginComponent } from './components/login/login.component';
 import { SignupComponent } from './components/signup/signup.component';
 import { HomeComponent } from './components/intern-home/intern-home.component';
@@ -34,7 +35,9 @@ export const routes: Routes = [
         children: [
             { path: 'home', component: HomeComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN','COORDENADOR'] } },
             { path: 'checkin', component: AlunoCheckinComponent, canActivate: [roleGuard], data: { roles: ['ALUNO'] } },
-            { path: 'preceptor/codigo', component: PreceptorCodeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
+            { path: 'preceptor/codigo', component: PreceptorCodeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR'] } },
+            // Admin visualização de códigos de preceptores (read-only)
+            { path: 'admin/codigos', component: AdminPreceptorCodesComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
             { path: 'preceptor/home', component: PreceptorHomeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
             { path: 'preceptor/avaliar/:alunoId', component: PreceptorEvaluateComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
             { path: 'calendario', component: UserCalendarComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN','COORDENADOR'] } },

@@ -34,6 +34,43 @@ public class CheckInController {
         return ResponseEntity.ok(checkInService.getOrCreateCurrentCode(me.getId()));
     }
 
+    // ADMIN: visualizar código ativo de um preceptor específico (read-only, não gera novo)
+    @GetMapping("/admin/preceptor/{id}/code")
+    public ResponseEntity<?> adminViewPreceptorCode(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                                    @PathVariable Long id) {
+        User me = currentUser(principal);
+        if (me.getRole() != com.medcheckapi.user.model.Role.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Acesso restrito ao ADMIN"));
+        }
+        try {
+            return ResponseEntity.ok(checkInService.getActiveCodeReadOnly(id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ADMIN: listar disciplinas vinculadas a um preceptor
+    @GetMapping("/admin/preceptor/{id}/disciplines")
+    public ResponseEntity<?> adminViewPreceptorDisciplines(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                                           @PathVariable Long id) {
+        User me = currentUser(principal);
+        if (me.getRole() != com.medcheckapi.user.model.Role.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Acesso restrito ao ADMIN"));
+        }
+        List<Discipline> list = disciplineRepository.findByPreceptors_Id(id);
+        List<Map<String,Object>> dto = new ArrayList<>();
+        for (Discipline d : list) {
+            Map<String,Object> m = new HashMap<>();
+            m.put("id", d.getId());
+            m.put("code", d.getCode());
+            m.put("name", d.getName());
+            m.put("hours", d.getHours());
+            m.put("ciclo", d.getCiclo());
+            dto.add(m);
+        }
+        return ResponseEntity.ok(dto);
+    }
+
     // PRECEPTOR: list disciplines linked to authenticated preceptor (via discipline_preceptors)
     @GetMapping("/my-disciplines")
     public ResponseEntity<?> myDisciplines(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {

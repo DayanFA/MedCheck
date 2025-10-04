@@ -10,6 +10,10 @@ import { AuthService } from '../../services/auth.service';
   imports: [CommonModule],
   template: `
   <div class="preceptor-code-wrapper d-flex justify-content-center p-3 p-sm-4">
+    <div *ngIf="!isPreceptor" class="alert alert-warning w-100 text-center" style="max-width:760px;">
+      Acesso restrito: apenas PRECEPTORES podem gerar códigos de check-in.
+    </div>
+    <ng-container *ngIf="isPreceptor">
     <div class="code-card card p-4 w-100 position-relative" style="max-width:760px;">
       <div *ngIf="loading" class="loading-overlay d-flex flex-column align-items-center justify-content-center">
         <div class="spinner-border text-primary spinner-sm mb-2" role="status"></div>
@@ -49,6 +53,7 @@ import { AuthService } from '../../services/auth.service';
         </div>
       </div>
     </div>
+    </ng-container>
   </div>
   `,
   styles: [
@@ -87,11 +92,17 @@ export class PreceptorCodeComponent implements OnInit, OnDestroy {
   constructor(private check: CheckInService, private auth: AuthService, @Inject(PLATFORM_ID) platformId: Object) {
     this.isBrowser = isPlatformBrowser(platformId);
   }
+  isPreceptor = false;
   ngOnInit(): void { 
     if (!this.isBrowser) { return; } // evita tentativa de gerar QR no SSR
   const u = this.auth.getUser();
   // Agora backend fornece 'id'; não usar cpf como id.
   this.preceptorId = (u?.id ?? null);
+  const role = u?.role || this.auth.getRole();
+  this.isPreceptor = role === 'PRECEPTOR';
+  if (!this.isPreceptor) {
+    return; // não prossegue com fetch de código / disciplinas
+  }
     // Se ainda não temos o id mas existe token, tenta carregar do backend
     if (this.preceptorId == null) {
       this.ensureUserLoaded();

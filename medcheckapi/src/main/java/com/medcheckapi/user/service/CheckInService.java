@@ -70,6 +70,28 @@ public class CheckInService {
         return m;
     }
 
+    /**
+     * Retorna o código atual somente se ainda estiver válido (sem gerar novo). Uso: visualização ADMIN.
+     * Caso nenhum código válido exista, devolve estrutura neutra.
+     */
+    @Transactional(readOnly = true)
+    public Map<String,Object> getActiveCodeReadOnly(Long preceptorId) {
+        User preceptor = userRepo.findById(preceptorId).orElseThrow();
+        if (preceptor.getRole() != Role.PRECEPTOR) {
+            throw new IllegalStateException("Usuário alvo não é preceptor");
+        }
+        LocalDateTime now = fixedNow();
+        return codeRepo.findFirstByPreceptorAndExpiresAtGreaterThanOrderByGeneratedAtDesc(preceptor, now)
+                .map(this::mapCode)
+                .orElseGet(() -> {
+                    Map<String,Object> empty = new HashMap<>();
+                    empty.put("code", null);
+                    empty.put("expiresAt", null);
+                    empty.put("secondsRemaining", 0);
+                    return empty;
+                });
+    }
+
     @Transactional
     public Map<String,Object> performCheckIn(Long alunoId, Long preceptorId, String code, Long disciplineId) {
     User aluno = userRepo.findById(alunoId).orElseThrow();

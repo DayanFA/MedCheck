@@ -16,9 +16,15 @@
           <i class="bi bi-person-check"></i><span>Check-In</span>
         </a>
       </li>
-      <li class="nav-item" *ngIf="role === 'PRECEPTOR' || role === 'ADMIN'">
+      <!-- Código (Preceptor gera). Para ADMIN mostrar link separado somente leitura -->
+      <li class="nav-item" *ngIf="role === 'PRECEPTOR'">
         <a routerLink="/preceptor/codigo" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/preceptor/codigo'">
           <i class="bi bi-qr-code"></i><span>Código</span>
+        </a>
+      </li>
+      <li class="nav-item" *ngIf="role === 'ADMIN'">
+        <a routerLink="/admin/codigos" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/admin/codigos'">
+          <i class="bi bi-qr-code"></i><span>Códigos Preceptores</span>
         </a>
       </li>
       <li class="nav-item">

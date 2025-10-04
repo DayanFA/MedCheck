@@ -22,6 +22,14 @@ import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-con
           <input [(ngModel)]="q" (input)="onSearchTyping()" (keyup.enter)="reloadFirstPage()" class="form-control border-0 shadow-none" placeholder="Buscar..." />
         </div>
         <div class="ms-auto d-flex align-items-center gap-2 flex-wrap position-relative">
+          <!-- ADMIN: seletor de disciplina (Todos) -->
+          <div *ngIf="role==='ADMIN'" class="d-flex align-items-center gap-2">
+            <label class="text-muted small">Disciplina</label>
+            <select class="form-select form-select-sm" style="min-width:180px" [(ngModel)]="adminDisciplineId" (change)="reloadFirstPage()">
+              <option value="">Todos</option>
+              <option *ngFor="let d of adminDisciplines" [ngValue]="d.id">{{d.code}} - {{d.name}}</option>
+            </select>
+          </div>
           <div class="d-flex align-items-center gap-2">
             <label class="text-muted small">Ano</label>
             <select class="form-select form-select-sm year-select" [(ngModel)]="year" (change)="reloadFirstPage()">
@@ -103,6 +111,11 @@ import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-con
                         [class.active]="isSelecionado(a)">
                   {{ isSelecionado(a) ? 'Selecionado' : 'Visualizar' }}
                 </button>
+                <!-- ADMIN: ver código do PRECEPTOR (quando o item for um preceptor) -->
+                <button *ngIf="role==='ADMIN' && a.role==='PRECEPTOR'" class="btn btn-secondary btn-sm w-100" type="button"
+                        (click)="$event.stopPropagation(); openPreceptorCode(a)">
+                  Código / Disciplinas
+                </button>
               </div>
             </div>
           </div>
@@ -119,6 +132,38 @@ import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-con
         <div class="ms-auto">
           <button class="btn btn-primary-subtle btn-cta">Gerenciar Internos</button>
         </div>
+      </div>
+    </div>
+    <!-- Modal simples para exibir código e disciplinas de um preceptor (ADMIN) -->
+    <div class="modal-backdrop fade show" *ngIf="showCodeModal" (click)="closeCodeModal()"></div>
+    <div class="code-modal card shadow-lg" *ngIf="showCodeModal">
+      <div class="card-header d-flex align-items-center justify-content-between py-2">
+        <h6 class="mb-0">Preceptor: {{ modalPreceptor?.name }}</h6>
+        <button type="button" class="btn-close btn-sm" (click)="closeCodeModal()"></button>
+      </div>
+      <div class="card-body small">
+        <div class="mb-3">
+          <div class="text-muted">Código ativo (read-only)</div>
+          <div class="display-6 fw-bold" *ngIf="modalCode?.code; else noCode">{{ modalCode.code }}</div>
+          <ng-template #noCode>
+            <div class="text-muted fst-italic">Nenhum código válido agora</div>
+          </ng-template>
+          <div class="mt-1" *ngIf="modalCode?.code">
+            <span class="badge bg-dark-subtle text-dark" *ngIf="modalCode?.secondsRemaining>0">Expira em {{ modalCode.secondsRemaining }}s</span>
+            <span class="badge bg-danger-subtle text-danger" *ngIf="modalCode?.secondsRemaining===0">Expirado</span>
+          </div>
+        </div>
+        <div>
+          <div class="text-muted mb-1">Disciplinas vinculadas</div>
+          <ul class="list-unstyled mb-0 max-h-150 overflow-auto small">
+            <li *ngFor="let d of modalDisciplines">• {{ d.code }} - {{ d.name }}</li>
+            <li *ngIf="modalDisciplines.length===0" class="fst-italic text-muted">Nenhuma disciplina vinculada</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer d-flex justify-content-between align-items-center py-2">
+        <small class="text-muted">Atualiza automaticamente</small>
+        <button class="btn btn-outline-secondary btn-sm" (click)="manualRefreshCode()" [disabled]="refreshing">{{ refreshing? '...' : 'Atualizar agora' }}</button>
       </div>
     </div>
   </div>
@@ -144,6 +189,9 @@ import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-con
       .year-select{width:auto;}
       .status{width:100%;}
     }
+    .code-modal{position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:420px; max-width:94vw; z-index:1056; border-radius:14px;}
+    .modal-backdrop{z-index:1055; background:rgba(33,37,41,.55);}
+    .max-h-150{max-height:150px;}
   `]
 })
 export class PreceptorHomeComponent implements OnInit, OnDestroy {
@@ -164,23 +212,61 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
 
   constructor(private svc: PreceptorService, private http: HttpClient, private auth: AuthService, private toast: ToastService, private router: Router, private alunoCtx: PreceptorAlunoContextService) {}
 
-  ngOnInit(): void { this.load(); }
+  role: string | null = null;
+  adminDisciplineId: string | number = '';
+  adminDisciplines: any[] = [];
+
+  // Modal state for ADMIN viewing preceptor code
+  showCodeModal = false;
+  modalPreceptor: any = null;
+  modalCode: any = null;
+  modalDisciplines: any[] = [];
+  private modalTimer?: any;
+  refreshing = false;
+
+  ngOnInit(): void {
+    this.role = this.auth.getRole();
+    if (this.role === 'ADMIN') {
+      this.fetchAdminDisciplines();
+    }
+    this.load();
+  }
 
   load() {
     if (this.loading) return;
     this.loading = true;
-  this.svc.students(this.year, this.page, this.size, this.q || undefined, this.filters).subscribe({
-      next: res => {
-        this.items = res?.items || [];
-        this.totalPages = res?.totalPages || 0;
-        this.totalItems = res?.totalItems || 0;
-        this.page = res?.page || 0;
-        this.size = res?.size || this.size;
-        this.loading = false;
-        this.loadAvatars();
-      },
-      error: _ => { this.items = []; this.totalPages = 0; this.totalItems = 0; this.loading = false; }
-    });
+    if (this.role === 'ADMIN') {
+      const params: any = { page: this.page, size: this.size, year: this.year,
+        fName: this.filters.fName, fPhone: this.filters.fPhone, fEmail: this.filters.fEmail, fCpf: this.filters.fCpf,
+        statusIn: this.filters.statusIn, statusOut: this.filters.statusOut };
+      if (this.q) params.q = this.q;
+      if (this.adminDisciplineId) params.disciplineId = this.adminDisciplineId;
+      this.http.get<any>('/api/admin/students', { params }).subscribe({
+        next: res => {
+          this.items = res?.items || [];
+          this.totalPages = res?.totalPages || 0;
+          this.totalItems = res?.totalItems || 0;
+          this.page = res?.page || 0;
+          this.size = res?.size || this.size;
+          this.loading = false;
+          this.loadAvatars();
+        },
+        error: _ => { this.items = []; this.totalPages = 0; this.totalItems = 0; this.loading = false; }
+      });
+    } else {
+      this.svc.students(this.year, this.page, this.size, this.q || undefined, this.filters).subscribe({
+        next: res => {
+          this.items = res?.items || [];
+          this.totalPages = res?.totalPages || 0;
+          this.totalItems = res?.totalItems || 0;
+          this.page = res?.page || 0;
+          this.size = res?.size || this.size;
+          this.loading = false;
+          this.loadAvatars();
+        },
+        error: _ => { this.items = []; this.totalPages = 0; this.totalItems = 0; this.loading = false; }
+      });
+    }
   }
 
   reloadFirstPage(){ this.page = 0; this.load(); }
@@ -216,6 +302,13 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
     if (this.searchDebounce) clearTimeout(this.searchDebounce);
     this.searchDebounce = setTimeout(() => this.reloadFirstPage(), 400);
   }
+
+  private fetchAdminDisciplines() {
+    this.http.get<any[]>('/api/admin/disciplines').subscribe({
+      next: list => { this.adminDisciplines = Array.isArray(list) ? list : []; },
+      error: _ => { this.adminDisciplines = []; }
+    });
+  }
   onImgError(a: any, _ev: Event){ if (a) a._noPhoto = true; }
 
   private headers(): HttpHeaders | undefined {
@@ -248,6 +341,7 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.avatarObjectUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
     this.avatarObjectUrls = [];
+    if (this.modalTimer) { clearInterval(this.modalTimer); this.modalTimer = undefined; }
   }
 
   visualizar(a: any){
@@ -264,5 +358,50 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
   isSelecionado(a: any): boolean {
     const current = this.alunoCtx.getAluno();
     return !!current.id && current.id === a.id;
+  }
+
+  openPreceptorCode(p: any){
+    if (!p?.id) return;
+    this.modalPreceptor = p;
+    this.showCodeModal = true;
+    this.fetchPreceptorCodeAndDisciplines();
+    if (this.modalTimer) clearInterval(this.modalTimer);
+    // Refresh countdown every second locally, and fetch again when expires
+    this.modalTimer = setInterval(() => {
+      if (this.modalCode && typeof this.modalCode.secondsRemaining === 'number' && this.modalCode.secondsRemaining > 0){
+        this.modalCode.secondsRemaining -= 1;
+        if (this.modalCode.secondsRemaining === 0){
+          // Do not auto generate, just keep expired until manual refresh or periodic fetch
+        }
+      }
+    }, 1000);
+  }
+
+  closeCodeModal(){
+    this.showCodeModal = false;
+    this.modalPreceptor = null;
+    this.modalCode = null;
+    this.modalDisciplines = [];
+    if (this.modalTimer) { clearInterval(this.modalTimer); this.modalTimer = undefined; }
+  }
+
+  manualRefreshCode(){
+    if (!this.modalPreceptor) return;
+    this.fetchPreceptorCodeAndDisciplines(true);
+  }
+
+  private fetchPreceptorCodeAndDisciplines(force:boolean=false){
+    if (!this.modalPreceptor?.id) return;
+    this.refreshing = force;
+    // code
+    this.http.get<any>(`/api/check/admin/preceptor/${this.modalPreceptor.id}/code`).subscribe({
+      next: c => { this.modalCode = c; this.refreshing = false; },
+      error: _ => { this.modalCode = { code:null, secondsRemaining:0, expiresAt:null }; this.refreshing = false; }
+    });
+    // disciplines
+    this.http.get<any[]>(`/api/check/admin/preceptor/${this.modalPreceptor.id}/disciplines`).subscribe({
+      next: list => { this.modalDisciplines = Array.isArray(list)? list: []; },
+      error: _ => { this.modalDisciplines = []; }
+    });
   }
 }

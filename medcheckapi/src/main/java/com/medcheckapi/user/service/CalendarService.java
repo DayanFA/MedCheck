@@ -14,6 +14,8 @@ public class CalendarService {
     private final InternshipJustificationRepository justRepo;
     private final CheckSessionRepository sessionRepo;
     private static final ZoneId ZONE = ZoneId.of("GMT-5");
+    // Minutos de tolerância após o horário inicial planejado antes de marcar FALTOU se não houve qualquer trabalho
+    private static final int LATE_START_GRACE_MINUTES = 1;
 
     public CalendarService(InternshipPlanRepository planRepo, InternshipJustificationRepository justRepo, CheckSessionRepository sessionRepo) {
         this.planRepo = planRepo; this.justRepo = justRepo; this.sessionRepo = sessionRepo;
@@ -48,6 +50,24 @@ public class CalendarService {
             : sessionRepo.findByAlunoAndDisciplineAndCheckInTimeBetweenOrderByCheckInTimeDesc(aluno, effective, start.atStartOfDay(), end.atTime(23,59,59));
 
         Map<LocalDate, Long> plannedByDay = plans.stream().collect(Collectors.groupingBy(InternshipPlan::getDate, Collectors.summingLong(InternshipPlan::getPlannedSeconds)));
+        // Mapear menor horário de início e maior horário de fim por dia (para distinguir "futuro" de "faltou" no próprio dia)
+        Map<LocalDate, LocalTime> earliestStartByDay = new HashMap<>();
+        Map<LocalDate, LocalTime> latestEndByDay = new HashMap<>();
+        for (InternshipPlan p : plans) {
+            LocalDate d = p.getDate();
+            LocalTime s = p.getStartTime();
+            LocalTime e = p.getEndTime();
+            if (s != null) {
+                earliestStartByDay.merge(d, s, (oldV, newV) -> newV.isBefore(oldV) ? newV : oldV);
+            }
+            if (e != null) {
+                if (s != null && s.isAfter(e)) {
+                    e = LocalTime.of(23,59); // overnight: usar 23:59 como limite do dia
+                }
+                LocalTime finalEnd = e;
+                latestEndByDay.merge(d, finalEnd, (oldV, newV) -> newV.isAfter(oldV) ? newV : oldV);
+            }
+        }
         Map<LocalDate, Long> workedByDay = computeWorkedByDay(sessions, start, end);
         Map<LocalDate, List<InternshipJustification>> justByDay = justs.stream().collect(Collectors.groupingBy(InternshipJustification::getDate));
 
@@ -57,7 +77,7 @@ public class CalendarService {
             long planned = plannedByDay.getOrDefault(d, 0L);
             long worked = workedByDay.getOrDefault(d, 0L);
             List<InternshipJustification> ds = justByDay.getOrDefault(d, Collections.emptyList());
-            String status = computeStatus(d, today, planned, worked, ds);
+            String status = computeStatus(d, today, planned, worked, ds, earliestStartByDay.get(d), latestEndByDay.get(d));
             Map<String,Object> item = new HashMap<>();
             item.put("date", d.toString());
             item.put("plannedSeconds", planned);
@@ -84,14 +104,55 @@ public class CalendarService {
         return out;
     }
 
-    private String computeStatus(LocalDate day, LocalDate today, long planned, long worked, List<InternshipJustification> justs) {
-    boolean hasAnyJust = !justs.isEmpty();
-    if (hasAnyJust) return "ORANGE"; // mantém laranja em qualquer justificativa (pendente, aprovada ou reprovada)
+    private String computeStatus(LocalDate day, LocalDate today, long planned, long worked, List<InternshipJustification> justs,
+                                 LocalTime earliestStart, LocalTime latestEnd) {
+        boolean hasAnyJust = !justs.isEmpty();
+        if (hasAnyJust) return "ORANGE"; // justificativa domina
         if (planned <= 0) return "NONE";
-        if (day.isAfter(today)) return "BLUE"; // futuro planejado
-        if (worked <= 0 && day.isBefore(today)) return "RED"; // passou e não fez nada
-        if (worked < planned) return "YELLOW"; // fez menos que o planejado (hoje ou passado)
-        return "GREEN"; // cumpriu
+        if (day.isAfter(today)) return "BLUE"; // qualquer coisa no futuro
+
+        // Passado (ontem ou antes)
+        if (day.isBefore(today)) {
+            if (worked <= 0) return "RED"; // nada feito
+            if (worked < planned) return "YELLOW"; // fez algo mas não completou
+            return "GREEN"; // completou ou excedeu
+        }
+
+    // Dia atual: regra solicitada -> se houve qualquer check-in (worked>0):
+    //   - se worked < planned => INCOMPLETO (YELLOW)
+    //   - se worked >= planned => CUMPRIDO (GREEN)
+    // Caso contrário (worked==0) aplica lógica temporal (BLUE futuro / RED após janela / BLUE dentro da janela antes de check-in com tolerância).
+    // Mantemos contudo parte da granularidade para transição automática para RED quando passa a janela completa sem check-in.
+        LocalTime now = LocalTime.now(ZONE);
+        // Se não temos janelas, usar fallback agregado
+        if (earliestStart == null || latestEnd == null) {
+            if (worked <= 0) return "BLUE"; // sem info granular, considerar ainda futuro/andamento
+            if (worked < planned) return "YELLOW"; // começou e não terminou
+            return "GREEN";
+        }
+        // Antes de começar qualquer intervalo previsto
+        if (now.isBefore(earliestStart)) {
+            return "BLUE"; // ainda vai começar
+        }
+        // Após terminar todas as janelas previstas
+        if (now.isAfter(latestEnd)) {
+            if (worked <= 0) return "RED"; // perdeu tudo
+            if (worked < planned) return "YELLOW"; // fez parcial
+            return "GREEN"; // completou
+        }
+        // Se já existe qualquer worked > 0 ignoramos o estado futuro e passamos direto para YELLOW/GREEN
+        if (worked > 0) {
+            if (worked < planned) return "YELLOW";
+            return "GREEN";
+        }
+        // Ainda nenhum check-in dentro da janela
+        if (earliestStart != null) {
+            LocalTime graceLimit = earliestStart.plusMinutes(LATE_START_GRACE_MINUTES);
+            if (now.isAfter(graceLimit)) {
+                return "RED"; // atraso após tolerância sem check-in
+            }
+        }
+        return "BLUE"; // aguardando primeiro check-in
     }
 
     private Map<String,Object> planToMap(InternshipPlan p) {
@@ -167,6 +228,11 @@ public class CalendarService {
         for (Map.Entry<LocalDate, Long> e : map.entrySet()) {
             long s = e.getValue();
             long roundedToMin = Math.round(s / 60.0) * 60L;
+            // Regra de negócio: qualquer check-in (mesmo 1 segundo) deve contar para mudar estado.
+            // Se houve algum segundo (>0) mas o arredondamento levou a 0, preservamos como 1 segundo.
+            if (s > 0 && roundedToMin == 0) {
+                roundedToMin = 1; // garante worked>0 na lógica de status
+            }
             rounded.put(e.getKey(), roundedToMin);
         }
         return rounded;

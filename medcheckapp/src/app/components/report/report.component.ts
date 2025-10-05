@@ -5,6 +5,8 @@ import { AuthService } from '../../services/auth.service';
 import { CalendarServiceApi } from '../../services/calendar.service';
 import { WeekSelectionService } from '../../services/week-selection.service';
 import { CommonModule, DatePipe, isPlatformBrowser } from '@angular/common';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { PreceptorService } from '../../services/preceptor.service';
 import { EvaluationService } from '../../services/evaluation.service';
@@ -545,18 +547,49 @@ export class ReportComponent implements OnChanges {
           dayRows.push({ weekday, date: d, periods: [] });
         }
       }
-      wk.days = dayRows;
-      wk.loaded = true;
-      this.updateRotationPeriodSummary(wk);
-      // Se a semana carregada é a selecionada, garantir que o cabeçalho reflita o período atualizado
-      if (wk.number === this.selectedWeek.number) {
-        this.student.rotationPeriod = wk.rotationPeriod;
+      // --- FILTRO DE ATIVIDADES (Incompleto/Cumprido ou Justificativa APROVADA) ---
+      // Estratégia: consultar status diário via endpoint /calendar/month para os meses abrangidos por esta semana.
+      // Limitamos a filtragem em nível de DIA por ausência de metadados de status por turno/intervalo.
+      const allDates = dayRows.map(r => r.date.toISOString().substring(0,10));
+      const monthKeys = Array.from(new Set(allDates.map(d => d.substring(0,7)))); // YYYY-MM
+      const monthCalls = monthKeys.map(key => {
+        const [y,m] = key.split('-').map(x => parseInt(x,10));
+        return this.calApi.getMonth(y, m, this.alunoId, this.disciplineId).pipe(catchError(() => of(null)));
+      });
+      if (monthCalls.length === 0) {
+        this.applyWeekData(wk, dayRows);
+        return;
       }
-      // Carregar avaliação se modo aluno (sem alunoId input) ou se preceptor vendo aluno (mostrar nota se existir)
-      this.loadEvaluationForWeek(wk.number);
-      // Caso contexto preceptor e ainda não tenha carregado info (ex: input chegou antes de subscribe), reforçar
-      if (this.alunoId) this.fetchStudentInfo();
+      forkJoin(monthCalls).subscribe(monthResponses => {
+        const statusMap: Record<string,{status:string; justificationStatus?:string}> = {};
+        for (const mr of monthResponses) {
+          if (!mr || !Array.isArray((mr as any).days)) continue;
+            for (const d of (mr as any).days) {
+              statusMap[d.date] = { status: d.status, justificationStatus: d.justificationStatus };
+            }
+        }
+        const filtered = dayRows.filter(row => {
+          const iso = row.date.toISOString().substring(0,10);
+          const st = statusMap[iso];
+          if (!st) return false;
+          if (st.status === 'YELLOW' || st.status === 'GREEN') return true; // Incompleto ou Cumprido
+          if (st.status === 'ORANGE' && st.justificationStatus === 'APPROVED') return true; // Justificativa aprovada
+          return false;
+        });
+        this.applyWeekData(wk, filtered);
+      });
     });
+  }
+
+  private applyWeekData(wk: WeekData, dayRows: WeekDayRow[]) {
+    wk.days = dayRows;
+    wk.loaded = true;
+    this.updateRotationPeriodSummary(wk);
+    if (wk.number === this.selectedWeek.number) {
+      this.student.rotationPeriod = wk.rotationPeriod;
+    }
+    this.loadEvaluationForWeek(wk.number);
+    if (this.alunoId) this.fetchStudentInfo();
   }
 
   private loadEvaluationForWeek(_weekNumberIgnored: number) {
@@ -674,6 +707,40 @@ export class ReportComponent implements OnChanges {
   // (stub removido)
   // Verifica se avaliação global existe
   get hasGlobalEvaluation(): boolean { return this.weeks.some(w => w.evaluation !== null && w.evaluation !== undefined); }
+
+  showDeleteEvalConfirm = false;
+  deletingEval = false;
+
+  openDeleteEvaluationConfirm() {
+    if (!this.isPreceptorViewingStudent()) return;
+    if (!this.hasGlobalEvaluation || !this.evaluationDetails) return;
+    this.showDeleteEvalConfirm = true;
+  }
+
+  cancelDeleteEvaluation() {
+    if (this.deletingEval) return; // evita fechar durante request
+    this.showDeleteEvalConfirm = false;
+  }
+
+  confirmDeleteEvaluation() {
+    if (this.deletingEval) return;
+    const alunoRef = this.alunoId || this.auth.getUser()?.id;
+    if (!alunoRef) return;
+    this.deletingEval = true;
+    this.evalService.delete(alunoRef, 1, this.disciplineId).subscribe({
+      next: (_res: any) => {
+        this.toast.show('success','Avaliação excluída com sucesso.');
+        this.evaluationDetails = null;
+        this.weeks.forEach(w => w.evaluation = null);
+        this.deletingEval = false;
+        this.showDeleteEvalConfirm = false;
+      },
+      error: (_err: any) => {
+        this.toast.show('error','Falha ao excluir avaliação.');
+        this.deletingEval = false;
+      }
+    });
+  }
 
   // Geração de PDF consolidando TODAS as semanas + avaliação global (dinâmico / browser only)
   async onGeneratePdf() {

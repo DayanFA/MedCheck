@@ -5,6 +5,7 @@ import com.medcheckapi.user.repository.UserRepository;
 import com.medcheckapi.user.repository.InternshipPlanRepository;
 import com.medcheckapi.user.repository.InternshipJustificationRepository;
 import com.medcheckapi.user.repository.DisciplineRepository;
+import com.medcheckapi.user.repository.PreceptorEvaluationRepository;
 import com.medcheckapi.user.service.CalendarService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,9 +24,10 @@ public class CalendarController {
     private final InternshipPlanRepository planRepo;
     private final InternshipJustificationRepository justRepo;
     private final DisciplineRepository discRepo;
+    private final PreceptorEvaluationRepository evaluationRepo;
 
-    public CalendarController(UserRepository userRepo, CalendarService calendarService, InternshipPlanRepository planRepo, InternshipJustificationRepository justRepo, DisciplineRepository discRepo) {
-        this.userRepo = userRepo; this.calendarService = calendarService; this.planRepo = planRepo; this.justRepo = justRepo; this.discRepo = discRepo;
+    public CalendarController(UserRepository userRepo, CalendarService calendarService, InternshipPlanRepository planRepo, InternshipJustificationRepository justRepo, DisciplineRepository discRepo, PreceptorEvaluationRepository evaluationRepo) {
+        this.userRepo = userRepo; this.calendarService = calendarService; this.planRepo = planRepo; this.justRepo = justRepo; this.discRepo = discRepo; this.evaluationRepo = evaluationRepo;
     }
 
     private Map<String,Object> planDto(InternshipPlan p) {
@@ -172,6 +174,20 @@ public class CalendarController {
             try { disc = discRepo.findById(Long.valueOf(body.get("disciplineId"))).orElse(null); } catch (Exception ignored) {}
         }
         if (disc == null) disc = me.getCurrentDiscipline();
+
+        // LOCK: impedir adicionar/alterar planos se já existe avaliação para a semana (global ou da disciplina)
+        if (weekNumber != null) {
+            boolean locked = false;
+            if (disc != null) {
+                locked = evaluationRepo.findFirstByAlunoAndDisciplineAndWeekNumber(me, disc, weekNumber).isPresent();
+            }
+            if (!locked) {
+                locked = evaluationRepo.findFirstByAlunoAndWeekNumberAndDisciplineIsNull(me, weekNumber).isPresent();
+            }
+            if (locked) {
+                return ResponseEntity.status(409).body(Map.of("error", "Semana já avaliada. Não é possível adicionar/alterar planos."));
+            }
+        }
         p.setDiscipline(disc);
         p = planRepo.save(p);
         Map<String,Object> resp = new HashMap<>();
@@ -186,6 +202,20 @@ public class CalendarController {
         return planRepo.findById(id).map(p -> {
             if (!p.getAluno().getId().equals(me.getId())) {
                 return ResponseEntity.status(403).body(Map.of("error", "Sem permissão"));
+            }
+            // LOCK: impedir remover plano se já existe avaliação correspondente
+            Integer wn = p.getWeekNumber();
+            if (wn != null) {
+                boolean locked = false;
+                if (p.getDiscipline() != null) {
+                    locked = evaluationRepo.findFirstByAlunoAndDisciplineAndWeekNumber(me, p.getDiscipline(), wn).isPresent();
+                }
+                if (!locked) {
+                    locked = evaluationRepo.findFirstByAlunoAndWeekNumberAndDisciplineIsNull(me, wn).isPresent();
+                }
+                if (locked) {
+                    return ResponseEntity.status(409).body(Map.of("error", "Semana já avaliada. Não é possível remover planos."));
+                }
             }
             planRepo.deleteById(id);
             return ResponseEntity.ok(Map.of("deleted", true));

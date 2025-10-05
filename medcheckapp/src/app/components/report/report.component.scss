@@ -167,3 +167,29 @@
 @media (max-width: 768px) {
   .final-score-value { font-size:1.3rem; }
 }
+
+/* ===== Modal custom de confirmação de exclusão de avaliação ===== */
+.modal-eval-delete-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(2px);
+  z-index: 2000;
+}
+.modal-eval-delete {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, 92%);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px -4px rgba(0,0,0,.28), 0 0 0 1px rgba(0,0,0,.06);
+  z-index: 2010;
+  display: flex;
+  flex-direction: column;
+  animation: modalEvalDeletePop .2s ease;
+}
+.modal-eval-delete .modal-header { padding:.75rem 1rem; border-bottom:1px solid #e6e9ef; }
+.modal-eval-delete .modal-body { padding:1rem 1rem .5rem; font-size:.9rem; }
+.modal-eval-delete .modal-footer { padding:.75rem 1rem 1rem; border-top:1px solid #eef1f5; }
+@keyframes modalEvalDeletePop { from { opacity:0; transform: translate(-50%, calc(-50% + 10px)); } to { opacity:1; transform: translate(-50%, -50%);} }

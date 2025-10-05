@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { LocationModalComponent } from '../location-modal/location-modal.component';
 import { FormsModule } from '@angular/forms';
 import { CalendarServiceApi, CalendarDay, InternshipPlanDto } from '../../services/calendar.service';
+import { EvaluationService } from '../../services/evaluation.service';
 import { ToastService } from '../../services/toast.service';
 import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-context.service';
 import { WeekSelectionService } from '../../services/week-selection.service';
@@ -26,6 +27,8 @@ export class UserCalendarComponent {
   disciplineId = signal<number|undefined>(undefined); // disciplina forçada (preceptor) ou escolhida (aluno)
   disciplines = signal<any[]|null>(null); // lista para aluno escolher na criação de plano/justificativa
   data = signal<{ days: CalendarDay[]; plans:any[]; justifications:any[]; forcedDiscipline?: any }|null>(null);
+  // Bloqueio de edição após avaliação
+  planEditLocked = false;
   loading = signal(false);
   // day history
   selectedDate = signal<string>('');
@@ -97,6 +100,11 @@ export class UserCalendarComponent {
   private alunoCtx = inject(PreceptorAlunoContextService);
   private initialized = false;
   isCoordinator = false;
+  private refreshIntervalId: any = null;
+  private pendingTimeoutId: any = null;
+  private sessionEventHandler = () => {
+    this.refreshMonth(true);
+  };
   private alunoChangedHandler = (e: any) => {
     // Só reagir se nenhum alunoId explícito na URL (modo preceptor com contexto global)
     if (this.alunoId()) return; // já há alunoId via query
@@ -107,7 +115,7 @@ export class UserCalendarComponent {
     }
   };
 
-  constructor(private weekSync: WeekSelectionService, private toast: ToastService) {
+  constructor(private weekSync: WeekSelectionService, private toast: ToastService, private evalApi: EvaluationService) {
     // Se usuário é preceptor e nenhum aluno selecionado (nem query param, nem contexto), redirecionar
     setTimeout(() => {
       const user: any = (this.api as any)?.auth?.getUser?.() || (window as any).mc_user_cache;
@@ -149,6 +157,9 @@ export class UserCalendarComponent {
     }, 0);
     if (typeof window !== 'undefined') {
       window.addEventListener('mc:aluno-changed', this.alunoChangedHandler as any);
+      ['mc:session-updated','mc:session-created','mc:checkin-created','mc:checkin-updated'].forEach(evt => window.addEventListener(evt, this.sessionEventHandler as any));
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.refreshMonth(true); });
+      this.startAdaptiveRefresh();
     }
   }
 
@@ -169,8 +180,9 @@ export class UserCalendarComponent {
         // Preserva metadata de disciplina forçada
         this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
         this.loading.set(false);
+        this.updatePlanLock();
         this.openPlan(dateIso);
-      }, _ => this.loading.set(false));
+      }, _ => { this.loading.set(false); this.updatePlanLock(); });
     } else {
       // Same month: just open the day
       this.openPlan(dateIso);
@@ -203,7 +215,8 @@ export class UserCalendarComponent {
     this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe(res => {
       this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
       this.loading.set(false);
-    }, _ => this.loading.set(false));
+      this.updatePlanLock();
+    }, _ => { this.loading.set(false); this.updatePlanLock(); });
     // se for aluno (sem alunoId) carregar disciplinas para seleção local
     if (!this.alunoId()) {
       const t = (this.api as any)['auth'].getToken?.();
@@ -234,7 +247,8 @@ export class UserCalendarComponent {
                 this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe(res => {
                   this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
                   this.loading.set(false);
-                }, _ => this.loading.set(false));
+                  this.updatePlanLock();
+                }, _ => { this.loading.set(false); this.updatePlanLock(); });
               }
               return; // já tratou como preceptor
             }
@@ -255,7 +269,8 @@ export class UserCalendarComponent {
                   this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe(res => {
                     this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
                     this.loading.set(false);
-                  }, _ => this.loading.set(false));
+                    this.updatePlanLock();
+                  }, _ => { this.loading.set(false); this.updatePlanLock(); });
                 }
               })
               .catch(() => { this.disciplines.set([]); });
@@ -335,6 +350,10 @@ export class UserCalendarComponent {
   }
 
   savePlan() {
+    if (this.planEditLocked) {
+      this.toast.show('warning', 'Semana já avaliada. Planos bloqueados.');
+      return;
+    }
     const payload: InternshipPlanDto = {
       id: this.formId(),
       date: this.formDate(),
@@ -377,6 +396,10 @@ export class UserCalendarComponent {
   }
 
   deletePlan(id: number) {
+    if (this.planEditLocked) {
+      this.toast.show('warning', 'Semana já avaliada. Planos bloqueados.');
+      return;
+    }
     this.api.deletePlan(id).subscribe(() => {
       const cur = this.data();
       if (cur) {
@@ -385,6 +408,7 @@ export class UserCalendarComponent {
       }
       // Optional: reload to confirm server state
       this.load();
+      this.refreshMonth(true);
     });
   }
 
@@ -413,7 +437,7 @@ export class UserCalendarComponent {
 
   saveJustify() {
     this.api.justify({ date: this.justDate(), planId: this.justPlanId(), type: this.justType(), reason: this.justReason(), disciplineId: this.disciplineId() })
-      .subscribe(() => this.load());
+      .subscribe(() => { this.load(); this.refreshMonth(true); });
   }
 
   deleteJustify(j: any) {
@@ -437,8 +461,8 @@ export class UserCalendarComponent {
     if (!ok) return;
     const note = (this.reviewNote() || '').trim() || undefined;
     this.api.reviewJustification({ alunoId, date: dateIso, action, note }).subscribe({
-      next: () => this.load(),
-      error: () => this.load(),
+      next: () => { this.load(); this.refreshMonth(true); },
+      error: () => { this.load(); this.refreshMonth(true); },
     });
   }
 
@@ -464,14 +488,8 @@ export class UserCalendarComponent {
     if (!action || !alunoId || !dateIso) return;
     const note = (this.reviewNote() || '').trim() || undefined;
     this.api.reviewJustification({ alunoId, date: dateIso, action, note }).subscribe({
-      next: () => {
-        this.hideReviewModal();
-        this.load();
-      },
-      error: () => {
-        this.hideReviewModal();
-        this.load();
-      },
+      next: () => { this.hideReviewModal(); this.load(); this.refreshMonth(true); },
+      error: () => { this.hideReviewModal(); this.load(); this.refreshMonth(true); },
     });
   }
 
@@ -516,5 +534,80 @@ export class UserCalendarComponent {
 
   ngOnDestroy() {
     try { window.removeEventListener('mc:aluno-changed', this.alunoChangedHandler as any); } catch {}
+    try {
+      ['mc:session-updated','mc:session-created','mc:checkin-created','mc:checkin-updated'].forEach(evt => window.removeEventListener(evt, this.sessionEventHandler as any));
+      if (this.refreshIntervalId) clearInterval(this.refreshIntervalId);
+      if (this.pendingTimeoutId) clearTimeout(this.pendingTimeoutId);
+    } catch {}
+  }
+
+  private refreshMonth(force = false) {
+    if (!this.initialized || this.loading()) return;
+    this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe({
+      next: res => {
+        this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
+        if (force) this.scheduleNextCriticalEdge();
+        this.updatePlanLock();
+      },
+      error: () => {/* noop */}
+    });
+  }
+
+  private startAdaptiveRefresh() {
+    // Intervalo base mais curto para reação visual (~60s)
+    this.refreshIntervalId = setInterval(() => this.refreshMonth(false), 60 * 1000);
+    // E agendamentos precisos para bordas (início / fim de planos) do dia atual
+    this.scheduleNextCriticalEdge();
+  }
+
+  private scheduleNextCriticalEdge() {
+    if (this.pendingTimeoutId) { clearTimeout(this.pendingTimeoutId); this.pendingTimeoutId = null; }
+    const todayIso = new Date().toISOString().slice(0,10);
+    const cur = this.data();
+    if (!cur) return;
+  const todayRaw = cur.days.find(d => d.date === todayIso);
+  if (!todayRaw) return;
+  const today: any = todayRaw; // acesso a campos complementares calculados no backend (earliestStart/latestEnd)
+  // Edge candidates: earliestStart + 1min (grace) se status BLUE e há planos; latestEnd + 5s para virar RED se nada feito; ou próximo minuto se trabalhando
+    const now = new Date();
+    const parse = (t?: string) => { if (!t) return null; const dt = new Date(`${todayIso}T${t}:00`); return isNaN(dt.getTime()) ? null : dt; };
+  const earliest = parse(today.earliestStart);
+  const latest = parse(today.latestEnd);
+    let target: Date | null = null;
+    if (today.status === 'BLUE' && earliest) {
+      const grace = new Date(earliest.getTime() + 60*1000); // +1 min
+      if (grace > now) target = grace;
+    } else if (today.status === 'YELLOW' && latest) {
+      // ao fim do período pode virar GREEN ou manter YELLOW; ainda assim refresh imediato
+      const endPlus = new Date(latest.getTime() + 5*1000);
+      if (endPlus > now) target = endPlus;
+    } else if (today.status === 'BLUE' && latest) {
+      // caso especial: nenhum trabalho e já perto do fim; garantir refresh próximo do fim
+      const endPlus = new Date(latest.getTime() + 5*1000);
+      if (endPlus > now) target = endPlus;
+    }
+    if (target) {
+      const ms = target.getTime() - now.getTime();
+      if (ms > 0 && ms < 6*60*1000) { // só agenda se dentro de 6 min para evitar fila longa
+        this.pendingTimeoutId = setTimeout(() => this.refreshMonth(true), ms);
+      }
+    }
+  }
+
+  private updatePlanLock() {
+    const alunoId = this.alunoId();
+    const week = this.selectedWeek();
+    if (!alunoId || !week) { this.planEditLocked = false; return; }
+    // tenta avaliação específica da disciplina primeiro
+    this.evalApi.get(alunoId, week, this.disciplineId() || undefined).subscribe({
+      next: () => { this.planEditLocked = true; },
+      error: () => {
+        // fallback avaliação global
+        this.evalApi.get(alunoId, week).subscribe({
+          next: () => { this.planEditLocked = true; },
+          error: () => { this.planEditLocked = false; }
+        });
+      }
+    });
   }
 }

@@ -275,4 +275,41 @@ public class PreceptorController {
         resp.put("updatedAt", eval.getUpdatedAt());
         return ResponseEntity.ok(resp);
     }
+
+    // Delete evaluation (allow PRECEPTOR or ADMIN). Coordinator intentionally not allowed to delete.
+    @org.springframework.web.bind.annotation.DeleteMapping("/evaluation")
+    public ResponseEntity<?> deleteEvaluation(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                              @RequestParam("alunoId") Long alunoId,
+                                              @RequestParam("weekNumber") Integer weekNumber,
+                                              @RequestParam(value = "disciplineId", required = false) Long disciplineId) {
+        User me = me(principal);
+        if (me.getRole() != Role.PRECEPTOR && me.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error","Forbidden"));
+        }
+        if (weekNumber < 1 || weekNumber > 52) return ResponseEntity.badRequest().body(Map.of("error","weekNumber inválido"));
+        User aluno = userRepository.findById(alunoId).orElse(null);
+        if (aluno == null) return ResponseEntity.notFound().build();
+        Discipline discipline = null;
+        if (disciplineId != null) {
+            discipline = disciplineRepository.findById(disciplineId).orElse(null);
+            if (discipline != null && me.getRole() == Role.PRECEPTOR) {
+                final Long dId = discipline.getId();
+                boolean belongs = disciplineRepository.findByPreceptors_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(dId));
+                if (!belongs) return ResponseEntity.status(403).body(Map.of("error","Preceptor não vinculado à disciplina"));
+            }
+        }
+        PreceptorEvaluation eval;
+        if (discipline != null) {
+            eval = evaluationRepository.findFirstByAlunoAndDisciplineAndWeekNumber(aluno, discipline, weekNumber).orElse(null);
+        } else {
+            eval = evaluationRepository.findFirstByAlunoAndWeekNumberAndDisciplineIsNull(aluno, weekNumber).orElse(null);
+        }
+        if (eval == null) return ResponseEntity.ok(Map.of("deleted", false, "reason", "not-found"));
+        // Only the original preceptor or an ADMIN can delete
+        if (!eval.getPreceptor().getId().equals(me.getId()) && me.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error","Somente o avaliador original ou ADMIN pode excluir"));
+        }
+        evaluationRepository.delete(eval);
+        return ResponseEntity.ok(Map.of("deleted", true));
+    }
 }

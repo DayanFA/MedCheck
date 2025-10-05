@@ -78,16 +78,19 @@
       <div class="card mb-3" *ngIf="formDate() && !alunoId()">
         <div class="card-header">
           <strong>Plano para {{ formDate() }}</strong>
+          <span *ngIf="planEditLocked" class="badge text-bg-warning ms-2">Avaliado</span>
         </div>
         <div class="card-body">
+          <!-- Mensagem de bloqueio -->
+          <div class="alert alert-info py-2 px-3 mb-3" *ngIf="planEditLocked">Edição de planos bloqueada após avaliação do preceptor.</div>
           <div class="row g-3">
             <div class="col-6">
               <label class="form-label">Início</label>
-              <input class="form-control" type="time" [readonly]="alunoId()" [ngModel]="formStart()" (ngModelChange)="formStart.set($event)" />
+              <input class="form-control" type="time" [readonly]="alunoId() || false" [ngModel]="formStart()" (ngModelChange)="formStart.set($event)" />
             </div>
             <div class="col-6">
               <label class="form-label">Fim</label>
-              <input class="form-control" type="time" [readonly]="alunoId()" [ngModel]="formEnd()" (ngModelChange)="formEnd.set($event)" />
+              <input class="form-control" type="time" [readonly]="alunoId() || false" [ngModel]="formEnd()" (ngModelChange)="formEnd.set($event)" />
             </div>
             <div class="col-12">
               <label class="form-label">Semana</label>
@@ -108,7 +111,7 @@
           
         </div>
         <div class="card-footer text-end" *ngIf="!alunoId()">
-          <button class="btn btn-primary" [disabled]="!formLocation() || !formLocation().trim()" (click)="savePlan()">Salvar Plano</button>
+          <button class="btn btn-primary" [disabled]="!formLocation() || !formLocation().trim() || false" (click)="savePlan()">Salvar Plano</button>
         </div>
       </div>
 
@@ -134,8 +137,8 @@
               <!-- Observação do plano: apenas para aluno -->
               <div class="text-muted small mt-1" *ngIf="p.note && !alunoId()">{{ p.note }}</div>
               <div class="mt-2 d-flex gap-2">
-                <button class="btn btn-sm btn-primary" *ngIf="!alunoId()" (click)="editPlan(p)">Editar</button>
-                <button class="btn btn-sm btn-primary" *ngIf="!alunoId()" (click)="deletePlan(p.id)">Excluir</button>
+                <button class="btn btn-sm btn-primary" *ngIf="!alunoId()" (click)="editPlan(p)" [disabled]="false">Editar</button>
+                <button class="btn btn-sm btn-primary" *ngIf="!alunoId()" (click)="deletePlan(p.id)" [disabled]="false">Excluir</button>
               </div>
             </li>
           </ul>

@@ -23,6 +23,12 @@ export class EvaluationService {
     return this.http.get(this.base + '/evaluation', { params });
   }
 
+  delete(alunoId: number, weekNumber: number, disciplineId?: number): Observable<any> {
+    let params = new HttpParams().set('alunoId', alunoId).set('weekNumber', weekNumber);
+    if (disciplineId) params = params.set('disciplineId', disciplineId);
+    return this.http.delete(this.base + '/evaluation', { params });
+  }
+
   save(payload: EvaluationPayload): Observable<any> {
     return this.http.post(this.base + '/evaluate', payload);
   }

@@ -322,6 +322,24 @@ export class ReportComponent implements OnChanges {
     if (!(u && (u.role === 'PRECEPTOR' || u.role === 'ADMIN') && this.alunoId)) return;
     // Evitar refetch desnecessário se já carregado
     this.preceptorDisciplines = null; // estado carregando
+    // ADMIN deve ver TODAS as disciplinas existentes (não apenas as dele)
+    if (u.role === 'ADMIN') {
+      this.http.get<any[]>('/api/admin/disciplines').subscribe({
+        next: list => {
+          this.preceptorDisciplines = Array.isArray(list) ? list : [];
+          if (this.disciplineId && !this.preceptorDisciplines.some(d => d.id === this.disciplineId)) {
+            this.disciplineId = undefined;
+          }
+          if (!this.disciplineId && this.preceptorDisciplines.length > 0) {
+            this.disciplineId = this.preceptorDisciplines[0].id;
+            this.resetWeeksAndReload();
+          }
+        },
+        error: _ => { this.preceptorDisciplines = []; }
+      });
+      return;
+    }
+    // PRECEPTOR mantém lógica anterior baseada em /api/users/me
     const token = (this.auth as any)?.getToken?.();
     const init: RequestInit = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
     fetch('/api/users/me', init)
@@ -332,11 +350,9 @@ export class ReportComponent implements OnChanges {
         } else {
           this.preceptorDisciplines = [];
         }
-        // Validar disciplina atual
         if (this.disciplineId && this.preceptorDisciplines && !this.preceptorDisciplines.some(d => d.id === this.disciplineId)) {
           this.disciplineId = undefined;
         }
-        // Auto selecionar primeira se nenhuma definida
         if (!this.disciplineId && this.preceptorDisciplines && this.preceptorDisciplines.length > 0) {
           this.disciplineId = this.preceptorDisciplines[0].id;
           this.resetWeeksAndReload();
@@ -743,7 +759,21 @@ export class ReportComponent implements OnChanges {
   onSubmit() { console.log('Enviar relatório semana', this.selectedWeek.number, this.selectedWeek); }
   isPreceptorViewingStudent(): boolean {
     const u = this.auth.getUser();
-    return !!(u && (u.role === 'PRECEPTOR' || u.role === 'ADMIN') && this.alunoId);
+    // ADMIN não deve avaliar interno: somente PRECEPTOR (e futuramente COORDENADOR se aplicável)
+    return !!(u && u.role === 'PRECEPTOR' && this.alunoId);
+  }
+
+  shouldShowEvalDetailsButton(): boolean {
+    const u = this.auth.getUser();
+    if (!u) return false;
+    // Mostrar para:
+    // - Aluno vendo seu próprio relatório (alunoId indefinido)
+    // - Coordenador visualizando aluno
+    // - Admin visualizando aluno
+    if (!this.alunoId) return true; // contexto próprio aluno
+    if (u.role === 'COORDENADOR' && this.alunoId) return true;
+    if (u.role === 'ADMIN' && this.alunoId) return true;
+    return false;
   }
 
   goToEvaluation() {

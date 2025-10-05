@@ -147,7 +147,15 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.preceptorId || !this.code) { this.message='Informe Preceptor e Código'; return; }
     this.submitting=true; this.message='Validando...';
     this.check.checkIn(this.preceptorId, this.code.trim().toUpperCase(), this.disciplineId).subscribe({
-      next: _ => { this.message='Check-In realizado'; this.code=''; this.refreshStatus(); this.loadHistory('today'); this.submitting=false; },
+      next: _ => {
+        this.message='Check-In realizado';
+        this.code='';
+        this.refreshStatus();
+        this.loadHistory('today');
+        this.submitting=false;
+        this.updateCachedUserStatus(true);
+        this.broadcastServiceStatus(true);
+      },
       error: err => { this.message = err?.error?.error || 'Falha no Check-In'; this.submitting=false; }
     });
   }
@@ -161,7 +169,15 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.submitting) return;
     this.submitting = true; this.message = 'Encerrando...';
     this.check.checkOut().subscribe({
-      next: _ => { this.message='Check-Out realizado'; this.showCheckoutConfirm=false; this.refreshStatus(); this.loadHistory('today'); this.submitting=false; },
+      next: _ => {
+        this.message='Check-Out realizado';
+        this.showCheckoutConfirm=false;
+        this.refreshStatus();
+        this.loadHistory('today');
+        this.submitting=false;
+        this.updateCachedUserStatus(false);
+        this.broadcastServiceStatus(false);
+      },
       error: err => { this.message = err?.error?.error || 'Falha no Check-Out'; this.showCheckoutConfirm=false; this.submitting=false; }
     });
   }
@@ -471,5 +487,24 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
         this.message = 'QR lido';
       }
     }
+  }
+  /* ===================== REAL-TIME STATUS BROADCAST ===================== */
+  private broadcastServiceStatus(inService: boolean) {
+    try {
+      const payload = { ts: Date.now(), inService };
+      localStorage.setItem('mc:last-service-status', JSON.stringify(payload));
+      window.dispatchEvent(new CustomEvent('mc:service-status-updated', { detail: payload }));
+    } catch {}
+  }
+  private updateCachedUserStatus(inService: boolean){
+    try {
+      const raw = localStorage.getItem('mc_user') || sessionStorage.getItem('mc_user');
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      obj.status = inService ? 'Em serviço' : 'Fora de serviço';
+      const str = JSON.stringify(obj);
+      if (localStorage.getItem('mc_user')) localStorage.setItem('mc_user', str); else sessionStorage.setItem('mc_user', str);
+      window.dispatchEvent(new CustomEvent('mc:user-updated', { detail: obj }));
+    } catch {}
   }
 }

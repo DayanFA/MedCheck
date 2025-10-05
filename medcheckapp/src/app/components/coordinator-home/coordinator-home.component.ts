@@ -179,6 +179,11 @@ export class CoordinatorHomeComponent implements OnInit, OnDestroy {
   disciplinaPreceptores: any[] = [];
   private searchDebounce?: any;
   private avatarObjectUrls: string[] = [];
+  /* ===== AUTO POLLING (multi-dispositivo) ===== */
+  private autoStatusTimer?: any;
+  private AUTO_INTERVAL_MS = 12000; // mesmo intervalo usado em preceptor-home
+  private lastSilentRefresh = 0;
+  private autoLoopStarted = false;
 
   constructor(private coord: CoordinatorService, private http: HttpClient, private auth: AuthService, private toast: ToastService, private alunoCtx: PreceptorAlunoContextService) {}
 
@@ -186,7 +191,22 @@ export class CoordinatorHomeComponent implements OnInit, OnDestroy {
   // Flag para saber se já houve interação manual de mudança de ano
   private userChangedYear = false;
 
-  ngOnDestroy(){ this.avatarObjectUrls.forEach(u=>{try{URL.revokeObjectURL(u);}catch{}}); this.avatarObjectUrls = []; }
+  ngOnDestroy(){
+    this.avatarObjectUrls.forEach(u=>{try{URL.revokeObjectURL(u);}catch{}});
+    this.avatarObjectUrls = [];
+    this.unregisterRealtime();
+    if (this.autoStatusTimer) { clearInterval(this.autoStatusTimer); this.autoStatusTimer = undefined; }
+    try { document.removeEventListener('visibilitychange', this.onVisibilityChange); } catch {}
+  }
+  private registerRealtime(){
+    try { window.addEventListener('mc:service-status-updated', this.onServiceStatusEvent as any); } catch {}
+    try { window.addEventListener('storage', this.onStorage as any); } catch {}
+    try { document.addEventListener('visibilitychange', this.onVisibilityChange); } catch {}
+  }
+  private unregisterRealtime(){
+    try { window.removeEventListener('mc:service-status-updated', this.onServiceStatusEvent as any); } catch {}
+    try { window.removeEventListener('storage', this.onStorage as any); } catch {}
+  }
 
   private authHeaders(): HttpHeaders | undefined { const token = this.auth.getToken?.(); return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined as any; }
 
@@ -200,6 +220,7 @@ export class CoordinatorHomeComponent implements OnInit, OnDestroy {
             this.loadDisciplinaPreceptores(); // carrega preceptores já na seleção automática
             this.reloadFirstPage();
           }
+          this.registerRealtime();
         }
       },
       error: _ => { this.toast.show('error','Erro ao carregar disciplinas'); }
@@ -230,6 +251,8 @@ export class CoordinatorHomeComponent implements OnInit, OnDestroy {
         this.size = res?.size || this.size;
         this.loading = false;
         this.loadAvatars();
+        // inicia loop após primeiro carregamento bem-sucedido
+        if (!this.autoLoopStarted) { this.startAutoRefreshLoop(); this.autoLoopStarted = true; }
       },
       error: _ => { this.items = []; this.totalPages = 0; this.totalItems = 0; this.loading = false; }
     });
@@ -265,5 +288,67 @@ export class CoordinatorHomeComponent implements OnInit, OnDestroy {
   formatDateTime(dt: string | Date | null | undefined): string { if(!dt) return ''; const d = new Date(dt); if(isNaN(d.getTime())) return ''; return d.toLocaleString('pt-BR',{dateStyle:'short', timeStyle:'short'}); }
   selectPreceptor(p:any){
     if(!p) return; this.filters.preceptorId = p.id; this.reloadFirstPage();
+  }
+  /* ===================== REAL-TIME STATUS LISTENERS ===================== */
+  private onServiceStatusEvent = (_e:any) => {
+    if (this.loading) return; // debounce
+    if (this.autoLoopStarted) { this.queueSilentRefresh(true); } else { this.reloadFirstPage(); }
+  };
+  private onStorage = (ev: StorageEvent) => {
+    if (ev.key === 'mc:last-service-status') {
+      if (this.loading) return;
+      if (this.autoLoopStarted) { this.queueSilentRefresh(true); } else { this.reloadFirstPage(); }
+    }
+  };
+
+  /* ===================== AUTO POLLING (multi-dispositivo) ===================== */
+  private startAutoRefreshLoop(){
+    if (this.autoStatusTimer) clearInterval(this.autoStatusTimer);
+    if (document.visibilityState === 'visible') {
+      this.queueSilentRefresh();
+    }
+    this.autoStatusTimer = setInterval(()=>{
+      if (document.visibilityState !== 'visible') return;
+      this.queueSilentRefresh();
+    }, this.AUTO_INTERVAL_MS);
+  }
+
+  private onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      this.queueSilentRefresh(true);
+    }
+  };
+
+  private queueSilentRefresh(force=false){
+    const now = Date.now();
+    if (!force && now - this.lastSilentRefresh < 4000) return; // proteção contra tempestade
+    this.lastSilentRefresh = now;
+    this.silentRefreshStatuses();
+  }
+
+  private silentRefreshStatuses(){
+    if (!this.disciplineId) return;
+    if (this.loading) return; // não competir com carregamento completo
+    const sendYear = this.userChangedYear || this.year === 'all';
+    const yValue = sendYear ? (this.year === 'all' ? 'all' : this.year) : undefined;
+    this.coord.studentsByDiscipline(this.disciplineId, yValue as any, this.page, this.size, this.q || undefined, this.filters).subscribe({
+      next: res => this.mergeInService(res?.items || []),
+      error: _ => {}
+    });
+  }
+
+  private mergeInService(fresh:any[]){
+    if (!Array.isArray(fresh) || !fresh.length) return;
+    const map = new Map<number, any>();
+    fresh.forEach(i=>{ if (i?.id != null) map.set(i.id, i); });
+    let changed = false;
+    this.items.forEach(local => {
+      const newer = map.get(local.id);
+      if (newer && typeof newer.inService === 'boolean' && newer.inService !== local.inService){
+        local.inService = newer.inService;
+        changed = true;
+      }
+    });
+    if (changed) { try { /* Angular default CD detecta */ } catch {} }
   }
 }

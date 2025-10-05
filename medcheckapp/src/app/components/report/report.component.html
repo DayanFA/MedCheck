@@ -272,7 +272,7 @@
           <span class="evaluation-inline-score">{{ weeks[selectedWeekIndex].evaluation | number:'1.0-1' }}</span>
           <!-- Botão detalhes agora aparece para Coordenador e Admin/Preceptor (quando não é o próprio aluno) -->
           <!-- Mostrar detalhes apenas para: aluno (sem alunoId em contexto de input) ou coordenador. Esconder para preceptor. -->
-          <button *ngIf="(!alunoId && !isPreceptorViewingStudent()) || (isCoordinator && alunoId)" type="button" class="eval-inline-details-btn ms-2" (click)="openEvaluationDetails()" title="Ver detalhes da avaliação">!</button>
+          <button *ngIf="shouldShowEvalDetailsButton()" type="button" class="eval-inline-details-btn ms-2" (click)="openEvaluationDetails()" title="Ver detalhes da avaliação">!</button>
         </ng-container>
         <ng-template #semAvaliacao>
           <span class="text-muted fst-italic">(não enviada)</span>
@@ -333,6 +333,7 @@
     <!-- Barra de ações inferior -->
     <div class="d-flex flex-wrap justify-content-between gap-2 pt-3 border-top mt-3 action-bar">
       <div class="d-flex align-items-center gap-2">
+        <!-- Botão só aparece para PRECEPTOR (admin não avalia) -->
         <button *ngIf="isPreceptorViewingStudent()" type="button" class="btn btn-warning btn-sm text-white fw-semibold" (click)="goToEvaluation()">
           Avaliar Interno
         </button>

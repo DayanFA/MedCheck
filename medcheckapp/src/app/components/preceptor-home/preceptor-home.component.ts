@@ -223,13 +223,20 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
   modalDisciplines: any[] = [];
   private modalTimer?: any;
   refreshing = false;
+  private autoStatusTimer?: any;
+  private AUTO_INTERVAL_MS = 12000; // 12s balanceando frescor vs carga
+  private lastSilentRefresh = 0;
 
   ngOnInit(): void {
     this.role = this.auth.getRole();
     if (this.role === 'ADMIN') {
       this.fetchAdminDisciplines();
     }
+    try { window.addEventListener('mc:service-status-updated', this.onServiceStatusEvent as any); } catch {}
+    try { window.addEventListener('storage', this.onStorage as any); } catch {}
     this.load();
+    this.startAutoRefreshLoop();
+    try { document.addEventListener('visibilitychange', this.onVisibilityChange); } catch {}
   }
 
   load() {
@@ -342,6 +349,10 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
     this.avatarObjectUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
     this.avatarObjectUrls = [];
     if (this.modalTimer) { clearInterval(this.modalTimer); this.modalTimer = undefined; }
+    try { window.removeEventListener('mc:service-status-updated', this.onServiceStatusEvent as any); } catch {}
+    try { window.removeEventListener('storage', this.onStorage as any); } catch {}
+    if (this.autoStatusTimer) { clearInterval(this.autoStatusTimer); this.autoStatusTimer = undefined; }
+    try { document.removeEventListener('visibilitychange', this.onVisibilityChange); } catch {}
   }
 
   visualizar(a: any){
@@ -403,5 +414,81 @@ export class PreceptorHomeComponent implements OnInit, OnDestroy {
       next: list => { this.modalDisciplines = Array.isArray(list)? list: []; },
       error: _ => { this.modalDisciplines = []; }
     });
+  }
+  /* ===================== REAL-TIME STATUS LISTENERS ===================== */
+  private onServiceStatusEvent = (_e: any) => {
+    if (this.loading) return; // simples debounce
+    this.load();
+  };
+  private onStorage = (ev: StorageEvent) => {
+    if (ev.key === 'mc:last-service-status') { if (this.loading) return; this.load(); }
+  };
+
+  /* ===================== AUTO POLLING (multi-dispositivo) ===================== */
+  private startAutoRefreshLoop(){
+    if (this.autoStatusTimer) clearInterval(this.autoStatusTimer);
+    // Poll apenas se página visível ao carregar, senão espera visibilitychange
+    if (document.visibilityState === 'visible') {
+      this.queueSilentRefresh();
+    }
+    this.autoStatusTimer = setInterval(()=>{
+      if (document.visibilityState !== 'visible') return; // não atualiza em background (economia)
+      this.queueSilentRefresh();
+    }, this.AUTO_INTERVAL_MS);
+  }
+
+  private onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      // Faz refresh imediato ao voltar
+      this.queueSilentRefresh(true);
+    }
+  };
+
+  private queueSilentRefresh(force = false){
+    const now = Date.now();
+    if (!force && now - this.lastSilentRefresh < 4000) return; // guarda-chuva contra tempestade de chamadas
+    this.lastSilentRefresh = now;
+    this.silentRefreshStatuses();
+  }
+
+  private silentRefreshStatuses(){
+    // Usa o mesmo endpoint, mas evita refazer layout / avatares se possível
+    if (this.loading) return; // não competir com carregamento principal
+    const wasLoading = this.loading;
+    // Monta params iguais ao load() para consistência
+    if (this.role === 'ADMIN') {
+      const params: any = { page: this.page, size: this.size, year: this.year,
+        fName: this.filters.fName, fPhone: this.filters.fPhone, fEmail: this.filters.fEmail, fCpf: this.filters.fCpf,
+        statusIn: this.filters.statusIn, statusOut: this.filters.statusOut };
+      if (this.q) params.q = this.q;
+      if (this.adminDisciplineId) params.disciplineId = this.adminDisciplineId;
+      this.http.get<any>('/api/admin/students', { params }).subscribe({
+        next: res => this.mergeInService(res?.items || []),
+        error: _ => {}
+      });
+    } else {
+      this.svc.students(this.year, this.page, this.size, this.q || undefined, this.filters).subscribe({
+        next: res => this.mergeInService(res?.items || []),
+        error: _ => {}
+      });
+    }
+  }
+
+  private mergeInService(fresh: any[]){
+    if (!Array.isArray(fresh) || !fresh.length) return;
+    const map = new Map<number, any>();
+    fresh.forEach(i=> { if (i?.id != null) map.set(i.id, i); });
+    let changed = false;
+    this.items.forEach(local => {
+      const newer = map.get(local.id);
+      if (newer && typeof newer.inService === 'boolean' && newer.inService !== local.inService){
+        local.inService = newer.inService;
+        changed = true;
+      }
+    });
+    if (changed) {
+      // dispara detecção de mudanças (caso OnPush no futuro)
+      try { /* noop - Angular default change detection já pega. */ } catch {}
+    }
   }
 }

@@ -53,6 +53,17 @@ export class HomeComponent implements OnInit, OnDestroy {
       if (isPlatformBrowser(this.platformId)) this.loadAvatarIfAny();
     } catch {}
   };
+  private serviceStatusListener = (_e: any) => {
+    try {
+      // Atualiza imediatamente usando o payload antes de consultar API
+      const det = (_e as CustomEvent).detail;
+      if (det && typeof det.inService === 'boolean') {
+        this.inService = det.inService;
+        if (!det.inService) this.sessionStart = null;
+      }
+    } catch {}
+    this.loadStatus(); // confirma com backend / sincroniza tempo
+  };
 
   ngOnInit(): void {
     // Restaura baseline persistido (secs + ts) para evitar reset visual
@@ -133,6 +144,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   // Ouve atualizações do usuário (ex.: upload/remoção de foto) para atualizar avatar imediatamente
   if (isPlatformBrowser(this.platformId)) {
     window.addEventListener('mc:user-updated', this.userUpdatedListener as any);
+    window.addEventListener('mc:service-status-updated', this.serviceStatusListener as any);
+    window.addEventListener('storage', (ev) => {
+      if (ev.key === 'mc:last-service-status') this.loadStatus();
+    });
   }
   // Fallback: caso role seja atribuída após micro-task ou cache não disponível de imediato
   setTimeout(() => this.ensureAdminDataLoaded(), 200);
@@ -144,6 +159,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   this.clearAvatarUrl();
   if (isPlatformBrowser(this.platformId)) {
     window.removeEventListener('mc:user-updated', this.userUpdatedListener as any);
+    window.removeEventListener('mc:service-status-updated', this.serviceStatusListener as any);
   }
   }
 
@@ -247,7 +263,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (this.submitting) return;
     this.submitting = true;
     this.check.checkOut().subscribe({
-      next: _ => { this.submitting=false; this.showCheckoutConfirm=false; this.loadStatus(); },
+      next: _ => { this.submitting=false; this.showCheckoutConfirm=false; this.loadStatus(); this.broadcastServiceStatus(false); },
       error: _ => { this.submitting=false; this.showCheckoutConfirm=false; }
     });
   }
@@ -408,6 +424,15 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   // Hook após role carregada
   private afterRoleSet() { this.ensureAdminDataLoaded(); }
+
+  /* ===================== REAL-TIME STATUS BROADCAST ===================== */
+  private broadcastServiceStatus(inService: boolean) {
+    try {
+      const payload = { ts: Date.now(), inService };
+      localStorage.setItem('mc:last-service-status', JSON.stringify(payload));
+      window.dispatchEvent(new CustomEvent('mc:service-status-updated', { detail: payload }));
+    } catch {}
+  }
 }
 
 // Backwards compatibility alias (remove later if unused)

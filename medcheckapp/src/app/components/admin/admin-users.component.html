@@ -1,28 +1,39 @@
 <div class="content-box p-3 p-md-4">
-  <div class="d-flex flex-wrap align-items-end justify-content-between mb-3 gap-3">
-    <div class="d-flex flex-column">
-      <h5 class="m-0">Usuários</h5>
-      <small class="text-muted">Gerencie papéis e filtre por disciplina</small>
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <div class="input-group search-group flex-grow-1" style="max-width:420px">
+      <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
+      <input placeholder="Buscar..." class="form-control border-0 shadow-none" [(ngModel)]="q" (input)="onSearchChange()" (keydown)="onSearchEnter($event)">
+      <button *ngIf="q" class="btn btn-light border-0" type="button" (click)="clearSearch()"><i class="bi bi-x"></i></button>
     </div>
-    <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
-      <div class="d-flex flex-column">
-        <label class="form-label small mb-1">Disciplina</label>
-        <select class="form-select form-select-sm" [(ngModel)]="disciplineId" (ngModelChange)="onChangeDiscipline()" style="min-width:220px">
-          <option value="">Todas</option>
-          <option *ngFor="let d of disciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
-        </select>
-      </div>
-      <div class="d-flex flex-column">
-        <label class="form-label small mb-1">Buscar</label>
-        <div class="input-group input-group-sm">
-          <input type="text" class="form-control" [(ngModel)]="q" (keydown)="onSearchEnter($event)" placeholder="Nome, CPF, email...">
-          <button class="btn btn-outline-secondary" (click)="load(true)" [disabled]="loading"><i class="bi bi-search"></i></button>
-          <button class="btn btn-outline-light border" (click)="clearSearch()" [disabled]="!q"><i class="bi bi-x"></i></button>
+    <div class="ms-auto d-flex align-items-center gap-2 flex-wrap position-relative">
+      <div class="dropdown" [class.show]="showFilters">
+        <button type="button" class="btn btn-light border shadow-sm small dropdown-toggle" (click)="toggleFilters()">
+          Filtros
+        </button>
+        <div class="dropdown-menu p-3" [class.show]="showFilters" style="min-width:220px">
+          <div class="mb-2 fw-semibold small text-uppercase text-muted">Campos</div>
+          <div class="form-check small">
+            <input type="checkbox" id="fName" class="form-check-input" [(ngModel)]="fName" (change)="onFieldsChange()" name="fName">
+            <label for="fName" class="form-check-label">Nome</label>
+          </div>
+          <div class="form-check small">
+            <input type="checkbox" id="fPhone" class="form-check-input" [(ngModel)]="fPhone" (change)="onFieldsChange()" name="fPhone">
+            <label for="fPhone" class="form-check-label">Telefone</label>
+          </div>
+            <div class="form-check small">
+            <input type="checkbox" id="fEmail" class="form-check-input" [(ngModel)]="fEmail" (change)="onFieldsChange()" name="fEmail">
+            <label for="fEmail" class="form-check-label">Email</label>
+          </div>
+          <div class="form-check small mb-2">
+            <input type="checkbox" id="fCpf" class="form-check-input" [(ngModel)]="fCpf" (change)="onFieldsChange()" name="fCpf">
+            <label for="fCpf" class="form-check-label">CPF</label>
+          </div>
+          <div class="d-flex justify-content-end pt-2">
+            <button class="btn btn-outline-secondary btn-sm" type="button" (click)="resetAdvancedFilters()" [disabled]="!roleFilter && fName && fPhone && fEmail && fCpf">Limpar</button>
+          </div>
         </div>
       </div>
-      <button class="btn btn-outline-secondary btn-sm align-self-end" (click)="load()" [disabled]="loading">
-        <i class="bi bi-arrow-clockwise"></i>
-      </button>
+      <button class="btn btn-outline-secondary btn-sm" (click)="load()" [disabled]="loading"><i class="bi bi-arrow-clockwise"></i></button>
     </div>
   </div>
   <div class="alert alert-info py-2" *ngIf="msg">{{msg}}</div>
@@ -37,7 +48,7 @@
             <th>Nome</th>
             <th>CPF</th>
             <th>Email</th>
-            <th>Role</th>
+            <th>Telefone</th>
             <th class="text-end">Ações</th>
           </tr>
         </thead>
@@ -46,11 +57,7 @@
             <td>{{u.name}}</td>
             <td>{{ u.cpf | cpf }}</td>
             <td>{{u.email}}</td>
-            <td>
-            <select class="form-select form-select-sm w-auto" [ngModel]="u.role" (ngModelChange)="changeRole(u, $event)">
-                <option *ngFor="let r of roles" [value]="r">{{r}}</option>
-              </select>
-            </td>
+            <td>{{u.phoneMasked || '—'}}</td>
             <td class="text-end">
               <div class="btn-group btn-group-sm">
                 <button class="btn btn-outline-primary" (click)="openEdit(u)"><i class="bi bi-pencil"></i></button>
@@ -108,16 +115,22 @@
             <input type="date" class="form-control form-control-sm" [(ngModel)]="editingUser.birthDate" name="birthDate" (change)="onBirthDateChange()" [ngClass]="{'is-invalid': birthDateInvalid}">
             <div *ngIf="birthDateInvalid" class="invalid-feedback d-block small">Data inválida.</div>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label class="form-label small mb-1">Naturalidade</label>
             <select class="form-select form-select-sm" [(ngModel)]="editingUser.naturalidade" name="naturalidade">
               <option *ngFor="let e of estados" [value]="e">{{e}}</option>
             </select>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label class="form-label small mb-1">Nacionalidade</label>
             <select class="form-select form-select-sm" [(ngModel)]="editingUser.nacionalidade" name="nacionalidade" required>
               <option *ngFor="let n of nacionalidades" [value]="n">{{n}}</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-1">Role</label>
+            <select class="form-select form-select-sm" [(ngModel)]="editingUser.role" name="role">
+              <option *ngFor="let r of roles" [value]="r">{{r}}</option>
             </select>
           </div>
           <!-- Campo disciplina removido conforme requisito -->
@@ -145,7 +158,6 @@
         <li><strong>CPF:</strong> {{editingUser.cpf}}</li>
         <li><strong>Email:</strong> {{editingUser.email}}</li>
         <li><strong>Telefone:</strong> {{editingUser.phone}}</li>
-        <li><strong>Matrícula:</strong> {{editingUser.matricula || '—'}}</li>
         <li><strong>Nasc.:</strong> {{editingUser.birthDate || '—'}}</li>
         <li><strong>Naturalidade:</strong> {{editingUser.naturalidade}}</li>
         <li><strong>Nacionalidade:</strong> {{editingUser.nacionalidade}}</li>

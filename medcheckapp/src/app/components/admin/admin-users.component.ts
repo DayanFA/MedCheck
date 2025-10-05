@@ -37,6 +37,14 @@ export class AdminUsersComponent {
   disciplines: any[] = [];
   disciplineId: number | '' = '';
   q: string = '';
+  roleFilter: string = '';
+  statusFilter: string = ''; // placeholder para futuro (ativo/inativo)
+  // Campos de busca avançada
+  fName = true;
+  fPhone = true;
+  fEmail = true;
+  fCpf = true;
+  private searchTimer: any = null;
   // Paginação
   page = 0; size = 25; totalPages = 0; totalItems = 0;
 
@@ -49,6 +57,7 @@ export class AdminUsersComponent {
   confirmDelete = false;
   deletingUser: any = null;
   deleting = false;
+  showFilters = false;
 
   ngOnInit() { this.fetchDisciplines(); this.load(); }
 
@@ -58,9 +67,24 @@ export class AdminUsersComponent {
     const params: any = { page: this.page, size: this.size };
     if (this.disciplineId) params.disciplineId = this.disciplineId;
     if (this.q && this.q.trim()) params.q = this.q.trim();
+  if (this.roleFilter) params.role = this.roleFilter;
+  if (this.statusFilter) params.status = this.statusFilter; // se backend ainda não suporta será ignorado
+    // Campos: só enviar se usuário desmarcou algum (evitar quebrar backend antigo). Se todos true, omitimos.
+    const anyChanged = !(this.fName && this.fPhone && this.fEmail && this.fCpf);
+    if (anyChanged) {
+      params.fName = this.fName;
+      params.fPhone = this.fPhone;
+      params.fEmail = this.fEmail;
+      params.fCpf = this.fCpf;
+    }
     this.http.get<any>('/api/admin/users', { params }).subscribe({
       next: data => {
-        this.users = data.items || [];
+        this.users = (data.items || []).map((u:any)=>({
+          ...u,
+          phone: u.phone || '',
+          matricula: u.matricula, // manter para edição interna
+          phoneMasked: this.maskPhone(String(u.phone||'').replace(/\D/g,'').substring(0,11))
+        }));
         this.page = data.page;
         this.size = data.size;
         this.totalPages = data.totalPages;
@@ -80,18 +104,38 @@ export class AdminUsersComponent {
 
   onChangeDiscipline() { this.load(true); }
   onSearchEnter(ev: KeyboardEvent) { if (ev.key === 'Enter') this.load(true); }
+  onSearchChange() {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => {
+      this.load(true);
+    }, 350); // debounce 350ms
+  }
   clearSearch() { this.q=''; this.load(true); }
   nextPage() { if (this.page + 1 < this.totalPages) { this.page++; this.load(); } }
   prevPage() { if (this.page > 0) { this.page--; this.load(); } }
   firstPage() { if (this.page!==0) { this.page=0; this.load(); } }
   lastPage() { if (this.page+1 < this.totalPages) { this.page = this.totalPages -1; this.load(); } }
 
+  onFieldsChange() {
+    // Garantir que pelo menos um campo permaneça selecionado
+    if (!this.fName && !this.fPhone && !this.fEmail && !this.fCpf) {
+      this.fName = true; // fallback
+    }
+    this.load(true);
+  }
+
+  resetAdvancedFilters() {
+    this.roleFilter='';
+    this.statusFilter='';
+    this.fName = this.fPhone = this.fEmail = this.fCpf = true;
+    this.load(true);
+  }
+
+  toggleFilters() { this.showFilters = !this.showFilters; }
+
   changeRole(u: any, role: any) {
-    const value = String(role);
-    this.http.put(`/api/admin/users/${u.id}/role`, { role: value }).subscribe({
-  next: _ => { this.toast.show('success','Role atualizada'); u.role = role; },
-  error: _ => { this.toast.show('error','Falha ao atualizar role'); }
-    });
+    // Não mais usado (role agora dentro do modal). Mantido por compatibilidade se algum template antigo chamar.
+    return;
   }
 
   deleteUser(u: any) {
@@ -167,7 +211,8 @@ export class AdminUsersComponent {
       matricula: this.editingUser.matricula?.trim() || null,
       birthDate: this.editingUser.birthDate || null,
       naturalidade: this.editingUser.naturalidade || null,
-      nacionalidade: this.editingUser.nacionalidade || 'Brasil'
+      nacionalidade: this.editingUser.nacionalidade || 'Brasil',
+      role: this.editingUser.role
     };
     this.pendingSubmit = payload;
     this.confirmSave = true;
@@ -279,12 +324,14 @@ export class AdminUsersComponent {
   private maskPhone(d: string): string {
     if (!d) return '';
     if (d.length <= 10) {
+      // Formato: (DD) 9999-9999
       return d
-        .replace(/(\d{2})(\d)/, '($1)$2')
+        .replace(/(\d{2})(\d)/, '($1) $2')
         .replace(/(\d{4})(\d)/, '$1-$2');
     }
+    // Formato: (DD) 99999-9999
     return d
-      .replace(/(\d{2})(\d)/, '($1)$2')
+      .replace(/(\d{2})(\d)/, '($1) $2')
       .replace(/(\d{5})(\d)/, '$1-$2');
   }
 }

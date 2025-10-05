@@ -38,7 +38,11 @@ public class AdminController {
                                        @RequestParam(value = "disciplineId", required = false) Long disciplineId,
                                        @RequestParam(value = "q", required = false) String q,
                                        @RequestParam(value = "page", defaultValue = "0") int page,
-                                       @RequestParam(value = "size", defaultValue = "50") int size) {
+                                       @RequestParam(value = "size", defaultValue = "50") int size,
+                                       @RequestParam(value = "fName", required = false, defaultValue = "true") boolean fName,
+                                       @RequestParam(value = "fPhone", required = false, defaultValue = "true") boolean fPhone,
+                                       @RequestParam(value = "fEmail", required = false, defaultValue = "true") boolean fEmail,
+                                       @RequestParam(value = "fCpf", required = false, defaultValue = "true") boolean fCpf) {
         ensureAdmin(principal);
         if (page < 0) page = 0; if (size < 1) size = 1; if (size > 200) size = 200;
         String qNorm = q != null ? q.trim().toLowerCase() : null;
@@ -64,15 +68,27 @@ public class AdminController {
                 base = java.util.Collections.emptyList();
             }
         }
-        // Filtro de busca (nome, cpf sem pontuação, email)
+        // Filtro de busca (campos selecionáveis: nome, email, cpf, phone)
         if (qNorm != null && !qNorm.isEmpty()) {
             String qDigits = qNorm.replaceAll("\\D", "");
+            boolean anyField = fName || fPhone || fEmail || fCpf; // se cliente antigo não enviar flags, todos true
+            boolean selName = anyField ? fName : true;
+            boolean selPhone = anyField ? fPhone : true;
+            boolean selEmail = anyField ? fEmail : true;
+            boolean selCpf = anyField ? fCpf : true;
             base = base.stream().filter(u -> {
-                boolean matchName = u.getName() != null && u.getName().toLowerCase().contains(qNorm);
-                boolean matchEmail = u.getInstitutionalEmail() != null && u.getInstitutionalEmail().toLowerCase().contains(qNorm);
-                String cpfDigits = u.getCpf() != null ? u.getCpf().replaceAll("\\D", "") : "";
-                boolean matchCpf = !qDigits.isEmpty() && cpfDigits.contains(qDigits);
-                return matchName || matchEmail || matchCpf;
+                boolean match = false;
+                if (selName && u.getName() != null && u.getName().toLowerCase().contains(qNorm)) match = true;
+                if (!match && selEmail && u.getInstitutionalEmail() != null && u.getInstitutionalEmail().toLowerCase().contains(qNorm)) match = true;
+                if (!match && selCpf) {
+                    String cpfDigits = u.getCpf() != null ? u.getCpf().replaceAll("\\D", "") : "";
+                    if (!qDigits.isEmpty() && cpfDigits.contains(qDigits)) match = true;
+                }
+                if (!match && selPhone) {
+                    String phoneDigits = u.getPhone() != null ? u.getPhone().replaceAll("\\D", "") : "";
+                    if (!qDigits.isEmpty() && phoneDigits.contains(qDigits)) match = true;
+                }
+                return match;
             }).collect(Collectors.toList());
         }
         int total = base.size();
@@ -84,6 +100,8 @@ public class AdminController {
             m.put("name", u.getName());
             m.put("cpf", u.getCpf());
             m.put("email", u.getInstitutionalEmail());
+            m.put("phone", u.getPhone());
+            m.put("matricula", u.getMatricula());
             m.put("role", u.getRole().name());
             if (u.getCurrentDiscipline() != null) {
                 m.put("currentDiscipline", Map.of(

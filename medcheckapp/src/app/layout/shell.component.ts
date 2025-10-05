@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, Inject, PLATFORM_ID, HostListener } from '@angular/core';
+import { Component, OnDestroy, OnInit, Inject, PLATFORM_ID, ElementRef, AfterViewInit, ViewChild } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { SidebarComponent } from '../components/sidebar/sidebar.component';
@@ -15,17 +15,28 @@ import { PreceptorAlunoContextService } from '../services/preceptor-aluno-contex
   templateUrl: './shell.component.html',
   styleUrls: ['./shell.component.scss']
 })
-export class ShellComponent implements OnInit, OnDestroy {
+export class ShellComponent implements OnInit, OnDestroy, AfterViewInit {
   collapsed = false;
-  private userPreference: 'collapsed' | 'expanded' = 'expanded'; // stores last manual state for large screens
-  private AUTO_BREAKPOINT = 960; // px
-  userName = '';
-  avatarUrl = '';
+  userName: string = '';
+  avatarUrl: string = '';
+  private userPreference: 'collapsed' | 'expanded' = 'expanded';
+  private AUTO_BREAKPOINT = 960; // px collapse sidebar
+  private TOP_NARROW_BREAKPOINT = 860; // px to switch discipline label formatting & hide 'Visualizando:'
+  isNarrowTop = false;
+  disciplineCode: string = '';
+  disciplineName: string = '';
   private avatarObjectUrl: string | null = null;
   currentDisciplineLabel = '';
   private disciplines: any[] = [];
   private LOCAL_DISC_KEY = 'mc_current_discipline_id';
   selectedAlunoName: string = '';
+  showWelcome: boolean = true; // control to hide welcome text before wrapping
+
+  // Template element refs for dynamic measurement
+  @ViewChild('topBar') topBarRef?: ElementRef<HTMLElement>;
+  @ViewChild('rightInfo') rightInfoRef?: ElementRef<HTMLElement>;
+  @ViewChild('hamburgerBtn') hamburgerRef?: ElementRef<HTMLElement>;
+  @ViewChild('welcomeRef') welcomeRef?: ElementRef<HTMLElement>;
   private alunoChangedListener = (e: any) => {
     this.updateAlunoBadge();
   };
@@ -51,6 +62,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     } catch {}
     // Apply initial based on viewport
     this.applyResponsiveForced();
+    this.updateTopNarrowState();
     // Tenta pegar usuário real do AuthService (cache de login)
     const cached: any = (this.auth as any).getUser?.();
     if (cached && cached.name) {
@@ -72,13 +84,24 @@ export class ShellComponent implements OnInit, OnDestroy {
       window.addEventListener('resize', this.onResizeForced, { passive: true });
     }
   }
+  ngAfterViewInit(): void {
+    // Delay to allow view to settle then measure
+    if (isPlatformBrowser(this.platformId)) {
+      setTimeout(() => this.recalculateWelcomeVisibility(), 0);
+    }
+  }
   toggleSidebar() {
     // Only toggle when in large screen context. If small, we still allow user to open, but userPreference updates so when they return to large it reflects.
     this.collapsed = !this.collapsed;
     this.userPreference = this.collapsed ? 'collapsed' : 'expanded';
     try { localStorage.setItem('sidebarCollapsed', this.collapsed ? '1' : '0'); } catch {}
   }
-  private onResizeForced = () => { this.applyResponsiveForced(); };
+  private onResizeForced = () => {
+    this.applyResponsiveForced();
+    this.updateTopNarrowState(); // triggers label refresh if crossing
+    // Recalculate after next paint to let text changes apply
+    if (isPlatformBrowser(this.platformId)) setTimeout(() => this.recalculateWelcomeVisibility(), 0);
+  };
   private applyResponsiveForced() {
     if (!isPlatformBrowser(this.platformId)) return;
     const w = window.innerWidth;
@@ -88,6 +111,17 @@ export class ShellComponent implements OnInit, OnDestroy {
     } else {
       // Restore last manual preference
       this.collapsed = (this.userPreference === 'collapsed');
+    }
+  }
+  private updateTopNarrowState() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    const prev = this.isNarrowTop;
+    this.isNarrowTop = window.innerWidth < this.TOP_NARROW_BREAKPOINT;
+    if (prev !== this.isNarrowTop) {
+      // Breakpoint crossing: recalc label to switch between code-only and full form
+      this.updateDisciplineLabel();
+      // Also re-evaluate welcome visibility
+      this.recalculateWelcomeVisibility();
     }
   }
   ngOnDestroy(): void {
@@ -144,13 +178,18 @@ export class ShellComponent implements OnInit, OnDestroy {
       if (id && this.disciplines.length) {
         const d = this.disciplines.find(x => x.id === id);
         if (d) {
-          this.currentDisciplineLabel = `${d.code} - ${d.name}`;
+          this.disciplineCode = d.code;
+          this.disciplineName = d.name;
+          this.currentDisciplineLabel = this.isNarrowTop ? d.code : `${d.code} - ${d.name}`;
+          // Recalculate after label potentially changed width
+          if (isPlatformBrowser(this.platformId)) setTimeout(() => this.recalculateWelcomeVisibility(), 0);
           return;
         }
       }
-      // Sem seleção ou não encontrada => limpa badge
+      this.disciplineCode = '';
+      this.disciplineName = '';
       this.currentDisciplineLabel = '';
-    } catch { this.currentDisciplineLabel = ''; }
+    } catch { this.disciplineCode = ''; this.disciplineName=''; this.currentDisciplineLabel = ''; }
   }
 
   private loadDisciplines() {
@@ -166,6 +205,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   private updateAlunoBadge(){
     const c = this.alunoCtx.getAluno();
     this.selectedAlunoName = c.name || '';
+    if (isPlatformBrowser(this.platformId)) setTimeout(() => this.recalculateWelcomeVisibility(), 0);
   }
 
   private loadUserDetails() {
@@ -190,5 +230,30 @@ export class ShellComponent implements OnInit, OnDestroy {
       },
       error: _ => {}
     });
+  }
+
+  private recalculateWelcomeVisibility() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    if (this.isNarrowTop) { this.showWelcome = false; return; }
+    const topBar = this.topBarRef?.nativeElement;
+    const rightInfo = this.rightInfoRef?.nativeElement;
+    const hamburger = this.hamburgerRef?.nativeElement;
+    const welcome = this.welcomeRef?.nativeElement;
+    if (!topBar || !rightInfo || !hamburger || !welcome) { this.showWelcome = true; return; }
+    // Use precise measurements including horizontal gaps
+    const style = getComputedStyle(topBar);
+    const gap = parseFloat(style.columnGap || style.gap || '0');
+    const leftPad = parseFloat(style.paddingLeft || '0');
+    const rightPad = parseFloat(style.paddingRight || '0');
+    const totalWidth = topBar.getBoundingClientRect().width;
+    const occupied = hamburger.getBoundingClientRect().width + gap + rightInfo.getBoundingClientRect().width + leftPad + rightPad;
+    const available = totalWidth - occupied - 4; // small safety margin
+    this.showWelcome = welcome.getBoundingClientRect().width <= available;
+    if (!this.showWelcome) {
+      // Extra guard: ensure no wrapping by hiding early
+      if (welcome && welcome.style.display !== 'none') {
+        // nothing else needed; the *ngIf will remove it next change detection
+      }
+    }
   }
 }

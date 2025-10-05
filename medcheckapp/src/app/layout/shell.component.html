@@ -1,26 +1,24 @@
 <div class="app-shell d-flex" [class.collapsed]="collapsed">
   <app-sidebar [collapsed]="collapsed"></app-sidebar>
   <div class="flex-grow-1 d-flex flex-column main-area">
-    <nav class="navbar navbar-light bg-white shadow-sm px-3 top-bar" [class.is-collapsed]="collapsed">
-      <button class="hamburger-btn me-3" (click)="toggleSidebar()" [attr.aria-label]="collapsed ? 'Expandir menu' : 'Recolher menu'" [class.active]="collapsed">
+    <nav #topBar class="navbar navbar-light bg-white shadow-sm px-3 top-bar" [class.is-collapsed]="collapsed" [class.narrow]="isNarrowTop">
+      <button #hamburgerBtn class="hamburger-btn me-3" (click)="toggleSidebar()" [attr.aria-label]="collapsed ? 'Expandir menu' : 'Recolher menu'" [class.active]="collapsed">
         <span></span>
         <span></span>
         <span></span>
       </button>
-      <span class="fw-semibold" *ngIf="userName">Seja bem-vindo {{userName}}</span>
-      <div class="ms-auto d-flex align-items-center gap-2">
+      <span #welcomeRef class="fw-semibold welcome" *ngIf="userName && !isNarrowTop && showWelcome">Seja bem-vindo {{userName}}</span>
+      <div #rightInfo class="ms-auto d-flex align-items-center gap-2 top-info">
         <ng-container *ngIf="selectedAlunoName">
-          <span class="text-muted small">Visualizando:</span>
-          <span class="badge border fw-normal px-2 py-1" style="background:#e7f1ff;color:#000;">
-            {{ selectedAlunoName }}
-          </span>
+          <span class="text-muted small view-label" *ngIf="!isNarrowTop">Visualizando:</span>
+          <span class="badge aluno-badge fw-normal px-2 py-1">{{ selectedAlunoName }}</span>
         </ng-container>
-        <span *ngIf="currentDisciplineLabel" class="badge text-bg-light border fw-normal px-2 py-1">
+        <span *ngIf="currentDisciplineLabel" class="badge disc-badge fw-normal px-2 py-1" [attr.title]="!isNarrowTop ? '' : (disciplineCode + ' - ' + disciplineName)">
           {{ currentDisciplineLabel }}
         </span>
         <div class="rounded-circle bg-secondary-subtle user-avatar d-flex align-items-center justify-content-center overflow-hidden" aria-label="Avatar">
           <img *ngIf="avatarUrl" [src]="avatarUrl" alt="Avatar" class="w-100 h-100 object-fit-cover rounded-circle" />
-            <i *ngIf="!avatarUrl" class="bi bi-person text-muted"></i>
+          <i *ngIf="!avatarUrl" class="bi bi-person text-muted"></i>
         </div>
       </div>
     </nav>

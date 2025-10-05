@@ -19,17 +19,36 @@
         <input type="text" class="form-control" [(ngModel)]="code" placeholder="ABC123" />
       </div>
       <div class="col-md-3 d-grid">
-        <button class="btn btn-primary" [disabled]="submitting" (click)="submit()">{{ submitting ? 'Enviando...' : 'Validar & Check-In' }}</button>
+        <button class="btn btn-primary mb-2" [disabled]="submitting || checkingOut" (click)="submit()">{{ submitting ? 'Enviando...' : 'Validar & Check-In' }}</button>
+        <button class="btn btn-outline-danger" [disabled]="checkingOut || submitting" (click)="doCheckout()">{{ checkingOut ? 'Finalizando...' : 'Check-Out' }}</button>
       </div>
     </div>
     <div class="small mt-2 text-muted">Informe o código exibido pelo preceptor (ou escaneie QR futuramente).</div>
     <div class="mt-2 fw-semibold" [class.text-danger]="message.startsWith('Falha')" [class.text-success]="message.includes('realizado')">{{message}}</div>
+    <div *ngIf="lastLat != null && lastLng != null" class="mt-1 small text-info">
+      Última localização capturada: <span class="fw-bold">{{lastLat}}, {{lastLng}}</span>
+    </div>
   </div>
 
   <h6>Histórico de Hoje</h6>
   <div *ngIf="loadingHistory" class="text-muted small">Carregando...</div>
   <ul class="list-unstyled small" *ngIf="!loadingHistory && history.length; else emptyHistory">
-    <li *ngFor="let h of history">Check-In: {{h.checkInTime}} <span *ngIf="h.checkOutTime"> | Check-Out: {{h.checkOutTime}}</span> <span *ngIf="h.worked"> ({{h.worked}})</span></li>
+    <li *ngFor="let h of history">
+      Check-In: {{h.checkInTime}}
+      <span *ngIf="h.checkInLat != null && h.checkInLng != null">
+        <span class="text-info">[{{h.checkInLat}}, {{h.checkInLng}}]
+          <button class="btn btn-link p-0 ms-1" style="font-size:11px" (click)="openLocation(h.checkInLat, h.checkInLng)" title="Ver mapa">🗺️</button>
+        </span>
+      </span>
+      <span *ngIf="h.checkOutTime"> | Check-Out: {{h.checkOutTime}}
+        <span *ngIf="h.checkOutLat != null && h.checkOutLng != null" class="text-info">[{{h.checkOutLat}}, {{h.checkOutLng}}]
+          <button class="btn btn-link p-0 ms-1" style="font-size:11px" (click)="openLocation(h.checkOutLat, h.checkOutLng)" title="Ver mapa">🗺️</button>
+        </span>
+      </span>
+      <span *ngIf="h.worked"> ({{h.worked}})</span>
+    </li>
   </ul>
   <ng-template #emptyHistory><div class="small text-muted">Sem registros.</div></ng-template>
+  <app-location-modal *ngIf="showLocModal && modalLat != null && modalLng != null"
+    [lat]="modalLat" [lng]="modalLng" [onClose]="closeLocationModal.bind(this)"></app-location-modal>
 </div>

@@ -34,6 +34,16 @@ public class CheckSession {
     @Column(name = "validated", nullable = false)
     private boolean validated; // true when check-in validated
 
+    // ===== Localização (opcional) =====
+    @Column(name = "check_in_lat")
+    private Double checkInLat;
+    @Column(name = "check_in_lng")
+    private Double checkInLng;
+    @Column(name = "check_out_lat")
+    private Double checkOutLat;
+    @Column(name = "check_out_lng")
+    private Double checkOutLng;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public User getAluno() { return aluno; }
@@ -48,6 +58,14 @@ public class CheckSession {
     public void setCheckOutTime(LocalDateTime checkOutTime) { this.checkOutTime = checkOutTime; }
     public boolean isValidated() { return validated; }
     public void setValidated(boolean validated) { this.validated = validated; }
+    public Double getCheckInLat() { return checkInLat; }
+    public void setCheckInLat(Double checkInLat) { this.checkInLat = checkInLat; }
+    public Double getCheckInLng() { return checkInLng; }
+    public void setCheckInLng(Double checkInLng) { this.checkInLng = checkInLng; }
+    public Double getCheckOutLat() { return checkOutLat; }
+    public void setCheckOutLat(Double checkOutLat) { this.checkOutLat = checkOutLat; }
+    public Double getCheckOutLng() { return checkOutLng; }
+    public void setCheckOutLng(Double checkOutLng) { this.checkOutLng = checkOutLng; }
 
     @Transient
     public Duration getWorkedDuration() {

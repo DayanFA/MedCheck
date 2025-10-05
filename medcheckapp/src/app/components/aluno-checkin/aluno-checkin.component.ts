@@ -1,7 +1,9 @@
 import { Component, OnDestroy, OnInit, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { LocationModalComponent } from '../location-modal/location-modal.component';
 import { CheckInService } from '../../services/checkin.service';
+import { todayAcreISODate } from '../../util/date-utils';
 import { HttpClient } from '@angular/common/http';
 // Nota: Para leitura de QR sem lib pesada, usamos um placeholder que pode ser trocado depois por 'jsqr'
 // ou outra lib. Aqui fica apenas estrutura inicial (captura de vídeo) para integração posterior.
@@ -9,7 +11,7 @@ import { HttpClient } from '@angular/common/http';
 @Component({
   selector: 'app-aluno-checkin',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LocationModalComponent],
   templateUrl: './aluno-checkin.component.html',
   styleUrls: ['./aluno-checkin.component.scss']
 })
@@ -26,8 +28,8 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   submitting = false;
   message = '';
   filterMessage = '';
-  startDate = new Date().toISOString().substring(0,10);
-  endDate = new Date().toISOString().substring(0,10);
+  startDate = todayAcreISODate();
+  endDate = todayAcreISODate();
   private timerId?: any;
   scanning = false;
   videoStream: MediaStream | null = null;
@@ -46,12 +48,16 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   // Baseline retornado pela API (segundos já contabilizados até o último refresh)
   private baselineWorkedSeconds = 0;
   private baselineCaptureTs = 0; // timestamp em ms de quando baseline foi definido
-  private todayDate = new Date().toISOString().substring(0,10);
+  private todayDate = todayAcreISODate();
   private cacheKey = 'mc_worked_cache_home'; // será ajustado após primeira resposta de status (CPF não está aqui diretamente)
   private LOCAL_DISC_KEY = 'mc_current_discipline_id';
   disciplineId?: number;
   disciplines: { id:number; code?:string; name?:string }[] = [];
   disciplineLoading = false;
+  // Modal de localização
+  showLocModal = false;
+  locLat?: number; locLng?: number;
+  // showDayMap removido (Mapa do Dia não requerido)
 
   get workedToday(): string {
     if (!this.status && (this as any)._initialWorkedDisplay) return (this as any)._initialWorkedDisplay;
@@ -145,8 +151,11 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.submitting) return;
     if (!this.disciplineId) { this.message = 'Selecione uma disciplina antes.'; return; }
     if (!this.preceptorId || !this.code) { this.message='Informe Preceptor e Código'; return; }
-    this.submitting=true; this.message='Validando...';
-    this.check.checkIn(this.preceptorId, this.code.trim().toUpperCase(), this.disciplineId).subscribe({
+    this.submitting=true; this.message='Obtendo localização...';
+    this.getLocation().then(pos => {
+      const { lat, lng } = pos || {} as any;
+      this.message='Validando...';
+      this.check.checkIn(this.preceptorId!, this.code.trim().toUpperCase(), this.disciplineId, lat, lng).subscribe({
       next: _ => {
         this.message='Check-In realizado';
         this.code='';
@@ -157,6 +166,7 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
         this.broadcastServiceStatus(true);
       },
       error: err => { this.message = err?.error?.error || 'Falha no Check-In'; this.submitting=false; }
+      });
     });
   }
 
@@ -167,8 +177,11 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   cancelCheckout() { this.showCheckoutConfirm = false; }
   confirmCheckout() {
     if (this.submitting) return;
-    this.submitting = true; this.message = 'Encerrando...';
-    this.check.checkOut().subscribe({
+    this.submitting = true; this.message = 'Obtendo localização...';
+    this.getLocation().then(pos => {
+      const { lat, lng } = pos || {} as any;
+      this.message = 'Encerrando...';
+      this.check.checkOut(lat, lng).subscribe({
       next: _ => {
         this.message='Check-Out realizado';
         this.showCheckoutConfirm=false;
@@ -179,6 +192,7 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
         this.broadcastServiceStatus(false);
       },
       error: err => { this.message = err?.error?.error || 'Falha no Check-Out'; this.showCheckoutConfirm=false; this.submitting=false; }
+      });
     });
   }
 
@@ -191,8 +205,9 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
       if (range==='3d') start = new Date(Date.now()-3*24*3600*1000);
       else if (range==='3w') start = new Date(Date.now()-21*24*3600*1000);
       else if (range==='all') start = new Date(Date.now()-180*24*3600*1000); // 6 meses arbitrário
-      sStr = start.toISOString().substring(0,10);
-      eStr = end.toISOString().substring(0,10);
+  // Converte cada Date para dia Acre (garante coerência com backend)
+  sStr = todayAcreISODate(start);
+  eStr = todayAcreISODate(end);
       // mantém campos do formulário alinhados
       this.startDate = sStr; this.endDate = eStr;
     } else {
@@ -507,4 +522,24 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
       window.dispatchEvent(new CustomEvent('mc:user-updated', { detail: obj }));
     } catch {}
   }
+  /* ===================== GEOLOCALIZAÇÃO ===================== */
+  private getLocation(): Promise<{lat:number,lng:number}|null> {
+    return new Promise(resolve => {
+      if (!('geolocation' in navigator)) { console.debug('[geo] geolocation API indisponível'); resolve(null); return; }
+      const opts: PositionOptions = { enableHighAccuracy: false, maximumAge: 20000, timeout: 5000 };
+      navigator.geolocation.getCurrentPosition(
+        p => {
+          const lat = +p.coords.latitude.toFixed(7);
+          const lng = +p.coords.longitude.toFixed(7);
+          console.debug('[geo] sucesso', lat, lng);
+          resolve({ lat, lng });
+        },
+        err => { console.debug('[geo] falha', err?.code, err?.message); resolve(null); },
+        opts
+      );
+    });
+  }
+  openLocation(lat:number,lng:number){ this.locLat = lat; this.locLng = lng; this.showLocModal = true; }
+  closeLocation = () => { this.showLocModal = false; };
+  // toggleDayMap removido
 }

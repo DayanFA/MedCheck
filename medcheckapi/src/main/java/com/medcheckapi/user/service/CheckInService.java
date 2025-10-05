@@ -93,7 +93,7 @@ public class CheckInService {
     }
 
     @Transactional
-    public Map<String,Object> performCheckIn(Long alunoId, Long preceptorId, String code, Long disciplineId) {
+    public Map<String,Object> performCheckIn(Long alunoId, Long preceptorId, String code, Long disciplineId, Double lat, Double lng) {
     User aluno = userRepo.findById(alunoId).orElseThrow();
         User preceptor = userRepo.findById(preceptorId).orElseThrow();
         if (aluno.getRole() != Role.ALUNO) throw new IllegalStateException("Usuário não é aluno");
@@ -134,16 +134,29 @@ public class CheckInService {
         cs.setCheckInTime(now);
         cs.setDiscipline(selected);
         cs.setValidated(true);
+        if (lat != null) cs.setCheckInLat(lat);
+        if (lng != null) cs.setCheckInLng(lng);
+        if (lat != null || lng != null) {
+            System.out.println("[DEBUG] Saving Check-In location lat="+lat+" lng="+lng+" sessionTempId? (before save)");
+        }
         sessionRepo.save(cs);
+        if (cs.getCheckInLat() != null || cs.getCheckInLng() != null) {
+            System.out.println("[DEBUG] Persisted Check-In session id="+cs.getId()+" lat="+cs.getCheckInLat()+" lng="+cs.getCheckInLng());
+        }
         return sessionToMap(cs);
     }
 
     @Transactional
-    public Map<String,Object> performCheckOut(Long alunoId) {
+    public Map<String,Object> performCheckOut(Long alunoId, Double lat, Double lng) {
         User aluno = userRepo.findById(alunoId).orElseThrow();
     CheckSession open = sessionRepo.findFirstByAlunoAndCheckOutTimeIsNullOrderByCheckInTimeDesc(aluno).orElseThrow(() -> new IllegalStateException("Nenhum check-in ativo"));
     open.setCheckOutTime(fixedNow());
+        if (lat != null) open.setCheckOutLat(lat);
+        if (lng != null) open.setCheckOutLng(lng);
         sessionRepo.save(open);
+        if (lat != null || lng != null) {
+            System.out.println("[DEBUG] Persisted Check-Out session id="+open.getId()+" lat="+open.getCheckOutLat()+" lng="+open.getCheckOutLng());
+        }
         return sessionToMap(open);
     }
 
@@ -183,7 +196,11 @@ public class CheckInService {
     }
     m.put("checkInTime", cs.getCheckInTime().atZone(ACRE_ZONE).toOffsetDateTime().toString());
     m.put("checkOutTime", cs.getCheckOutTime() == null ? null : cs.getCheckOutTime().atZone(ACRE_ZONE).toOffsetDateTime().toString());
-        m.put("validated", cs.isValidated());
+    m.put("validated", cs.isValidated());
+    m.put("checkInLat", cs.getCheckInLat());
+    m.put("checkInLng", cs.getCheckInLng());
+    m.put("checkOutLat", cs.getCheckOutLat());
+    m.put("checkOutLng", cs.getCheckOutLng());
         if (cs.getCheckOutTime() != null) {
             Duration d = cs.getWorkedDuration();
             long secs = d.getSeconds();

@@ -7,6 +7,7 @@ import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { todayAcreISODate } from '../../util/date-utils';
 
 @Component({
   selector: 'app-home',
@@ -34,7 +35,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   // Baseline para somar tempo decorrido da sessão atual sem perder sessões anteriores
   private baselineWorkedSeconds = 0; // segundos acumulados (sessões anteriores + instante inicial da sessão aberta)
   private baselineCaptureTs = 0; // timestamp (ms) de quando baseline foi capturado
-  private todayDate = new Date().toISOString().substring(0,10);
+  private todayDate = todayAcreISODate();
   private cacheKey = 'mc_worked_cache_home'; // será sobrescrito com CPF depois do user carregar
 
   loading = true;
@@ -68,6 +69,18 @@ export class HomeComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Restaura baseline persistido (secs + ts) para evitar reset visual
     this.loadWorkedCache();
+    // Recalcula todayDate caso usuário permaneça aberto após meia-noite Acre
+    const midnightWatcher = () => {
+      const current = todayAcreISODate();
+      if (current !== this.todayDate) {
+        this.todayDate = current;
+        // Reset de baseline diário opcional: manter horas só do dia presente
+        this.baselineWorkedSeconds = 0; this.baselineCaptureTs = Date.now();
+        this.persistWorkedCache(0, this.baselineCaptureTs);
+      }
+      setTimeout(midnightWatcher, 60_000); // verifica a cada minuto
+    };
+    midnightWatcher();
   const cached = (this.auth as any).getUser?.();
   if (cached && cached.name) {
       this.user = {

@@ -1,5 +1,6 @@
 import { Component, effect, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { LocationModalComponent } from '../location-modal/location-modal.component';
 import { FormsModule } from '@angular/forms';
 import { CalendarServiceApi, CalendarDay, InternshipPlanDto } from '../../services/calendar.service';
 import { ToastService } from '../../services/toast.service';
@@ -10,7 +11,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 @Component({
   selector: 'app-calendar',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LocationModalComponent],
   templateUrl: './calendar.component.html',
   styleUrls: ['./calendar.component.scss']
 })
@@ -29,6 +30,10 @@ export class UserCalendarComponent {
   // day history
   selectedDate = signal<string>('');
   sessionsForDay = signal<any[]|null>(null);
+  // Estado modal de localização (reutilizando o mesmo componente já usado em outros fluxos)
+  showLocModal = signal(false);
+  locLat = signal<number|undefined>(undefined);
+  locLng = signal<number|undefined>(undefined);
   plansForDay = computed(() => {
     const date = this.selectedDate();
     const plans = this.data()?.plans || [];
@@ -487,6 +492,27 @@ export class UserCalendarComponent {
       this.sessionsForDay.set(list);
     });
   }
+
+  // Abre modal de localização reaproveitando componente global já utilizado em outros fluxos.
+  openLocationModal(lat: number, lng: number) {
+    if (lat == null || lng == null) return;
+    this.locLat.set(lat);
+    this.locLng.set(lng);
+    this.showLocModal.set(true);
+    // Dispara evento global também para compatibilidade (caso haja outro handler genérico)
+    try { window.dispatchEvent(new CustomEvent('mc:open-location', { detail: { lat, lng } })); } catch {}
+    // Listener ESC para fechar
+    try {
+      const escHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') { this.closeLocationModal(); window.removeEventListener('keydown', escHandler); }
+      };
+      window.addEventListener('keydown', escHandler);
+    } catch {}
+  }
+
+  closeLocationModal = () => {
+    this.showLocModal.set(false);
+  };
 
   ngOnDestroy() {
     try { window.removeEventListener('mc:aluno-changed', this.alunoChangedHandler as any); } catch {}

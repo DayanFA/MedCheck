@@ -13,12 +13,19 @@ export class CheckInService {
   }
 
   currentCode(): Observable<any> { return this.http.get(`${this.base}/code`, { headers: this.authHeaders() }); }
-  checkIn(preceptorId: number, code: string, disciplineId?: number): Observable<any> {
+  checkIn(preceptorId: number, code: string, disciplineId?: number, lat?: number|null, lng?: number|null): Observable<any> {
     const body: any = { preceptorId, code };
     if (disciplineId) body.disciplineId = disciplineId;
+    if (lat != null) body.lat = lat;
+    if (lng != null) body.lng = lng;
     return this.http.post(`${this.base}/in`, body, { headers: this.authHeaders() });
   }
-  checkOut(): Observable<any> { return this.http.post(`${this.base}/out`, {}, { headers: this.authHeaders() }); }
+  checkOut(lat?: number|null, lng?: number|null): Observable<any> {
+    const body: any = {};
+    if (lat != null) body.lat = lat;
+    if (lng != null) body.lng = lng;
+    return this.http.post(`${this.base}/out`, body, { headers: this.authHeaders() });
+  }
   sessions(start: string, end: string, disciplineId?: number): Observable<any> {
     let params = new HttpParams().set('start', start).set('end', end);
     if (disciplineId) params = params.set('disciplineId', String(disciplineId));

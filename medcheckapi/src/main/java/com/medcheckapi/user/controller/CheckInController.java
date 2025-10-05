@@ -93,16 +93,20 @@ public class CheckInController {
     // ALUNO: perform check-in using code and preceptor id
     @PostMapping("/in")
     public ResponseEntity<?> checkIn(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
-                                     @RequestBody Map<String,String> body) {
+                                     @RequestBody Map<String,Object> body) {
         User me = currentUser(principal);
-        Long preceptorId = Long.valueOf(body.getOrDefault("preceptorId", "0"));
-        String code = body.getOrDefault("code", "");
+        Long preceptorId = Long.valueOf(String.valueOf(body.getOrDefault("preceptorId", "0")));
+        String code = String.valueOf(body.getOrDefault("code", ""));
         Long disciplineId = null;
         if (body.containsKey("disciplineId")) {
-            try { disciplineId = Long.valueOf(body.get("disciplineId")); } catch (Exception ignored) { disciplineId = null; }
+            try { disciplineId = Long.valueOf(String.valueOf(body.get("disciplineId"))); } catch (Exception ignored) { disciplineId = null; }
         }
+        Double lat = null, lng = null;
+        try { if (body.get("lat") != null) lat = Double.valueOf(String.valueOf(body.get("lat"))); } catch (Exception ignored) {}
+        try { if (body.get("lng") != null) lng = Double.valueOf(String.valueOf(body.get("lng"))); } catch (Exception ignored) {}
         try {
-            return ResponseEntity.ok(checkInService.performCheckIn(me.getId(), preceptorId, code, disciplineId));
+            System.out.println("[DEBUG] CheckInController /in aluno="+me.getId()+" preceptor="+preceptorId+" lat="+lat+" lng="+lng);
+            return ResponseEntity.ok(checkInService.performCheckIn(me.getId(), preceptorId, code, disciplineId, lat, lng));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -110,10 +114,17 @@ public class CheckInController {
 
     // ALUNO: perform checkout of open session
     @PostMapping("/out")
-    public ResponseEntity<?> checkOut(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
+    public ResponseEntity<?> checkOut(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                      @RequestBody(required = false) Map<String,Object> body) {
         User me = currentUser(principal);
+        Double lat = null, lng = null;
+        if (body != null) {
+            try { if (body.get("lat") != null) lat = Double.valueOf(String.valueOf(body.get("lat"))); } catch (Exception ignored) {}
+            try { if (body.get("lng") != null) lng = Double.valueOf(String.valueOf(body.get("lng"))); } catch (Exception ignored) {}
+        }
         try {
-            return ResponseEntity.ok(checkInService.performCheckOut(me.getId()));
+            System.out.println("[DEBUG] CheckInController /out aluno="+me.getId()+" lat="+lat+" lng="+lng);
+            return ResponseEntity.ok(checkInService.performCheckOut(me.getId(), lat, lng));
         } catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("error", e.getMessage())); }
     }
 

@@ -74,6 +74,11 @@ CREATE TABLE check_sessions (
   discipline_id BIGINT NULL,
   check_in_time TIMESTAMP NOT NULL,
   check_out_time TIMESTAMP NULL,
+  -- Localização (opcional) capturada no momento do check-in / check-out
+  check_in_lat DECIMAL(10,7) NULL,
+  check_in_lng DECIMAL(10,7) NULL,
+  check_out_lat DECIMAL(10,7) NULL,
+  check_out_lng DECIMAL(10,7) NULL,
   validated BOOLEAN NOT NULL DEFAULT TRUE,
   CONSTRAINT fk_cs_aluno FOREIGN KEY (aluno_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_cs_preceptor FOREIGN KEY (preceptor_id) REFERENCES users(id) ON DELETE CASCADE,

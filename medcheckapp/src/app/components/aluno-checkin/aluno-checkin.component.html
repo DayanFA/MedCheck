@@ -89,18 +89,41 @@
             <thead>
               <tr>
                 <th>Entrada</th>
+                <th class="text-center">Loc (In)</th>
                 <th>Saída</th>
+                <th class="text-center">Loc (Out)</th>
                 <th>Duração</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let h of pagedHistory">
                 <td>{{h.checkInTime | date:'dd/MM HH:mm'}}</td>
-                <td>{{h.checkOutTime ? (h.checkOutTime | date:'dd/MM HH:mm') : '-'}}</td>
-                <td>{{h.worked || '-'}}</td>
+                <td class="text-center" style="width:120px;">
+                  <ng-container *ngIf="h.checkInLat!=null && h.checkInLng!=null; else noInLoc">
+                    <small class="d-block text-muted">{{h.checkInLat | number:'1.4-4'}}, {{h.checkInLng | number:'1.4-4'}}</small>
+                    <button class="btn btn-link p-0" title="Ver local de entrada" (click)="openLocation(h.checkInLat,h.checkInLng)">
+                      <i class="bi bi-geo-alt-fill text-primary"></i>
+                    </button>
+                  </ng-container>
+                  <ng-template #noInLoc><span class="badge bg-secondary">sem loc</span></ng-template>
+                </td>
+                <td>{{h.checkOutTime ? (h.checkOutTime | date:'dd/MM HH:mm') : '-'}} </td>
+                <td class="text-center" style="width:120px;">
+                  <ng-container *ngIf="h.checkOutLat!=null && h.checkOutLng!=null; else noOutLoc">
+                    <small class="d-block text-muted">{{h.checkOutLat | number:'1.4-4'}}, {{h.checkOutLng | number:'1.4-4'}}</small>
+                    <button class="btn btn-link p-0" title="Ver local de saída" (click)="openLocation(h.checkOutLat,h.checkOutLng)">
+                      <i class="bi bi-geo-alt text-success"></i>
+                    </button>
+                  </ng-container>
+                  <ng-template #noOutLoc><span class="badge bg-secondary">sem loc</span></ng-template>
+                </td>
+                <td>{{h.worked || '-'}} </td>
               </tr>
             </tbody>
           </table>
+          <ng-container *ngIf="showLocModal">
+            <app-location-modal [lat]="locLat!" [lng]="locLng!" [onClose]="closeLocation"></app-location-modal>
+          </ng-container>
           <nav *ngIf="!loadingHistory && totalPages > 1" class="mt-2">
             <ul class="pagination pagination-sm mb-0 flex-wrap">
               <li class="page-item" [class.disabled]="currentPage === 1">

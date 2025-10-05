@@ -54,12 +54,21 @@ export class EvaluationComponent {
       { id: 'q2', text: 'Atua de forma integrada e solidária junto à equipe buscando melhorar o processo de trabalho?' },
       { id: 'q3', text: 'Compreende a necessidade de fortalecimento e legitimação da equipe junto à comunidade?' },
       { id: 'q4', text: 'Compreende as limitações do local onde atua e procura adequar suas condutas aos recursos disponíveis sem prejuízo ao tratamento?' },
-      { id: 'q5', text: 'É proativo na coordenação do cuidado (acompanhamento, resgate de faltosos por telefone, mensagem ou visita domiciliar)?' }
+      { id: 'q5', text: 'É proativo na coordenação do cuidado (acompanhamento, resgate de faltosos por telefone, mensagem ou visita domiciliar)?' },
+      { id: 'q6', text: 'Frequenta todas as atividades programadas com assiduidade?' },
+      { id: 'q7', text: 'Chega e sai nos horários adequados, cumprindo sua carga horária?' },
+      { id: 'q8', text: 'Mostra pró-atividade na resolução dos problemas do serviço?' },
+      { id: 'q9', text: 'Desenvolve as tarefas determinadas pela preceptoria diariamente, demonstrando comprometimento com a rotina da equipe?' },
+      { id: 'q10', text: 'Traz aspectos novos e contribuições criativas para as soluções de problemas da equipe ou dos pacientes?' }
     ] },
     { id: 'dim4', title: 'Dimensão 4: Conhecimento sobre o sistema de saúde e políticas públicas', questions: [
       { id: 'q1', text: 'Conhece o sistema de saúde loco-regional, reconhece os diversos pontos de atenção e direciona os pacientes adequadamente (integralidade)?' },
       { id: 'q2', text: 'Compreende processos de gestão e gerenciamento como fundamentais para garantir melhor cuidado às pessoas e trabalhadores (organização, condições de trabalho, remuneração)?' },
-      { id: 'q3', text: 'É capaz de elaborar e ter visão crítica e propositiva sobre as políticas de saúde?' }
+      { id: 'q3', text: 'É capaz de elaborar e ter visão crítica e propositiva sobre as políticas de saúde?' },
+      { id: 'q4', text: 'Busca continuamente conhecimentos teóricos para aprimorar o cuidado?' },
+      { id: 'q5', text: 'Estuda diariamente as patologias dos casos sob sua responsabilidade?' },
+      { id: 'q6', text: 'Estuda os artigos e materiais indicados pela preceptoria?' },
+      { id: 'q7', text: 'Estuda e realiza com afinco os procedimentos médicos necessários ao tratamento de seus pacientes?' }
     ] }
   ];
 

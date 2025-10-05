@@ -76,20 +76,29 @@ export class ReportComponent implements OnChanges {
     },
     dim2: {
       q1: 'Dispõe-se, havendo indicação, a realizar visita domiciliar de reconhecimento, seguimento ou busca ativa?',
-      q2: 'É permeável ao contato e vínculo com outros equipamentos e representações sociais no território?',
-      q3: 'Propõe e realiza atividades nos ambientes comunitários (escolas, associações, espaços coletivos)?'
+      q2: 'É permeável ao contato e vínculo com outros equipamentos e representações sociais no território (escolas, igrejas, associações comunitárias etc.)?',
+      q3: 'Propõe e realiza atividades nos ambientes comunitários citados (escolas, associações, espaços coletivos)?'
     },
     dim3: {
       q1: 'Tem bom vínculo com a equipe de saúde?',
       q2: 'Atua de forma integrada e solidária junto à equipe buscando melhorar o processo de trabalho?',
       q3: 'Compreende a necessidade de fortalecimento e legitimação da equipe junto à comunidade?',
-      q4: 'Compreende as limitações do local onde atua e adequa condutas aos recursos disponíveis sem prejuízo ao tratamento?',
-      q5: 'É proativo na coordenação do cuidado (acompanhamento, resgate de faltosos etc.)?'
+      q4: 'Compreende as limitações do local onde atua e procura adequar suas condutas aos recursos disponíveis sem prejuízo ao tratamento?',
+      q5: 'É proativo na coordenação do cuidado (acompanhamento, resgate de faltosos por telefone, mensagem ou visita domiciliar)?',
+      q6: 'Frequenta todas as atividades programadas com assiduidade?',
+      q7: 'Chega e sai nos horários adequados, cumprindo sua carga horária?',
+      q8: 'Mostra pró-atividade na resolução dos problemas do serviço?',
+      q9: 'Desenvolve as tarefas determinadas pela preceptoria diariamente, demonstrando comprometimento com a rotina da equipe?',
+      q10: 'Traz aspectos novos e contribuições criativas para as soluções de problemas da equipe ou dos pacientes?'
     },
     dim4: {
-      q1: 'Conhece o sistema de saúde loco-regional e direciona os pacientes adequadamente (integralidade)?',
-      q2: 'Compreende processos de gestão e gerenciamento como fundamentais para garantir melhor cuidado?',
-      q3: 'É capaz de elaborar e ter visão crítica e propositiva sobre as políticas de saúde?'
+      q1: 'Conhece o sistema de saúde loco-regional, reconhece os diversos pontos de atenção e direciona os pacientes adequadamente (integralidade)?',
+      q2: 'Compreende processos de gestão e gerenciamento como fundamentais para garantir melhor cuidado às pessoas e trabalhadores (organização, condições de trabalho, remuneração)?',
+      q3: 'É capaz de elaborar e ter visão crítica e propositiva sobre as políticas de saúde?',
+      q4: 'Busca continuamente conhecimentos teóricos para aprimorar o cuidado?',
+      q5: 'Estuda diariamente as patologias dos casos sob sua responsabilidade?',
+      q6: 'Estuda os artigos e materiais indicados pela preceptoria?',
+      q7: 'Estuda e realiza com afinco os procedimentos médicos necessários ao tratamento de seus pacientes?'
     }
   };
 
@@ -821,7 +830,30 @@ export class ReportComponent implements OnChanges {
     }
     root.style.width = originalWidth;
     root.classList.add('d-none');
-    pdf.save(`relatorio-internato-${this.student.name.replace(/\s+/g,'_')}.pdf`);
+  // Nome do arquivo conforme solicitado: Relatorio_[nome do internato]_[Nome do aluno].pdf
+  // O "nome do internato" será derivado do label da disciplina (antes do primeiro hífen, ou código + nome limpos)
+    // Agora apenas o código da disciplina (ex: CCSD459) no nome do PDF
+    const label = (this.disciplineLabel || '').trim();
+    // Tenta extrair padrão de código (sequência alfanumérica até primeiro espaço ou hífen)
+    // Geralmente formato "CCSD459 - Internato ..." então split por espaço/hífen e pega primeiro token com letras+digitos >=3
+    let code = '';
+    // Tenta capturar formato mais específico (ex: CCSD459). Se não achar, tenta padrão genérico depois.
+    const strictMatch = label.match(/\b([A-Za-z]{3,}\d{2,})\b/);
+    if (strictMatch) {
+      code = strictMatch[1];
+    } else {
+      const fallbackMatch = label.match(/\b([A-Za-z]{2,}\d{2,})\b/);
+      if (fallbackMatch) code = fallbackMatch[1];
+    }
+    if (!code) code = 'INTERNATO';
+    const slug = (v: string) => v
+      .normalize('NFD')
+      .replace(/\p{Diacritic}+/gu,'')
+      .replace(/[^A-Za-z0-9_-]/g,'')
+      .trim();
+    const normCode = slug(code);
+    const normAluno = slug(this.student.name.replace(/\s+/g,'_'));
+    pdf.save(`Relatorio_${normCode}_${normAluno}.pdf`);
   }
   onSubmit() { console.log('Enviar relatório semana', this.selectedWeek.number, this.selectedWeek); }
   isPreceptorViewingStudent(): boolean {

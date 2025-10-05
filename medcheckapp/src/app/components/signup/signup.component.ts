@@ -30,6 +30,8 @@ export class SignupComponent implements OnInit {
     confirmPassword: ''
   };
 
+  currentYear = new Date().getFullYear();
+
   estados = [
     'Acre','Alagoas','Amapá','Amazonas','Bahia','Ceará','Distrito Federal','Espírito Santo','Goiás','Maranhão','Mato Grosso','Mato Grosso do Sul','Minas Gerais','Pará','Paraíba','Paraná','Pernambuco','Piauí','Rio de Janeiro','Rio Grande do Norte','Rio Grande do Sul','Rondônia','Roraima','Santa Catarina','São Paulo','Sergipe','Tocantins','Outro'
   ];
@@ -38,7 +40,16 @@ export class SignupComponent implements OnInit {
   showConfirm = false;
   errors: string[] = [];
   passwordStrength = 0; // 0 a 100
+  passwordCriteria = {
+    length6: false,
+    length10: false,
+    lower: false,
+    upper: false,
+    digit: false,
+    symbol: false
+  };
   cpfInvalid = false;
+  cpfIncomplete = false; // verdadeiro enquanto dígitos < 11 (digitando)
   birthDateInvalid = false;
   loading = false;
   private draftKey = 'signup_draft_v1';
@@ -129,7 +140,7 @@ export class SignupComponent implements OnInit {
       next: response => {
         this.loading = false;
     console.debug('[SIGNUP_RESPONSE_OK]', response);
-    this.successModal = true; // exibe modal; navega após confirmação
+  this.successModal = true; // exibe modal
       },
       error: err => {
         this.loading = false;
@@ -147,18 +158,36 @@ export class SignupComponent implements OnInit {
   toggleShowConfirm() { this.showConfirm = !this.showConfirm; }
 
   onPasswordInput() {
-    this.passwordStrength = this.computeStrength(this.userData.password);
+    const pwd = this.userData.password;
+    this.passwordCriteria.length6 = !!pwd && pwd.length >= 6;
+    this.passwordCriteria.length10 = !!pwd && pwd.length >= 10;
+    this.passwordCriteria.lower = /[a-z]/.test(pwd || '');
+    this.passwordCriteria.upper = /[A-Z]/.test(pwd || '');
+    this.passwordCriteria.digit = /\d/.test(pwd || '');
+    this.passwordCriteria.symbol = /[^\w\s]/.test(pwd || '');
+    this.passwordStrength = this.computeStrength(pwd);
   this.persistDraft();
   }
 
   onCpfInput() {
     const digits = this.userData.cpf.replace(/\D/g,'');
-    if (digits.length === 11) {
-      this.cpfInvalid = !this.isCpfValid(this.userData.cpf);
-    } else {
-      this.cpfInvalid = false; // ainda digitando
+    if (digits.length === 0) {
+      this.cpfIncomplete = false;
+      this.cpfInvalid = false;
+      this.persistDraft();
+      return;
     }
-  this.persistDraft();
+    if (digits.length < 11) {
+      // Mostra estado "incompleto" mas não marca como inválido definitivo
+      this.cpfIncomplete = true;
+      this.cpfInvalid = false;
+      this.persistDraft();
+      return;
+    }
+    // >= 11: valida; máscara normalmente limita a 11
+    this.cpfIncomplete = false;
+    this.cpfInvalid = !this.isCpfValid(this.userData.cpf);
+    this.persistDraft();
   }
 
   private computeStrength(pwd: string): number {

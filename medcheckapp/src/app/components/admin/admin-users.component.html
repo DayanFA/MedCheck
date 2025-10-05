@@ -107,7 +107,7 @@
           </div>
           <div class="col-md-4">
             <label class="form-label small mb-1">Telefone</label>
-            <input class="form-control form-control-sm" [(ngModel)]="editingUser.phone" name="phone" appMask="phone" (input)="onPhoneInput()" placeholder="(00)00000-0000" [ngClass]="{'is-invalid': phoneInvalid}">
+            <input class="form-control form-control-sm" [(ngModel)]="editingUser.phone" name="phone" appMask="phone" (input)="onPhoneInput()" placeholder="(00) 00000-0000" [ngClass]="{'is-invalid': phoneInvalid}">
             <div *ngIf="phoneInvalid" class="invalid-feedback d-block small">Telefone inválido.</div>
           </div>
           <div class="col-md-4">

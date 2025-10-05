@@ -29,16 +29,16 @@ export class InputMaskDirective {
         .replace(/(\d{3})(\d)/, '$1.$2')
         .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
     } else if (this.maskType === 'phone') {
-      // Supports 10 or 11 digits
+      // Supports 10 or 11 digits - ensures space after DDD
       if (rawDigits.length <= 10) {
         formatted = rawDigits
           .slice(0, 10)
-          .replace(/(\d{2})(\d)/, '($1)$2')
+          .replace(/(\d{2})(\d)/, '($1) $2')
           .replace(/(\d{4})(\d)/, '$1-$2');
       } else {
         formatted = rawDigits
           .slice(0, 11)
-          .replace(/(\d{2})(\d)/, '($1)$2')
+          .replace(/(\d{2})(\d)/, '($1) $2')
           .replace(/(\d{5})(\d)/, '$1-$2');
       }
     } else if (this.maskType === 'matricula') {

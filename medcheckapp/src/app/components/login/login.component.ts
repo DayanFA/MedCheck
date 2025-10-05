@@ -22,6 +22,7 @@ export class LoginComponent {
   rememberMe = false;
   showPassword = false;
   loading = false;
+  currentYear = new Date().getFullYear();
 
   constructor(private authService: AuthService, private router: Router, private toast: ToastService) { }
 

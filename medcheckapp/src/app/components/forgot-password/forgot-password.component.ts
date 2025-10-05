@@ -16,6 +16,7 @@ export class ForgotPasswordComponent {
   email = '';
   submitted = false;
   loading = false;
+  currentYear = new Date().getFullYear();
 
   constructor(private auth: AuthService, private toast: ToastService, private router: Router) {}
 

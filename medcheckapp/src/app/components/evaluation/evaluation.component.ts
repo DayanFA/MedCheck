@@ -197,7 +197,7 @@ export class EvaluationComponent {
       this.saving.set(false);
       this.clearDraft();
       // voltar ao relatório
-  this.router.navigate(['/relatorio'], { queryParams: { alunoId: this.alunoId, disciplineId: this.disciplineId }, state: { refreshEval: true, ts: Date.now() } });
+  this.router.navigate(['/report'], { queryParams: { alunoId: this.alunoId, disciplineId: this.disciplineId }, state: { refreshEval: true, ts: Date.now() } });
     }, _ => this.saving.set(false));
   }
 

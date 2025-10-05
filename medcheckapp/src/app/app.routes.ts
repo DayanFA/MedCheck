@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 import { AdminPreceptorCodesComponent } from './components/admin/admin-preceptor-codes.component';
 import { LoginComponent } from './components/login/login.component';
 import { SignupComponent } from './components/signup/signup.component';
-import { HomeComponent } from './components/intern-home/intern-home.component';
+import { HomeComponent } from './components/home-dispatch/home-dispatch.component';
 import { ForgotPasswordComponent } from './components/forgot-password/forgot-password.component';
 import { ResetPasswordComponent } from './components/reset-password/reset-password.component';
 import { authGuard } from './services/auth.guard';
@@ -34,20 +34,37 @@ export const routes: Routes = [
         canActivate: [authGuard],
         children: [
             { path: 'home', component: HomeComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN','COORDENADOR'] } },
+            { path: 'preceptor/home', redirectTo: 'home', pathMatch: 'full' },
+            { path: 'coordenador/home', redirectTo: 'home', pathMatch: 'full' },
             { path: 'checkin', component: AlunoCheckinComponent, canActivate: [roleGuard], data: { roles: ['ALUNO'] } },
-            { path: 'preceptor/codigo', component: PreceptorCodeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR'] } },
+            { path: 'credentials', component: PreceptorCodeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR'] } },
+            { path: 'preceptor/codigo', redirectTo: 'credentials', pathMatch: 'full' },
             // Admin visualização de códigos de preceptores (read-only)
-            { path: 'admin/codigos', component: AdminPreceptorCodesComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
-            { path: 'preceptor/home', component: PreceptorHomeComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
+            { path: 'preceptors_credentials', component: AdminPreceptorCodesComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
+            { path: 'admin/codigos', redirectTo: 'preceptors_credentials', pathMatch: 'full' },
             { path: 'preceptor/avaliar/:alunoId', component: PreceptorEvaluateComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
-            { path: 'calendario', component: UserCalendarComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN','COORDENADOR'] } },
-            { path: 'relatorio', component: ReportComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN','COORDENADOR'] } },
-            { path: 'avaliacao', component: EvaluationComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
-            { path: 'configuracoes', component: SettingsComponent },
-            { path: 'admin/usuarios', component: AdminUsersComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
-            { path: 'admin/disciplinas', component: AdminDisciplinesComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
-            { path: 'coordenacao/disciplinas', component: CoordinatorComponent, canActivate: [roleGuard], data: { roles: ['COORDENADOR','ADMIN'] } },
-            { path: 'coordenador/home', component: CoordinatorHomeComponent, canActivate: [roleGuard], data: { roles: ['COORDENADOR','ADMIN'] } }
+            // Renamed from 'calendario' to 'calendar' (October 2025); keep legacy redirect below
+            { path: 'calendar', component: UserCalendarComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN','COORDENADOR'] } },
+            { path: 'calendario', pathMatch: 'full', redirectTo: 'calendar' },
+            // Renamed from 'relatorio' to 'report' (October 2025); keep legacy redirect below
+            { path: 'report', component: ReportComponent, canActivate: [roleGuard], data: { roles: ['ALUNO','PRECEPTOR','ADMIN','COORDENADOR'] } },
+            { path: 'relatorio', pathMatch: 'full', redirectTo: 'report' },
+            // Renamed from 'avaliacao' to 'evaluation' (October 2025); keep legacy redirect below
+            { path: 'evaluation', component: EvaluationComponent, canActivate: [roleGuard], data: { roles: ['PRECEPTOR','ADMIN'] } },
+            { path: 'avaliacao', pathMatch: 'full', redirectTo: 'evaluation' },
+            // Renamed from 'configuracoes' to 'settings' (October 2025); keep legacy redirect below
+            { path: 'settings', component: SettingsComponent },
+            { path: 'configuracoes', pathMatch: 'full', redirectTo: 'settings' },
+            // Renamed from 'admin/usuarios' to 'users' (October 2025); keep legacy redirect below for backward compatibility
+            { path: 'users', component: AdminUsersComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
+            { path: 'admin/usuarios', pathMatch: 'full', redirectTo: 'users' },
+            // Renamed from 'admin/disciplinas' to 'courses' (October 2025); keep legacy redirect below for backward compatibility
+            { path: 'courses', component: AdminDisciplinesComponent, canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
+            { path: 'admin/disciplinas', pathMatch: 'full', redirectTo: 'courses' },
+            // Renamed from 'coordenacao/disciplinas' to 'coordination' (October 2025); keep legacy redirect below for backward compatibility
+            { path: 'coordination', component: CoordinatorComponent, canActivate: [roleGuard], data: { roles: ['COORDENADOR','ADMIN'] } },
+            { path: 'coordenacao/disciplinas', pathMatch: 'full', redirectTo: 'coordination' },
+            // coordinator/home now handled by unified /home dispatcher
         ]
     },
     { path: '**', redirectTo: 'login' }

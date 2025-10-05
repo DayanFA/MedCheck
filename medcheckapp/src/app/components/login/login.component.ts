@@ -61,7 +61,7 @@ export class LoginComponent {
         // pequena pausa para garantir storage
         setTimeout(()=> {
           const role = (response.role || userPayload.role || '').toUpperCase();
-          const target = role === 'PRECEPTOR' || role === 'ADMIN' ? '/preceptor/home' : '/home';
+          const target = '/home'; // unified home dispatcher handles role-specific view
           this.router.navigate([target]).then(ok => {
             if (!ok) console.warn('[LOGIN] Navegação para', target, 'falhou');
           });

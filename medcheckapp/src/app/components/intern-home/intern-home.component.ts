@@ -10,13 +10,13 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { todayAcreISODate } from '../../util/date-utils';
 
 @Component({
-  selector: 'app-home',
+  selector: 'app-aluno-home',
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './intern-home.component.html',
   styleUrl: './intern-home.component.scss'
 })
-export class HomeComponent implements OnInit, OnDestroy {
+export class AlunoHomeComponent implements OnInit, OnDestroy {
   user!: CurrentUser;
   role: string | null = null;
   currentTime = '';
@@ -448,5 +448,4 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 }
 
-// Backwards compatibility alias (remove later if unused)
-export const InternHomeComponent = HomeComponent;
+// NOTE: Removed legacy alias to old HomeComponent name after dispatcher refactor.

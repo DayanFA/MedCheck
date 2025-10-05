@@ -139,10 +139,10 @@ export class ReportComponent implements OnChanges {
     setTimeout(() => {
       const u = this.auth.getUser();
       if (u && (u.role === 'PRECEPTOR' || u.role === 'ADMIN' || u.role === 'COORDENADOR') && !this.alunoId) {
-        const dest = u.role === 'COORDENADOR' ? '/coordenador/home' : '/preceptor/home';
+  const dest = '/home'; // unified home
         const feature = 'relatório';
         this.toast.show('warning', `Por favor selecione um aluno para visualizar o ${feature}.`);
-        this.router.navigate([dest], { queryParams: { redirect: 'relatorio' } });
+  this.router.navigate([dest]);
       }
     }, 60);
     this.initWeeks();
@@ -879,7 +879,7 @@ export class ReportComponent implements OnChanges {
     // Navega para avaliação global (sem parâmetro de semana)
     const queryParams: any = { alunoId: this.alunoId || '' };
     if (this.disciplineId) queryParams.disciplineId = this.disciplineId;
-    this.router.navigate(['/avaliacao'], { queryParams });
+  this.router.navigate(['/evaluation'], { queryParams });
   }
 
   ngOnDestroy() {

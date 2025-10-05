@@ -107,7 +107,7 @@
 
   <!-- Ações -->
   <div class="d-flex justify-content-end gap-2 pt-2 border-top">
-    <button class="btn btn-outline-secondary btn-sm" [routerLink]="['/relatorio']" [queryParams]="{ alunoId: alunoId, disciplineId: disciplineId }" type="button">Cancelar</button>
+  <button class="btn btn-outline-secondary btn-sm" [routerLink]="['/report']" [queryParams]="{ alunoId: alunoId, disciplineId: disciplineId }" type="button">Cancelar</button>
     <div class="d-flex gap-2">
       <button *ngIf="activeDimIndex()>0" class="btn btn-outline-primary btn-sm" type="button" (click)="setActiveDim(activeDimIndex()-1)">Anterior</button>
       <button *ngIf="!isLastDim()" class="btn btn-primary btn-sm" [disabled]="!canGoNext()" (click)="nextDim()">Próximo</button>

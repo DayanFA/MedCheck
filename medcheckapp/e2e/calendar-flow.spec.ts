@@ -14,7 +14,7 @@ async function login(page: Page, cpf: string, password: string) {
 test.describe('Calendário - Plano e Justificativa', () => {
   test.beforeEach(async ({ page }) => {
     await login(page, ALUNO.cpf, ALUNO.password);
-    await page.goto('/calendario');
+  await page.goto('/calendar');
     await expect(page.locator('text=Calendário').first()).toBeVisible();
   });
 

@@ -122,9 +122,9 @@ export class UserCalendarComponent {
       const role = user?.role;
       this.isCoordinator = role === 'COORDENADOR';
       if ((role === 'PRECEPTOR' || role === 'ADMIN' || role === 'COORDENADOR') && !this.alunoId()) {
-        const dest = role === 'COORDENADOR' ? '/coordenador/home' : '/preceptor/home';
+  const dest = '/home';
         this.toast.show('warning', `Por favor selecione um aluno para visualizar o calendário.`);
-        this.router.navigate([dest], { queryParams: { redirect: 'calendario' } });
+  this.router.navigate([dest]);
         return;
       }
     }, 50);

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnDestroy, OnInit, Inject, PLATFORM_ID, HostListener } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { SidebarComponent } from '../components/sidebar/sidebar.component';
@@ -17,6 +17,8 @@ import { PreceptorAlunoContextService } from '../services/preceptor-aluno-contex
 })
 export class ShellComponent implements OnInit, OnDestroy {
   collapsed = false;
+  private userPreference: 'collapsed' | 'expanded' = 'expanded'; // stores last manual state for large screens
+  private AUTO_BREAKPOINT = 960; // px
   userName = '';
   avatarUrl = '';
   private avatarObjectUrl: string | null = null;
@@ -42,11 +44,13 @@ export class ShellComponent implements OnInit, OnDestroy {
   constructor(private userService: UserService, private auth: AuthService, private http: HttpClient, private alunoCtx: PreceptorAlunoContextService, @Inject(PLATFORM_ID) private platformId: Object) {}
 
   ngOnInit(): void {
-    // Restaura estado do sidebar (persistência após F5)
     try {
       const saved = localStorage.getItem('sidebarCollapsed');
-      if (saved === '1') this.collapsed = true;
-    } catch { /* ignore storage errors */ }
+      if (saved === '1') { this.userPreference = 'collapsed'; }
+      else if (saved === '0') { this.userPreference = 'expanded'; }
+    } catch {}
+    // Apply initial based on viewport
+    this.applyResponsiveForced();
     // Tenta pegar usuário real do AuthService (cache de login)
     const cached: any = (this.auth as any).getUser?.();
     if (cached && cached.name) {
@@ -65,19 +69,34 @@ export class ShellComponent implements OnInit, OnDestroy {
       window.addEventListener('mc:aluno-changed', this.alunoChangedListener as any);
       this.loadDisciplines();
       this.updateAlunoBadge();
+      window.addEventListener('resize', this.onResizeForced, { passive: true });
     }
   }
   toggleSidebar() {
+    // Only toggle when in large screen context. If small, we still allow user to open, but userPreference updates so when they return to large it reflects.
     this.collapsed = !this.collapsed;
+    this.userPreference = this.collapsed ? 'collapsed' : 'expanded';
     try { localStorage.setItem('sidebarCollapsed', this.collapsed ? '1' : '0'); } catch {}
   }
-
+  private onResizeForced = () => { this.applyResponsiveForced(); };
+  private applyResponsiveForced() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    const w = window.innerWidth;
+    if (w < this.AUTO_BREAKPOINT) {
+      // Force collapsed state on small screens regardless of preference
+      this.collapsed = true;
+    } else {
+      // Restore last manual preference
+      this.collapsed = (this.userPreference === 'collapsed');
+    }
+  }
   ngOnDestroy(): void {
     this.clearAvatarUrl();
     if (isPlatformBrowser(this.platformId)) {
       window.removeEventListener('storage', this.storageListener);
       window.removeEventListener('mc:discipline-changed', this.disciplineChangedListener as any);
       window.removeEventListener('mc:aluno-changed', this.alunoChangedListener as any);
+      window.removeEventListener('resize', this.onResizeForced);
     }
   }
 

@@ -80,7 +80,7 @@
               <th style="min-width:100px">Data</th>
               <th style="min-width:110px">Período</th>
               <th style="min-width:140px">Local</th>
-              <th style="min-width:220px">Assinatura do Preceptor</th>
+              <!-- Coluna de assinatura removida -->
             </tr>
           </thead>
           <tbody>
@@ -100,7 +100,7 @@
                   <span *ngIf="period.locations?.length; else vazioPB">{{ period.locations.join(', ') }}</span>
                   <ng-template #vazioPB><span class="text-muted">—</span></ng-template>
                 </td>
-                <td class="text-muted small">{{ '{' }}Assinatura eletrônica automática pelo sistema{{ '}' }}</td>
+                <!-- célula de assinatura removida -->
               </tr>
             </ng-container>
           </tbody>
@@ -237,7 +237,7 @@
             <th style="min-width:100px">Data</th>
             <th style="min-width:110px">Período</th>
             <th style="min-width:140px">Local</th>
-            <th style="min-width:220px">Assinatura do Preceptor</th>
+            <!-- Coluna de assinatura removida -->
           </tr>
         </thead>
         <tbody>
@@ -257,7 +257,7 @@
                   <span *ngIf="period.locations?.length; else vazio">{{ period.locations.join(', ') }}</span>
                   <ng-template #vazio><span class="text-muted">—</span></ng-template>
                 </td>
-              <td class="text-muted small">{{ '{' }}Assinatura eletrônica automática pelo sistema{{ '}' }}</td>
+              <!-- célula de assinatura removida -->
             </tr>
           </ng-container>
         </tbody>

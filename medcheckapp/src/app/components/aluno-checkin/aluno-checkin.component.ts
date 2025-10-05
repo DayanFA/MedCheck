@@ -147,15 +147,30 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
     try { localStorage.setItem(this.cacheKey, JSON.stringify({ secs: totalSecs, ts, date: this.todayDate })); } catch {}
   }
 
-  submitCheckIn() {
+  async submitCheckIn() {
     if (this.submitting) return;
     if (!this.disciplineId) { this.message = 'Selecione uma disciplina antes.'; return; }
     if (!this.preceptorId || !this.code) { this.message='Informe Preceptor e Código'; return; }
+    // Verifica permissão de geolocalização antes de tentar
+    try {
+      if ((navigator as any).permissions?.query) {
+        const perm = await (navigator as any).permissions.query({ name: 'geolocation' });
+        if (perm.state === 'denied') {
+          this.message = 'Ative a localização do navegador para realizar o Check-In.';
+          return;
+        }
+      }
+    } catch {}
     this.submitting=true; this.message='Obtendo localização...';
-    this.getLocation().then(pos => {
-      const { lat, lng } = pos || {} as any;
-      this.message='Validando...';
-      this.check.checkIn(this.preceptorId!, this.code.trim().toUpperCase(), this.disciplineId, lat, lng).subscribe({
+    const pos = await this.getLocation();
+    if (!pos) {
+      this.submitting = false;
+      this.message = 'Não foi possível obter localização. Libere a permissão e tente novamente.';
+      return;
+    }
+    const { lat, lng } = pos;
+    this.message='Validando...';
+    this.check.checkIn(this.preceptorId!, this.code.trim().toUpperCase(), this.disciplineId, lat, lng).subscribe({
       next: _ => {
         this.message='Check-In realizado';
         this.code='';
@@ -166,7 +181,6 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
         this.broadcastServiceStatus(true);
       },
       error: err => { this.message = err?.error?.error || 'Falha no Check-In'; this.submitting=false; }
-      });
     });
   }
 

@@ -1,9 +1,11 @@
 <div class="app-shell d-flex" [class.collapsed]="collapsed">
   <app-sidebar [collapsed]="collapsed"></app-sidebar>
   <div class="flex-grow-1 d-flex flex-column main-area">
-    <nav class="navbar navbar-light bg-white shadow-sm px-3 top-bar">
-      <button class="btn btn-outline-secondary me-3" (click)="toggleSidebar()" aria-label="Menu">
-        <i class="bi bi-list fs-4"></i>
+    <nav class="navbar navbar-light bg-white shadow-sm px-3 top-bar" [class.is-collapsed]="collapsed">
+      <button class="hamburger-btn me-3" (click)="toggleSidebar()" [attr.aria-label]="collapsed ? 'Expandir menu' : 'Recolher menu'" [class.active]="collapsed">
+        <span></span>
+        <span></span>
+        <span></span>
       </button>
       <span class="fw-semibold" *ngIf="userName">Seja bem-vindo {{userName}}</span>
       <div class="ms-auto d-flex align-items-center gap-2">
@@ -18,7 +20,7 @@
         </span>
         <div class="rounded-circle bg-secondary-subtle user-avatar d-flex align-items-center justify-content-center overflow-hidden" aria-label="Avatar">
           <img *ngIf="avatarUrl" [src]="avatarUrl" alt="Avatar" class="w-100 h-100 object-fit-cover rounded-circle" />
-          <i *ngIf="!avatarUrl" class="bi bi-person text-muted"></i>
+            <i *ngIf="!avatarUrl" class="bi bi-person text-muted"></i>
         </div>
       </div>
     </nav>

@@ -885,8 +885,8 @@ export class ReportComponent implements OnChanges {
     // - Coordenador visualizando aluno
     // - Admin visualizando aluno
     if (!this.alunoId) return true; // contexto próprio aluno
-    if (u.role === 'COORDENADOR' && this.alunoId) return true;
-    if (u.role === 'ADMIN' && this.alunoId) return true;
+    if (u.role === 'COORDENADOR') return true;
+    if (u.role === 'ADMIN') return true;
     return false;
   }
 

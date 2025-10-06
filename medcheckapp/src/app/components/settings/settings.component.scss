@@ -1,3 +1,49 @@
-.settings-wrapper { max-width: 920px; margin: 0 auto; }
-.avatar { width: 160px; height: 160px; overflow: hidden; }
-.avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* Settings Page Modern Layout */
+.settings-wrapper { max-width:1100px; margin:0 auto; }
+.settings-card.glass-box { background:#fff; border-radius:22px; padding:2rem 2rem 2.2rem; box-shadow:0 10px 28px -6px rgba(20,40,60,.18), 0 4px 14px -4px rgba(20,40,60,.08); position:relative; overflow:hidden; }
+.settings-card.glass-box:before { content:""; position:absolute; inset:0; background:radial-gradient(circle at 82% 18%, rgba(255,255,255,.9), transparent 70%); pointer-events:none; }
+.settings-head h5 { letter-spacing:.4px; font-size:1.15rem; }
+.settings-head .icon-circle { width:46px; height:46px; border-radius:14px; background:linear-gradient(135deg,#eef4fa,#dfe8f1); display:inline-flex; align-items:center; justify-content:center; font-size:1.25rem; color:#1e4b7a; }
+.subtitle { letter-spacing:.3px; }
+
+/* Avatar block */
+.avatar-block { background:linear-gradient(145deg,#f7fbff,#eef4fa); border:1px solid #e2eaf1; border-radius:18px; position:relative; }
+.avatar-shell { position:relative; }
+.avatar-shell .avatar { width:170px; height:170px; background:#f3f7fa; border:1px solid #dfe7ef; border-radius:50%; font-size:3.2rem; color:#7d8b95; position:relative; }
+.avatar-shell .avatar.has-photo { background:#fff; }
+.avatar-shell .avatar img { width:100%; height:100%; object-fit:cover; }
+.change-photo-btn { position:absolute; bottom:6px; right:10px; width:42px; height:42px; border-radius:14px; background:#2563eb; display:flex; align-items:center; justify-content:center; color:#fff; cursor:pointer; font-size:1.1rem; box-shadow:0 4px 10px -3px rgba(37,99,235,.55); transition:.25s ease; }
+.change-photo-btn:hover { background:#1e4fae; transform:translateY(-2px); }
+
+/* Form section */
+.form-section { background:linear-gradient(145deg,#f9fcff,#f1f6fb); border:1px solid #dfe7ef; border-radius:18px; position:relative; }
+.field-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.55px; font-weight:600; color:#53697a; }
+.input-wrapper { position:relative; }
+.input-wrapper .form-control { padding-left:2.1rem; }
+.input-wrapper i.inbound { position:absolute; top:50%; left:.65rem; transform:translateY(-50%); color:#6b7d8a; font-size:.95rem; }
+.form-control { font-size:.85rem; }
+.form-control:focus { box-shadow:0 0 0 2px rgba(37,99,235,.25); border-color:#2563eb; }
+.status-msg { min-height:1.2rem; }
+
+/* Buttons */
+.settings-card .btn-outline-primary { border-color:#7aa9ee; color:#2360c8; }
+.settings-card .btn-outline-primary:hover { background:#e6f0ff; }
+.settings-card .btn-outline-danger { border-color:#f59a9a; }
+.settings-card .btn-outline-danger:hover { background:#ffe5e5; }
+
+/* Animations reuse */
+.animate-fade-slide { animation:fadeSlide .55s ease; }
+@keyframes fadeSlide { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+
+/* Responsive tweaks */
+@media (max-width: 991.98px) {
+	.settings-card.glass-box { padding:1.6rem 1.4rem 1.8rem; }
+	.avatar-shell .avatar { width:150px; height:150px; }
+	.settings-head h5 { font-size:1.05rem; }
+}
+@media (max-width: 575.98px) {
+	.settings-card.glass-box { padding:1.4rem 1.1rem 1.6rem; }
+	.change-photo-btn { width:38px; height:38px; font-size:1rem; }
+	.form-control { font-size:.8rem; }
+	.field-label { font-size:.6rem; }
+}

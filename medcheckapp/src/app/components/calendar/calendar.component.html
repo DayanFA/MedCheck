@@ -258,31 +258,37 @@
 </ng-template>
 
  <!-- Modal de Revisão (Bootstrap) -->
-<div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Avaliar justificativa</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="modal fade glass-review-modal" id="reviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content review-glass-wrapper">
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-semibold d-flex align-items-center gap-2">
+          <span class="icon-circle" [ngClass]="{'approve': selectedAction()==='APPROVED', 'reject': selectedAction()==='REJECTED'}">
+            <i class="bi" [ngClass]="{'bi-hand-thumbs-up-fill': selectedAction()==='APPROVED', 'bi-hand-thumbs-down-fill': selectedAction()==='REJECTED'}"></i>
+          </span>
+          Avaliar justificativa
+        </h6>
+        <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
-      <div class="modal-body">
-        <p class="mb-2">Data: <strong>{{ selectedDate() }}</strong></p>
-        <div class="mb-2" *ngIf="existingJust() as ej">
-          <span class="badge text-bg-warning" *ngIf="ej.status==='PENDING'">PENDENTE</span>
-          <span class="badge text-bg-success" *ngIf="ej.status==='APPROVED'">APROVADO</span>
-          <span class="badge text-bg-danger" *ngIf="ej.status==='REJECTED'">REPROVADO</span>
+      <div class="modal-body pt-0">
+        <div class="d-flex align-items-center justify-content-between mb-2 small text-muted">
+          <span>Data: <strong class="text-dark">{{ formatDateShort(selectedDate()) }}</strong></span>
+          <span *ngIf="existingJust() as ej" class="status-badge" [ngClass]="{
+            'pending': ej.status==='PENDING',
+            'approved': ej.status==='APPROVED',
+            'rejected': ej.status==='REJECTED'
+          }">{{ ej.status==='PENDING' ? 'PENDENTE' : (ej.status==='APPROVED' ? 'APROVADO' : 'REPROVADO') }}</span>
         </div>
-        <label class="form-label">Resposta ao aluno (opcional)</label>
-        <textarea class="form-control" rows="3" placeholder="Mensagem ao aluno" [ngModel]="reviewNote()" (ngModelChange)="reviewNote.set($event)"></textarea>
+        <label class="form-label small fw-semibold mb-1">Resposta ao aluno (opcional)</label>
+        <textarea class="form-control form-control-sm auto-grow" rows="3" placeholder="Mensagem ao aluno" [ngModel]="reviewNote()" (ngModelChange)="reviewNote.set($event)"></textarea>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-success" *ngIf="selectedAction()==='APPROVED'" (click)="confirmReview()">Confirmar Aprovação</button>
-        <button type="button" class="btn btn-danger" *ngIf="selectedAction()==='REJECTED'" (click)="confirmReview()">Confirmar Reprovação</button>
+      <div class="modal-footer border-0 pt-1 d-flex gap-2 justify-content-end">
+        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success btn-sm" *ngIf="selectedAction()==='APPROVED'" (click)="confirmReview()">Confirmar</button>
+        <button type="button" class="btn btn-danger btn-sm" *ngIf="selectedAction()==='REJECTED'" (click)="confirmReview()">Confirmar</button>
       </div>
     </div>
   </div>
-  
 </div>
 <!-- Modal de Localização isolado fora da estrutura do modal de revisão -->
 <ng-container *ngIf="showLocModal() && locLat()!=null && locLng()!=null">

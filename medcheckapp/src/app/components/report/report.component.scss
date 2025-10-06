@@ -145,6 +145,16 @@
 
 /* Full report print capture */
 .full-report-print { font-size:.72rem; }
+/* Manter off-screen para captura sem piscar na UI */
+.full-report-print {
+  position: fixed;
+  top: -20000px; /* suficientemente fora da viewport */
+  left: -20000px;
+  width: 1000px; /* base; pode ser ajustada temporariamente no TS */
+  pointer-events: none;
+  opacity: 0; /* invisível ao usuário */
+  z-index: -1; /* atrás de tudo */
+}
 .full-report-print .weekly-sheet { page-break-after: always; }
 .full-report-print .evaluation-form-print { page-break-after: always; }
 @media print {

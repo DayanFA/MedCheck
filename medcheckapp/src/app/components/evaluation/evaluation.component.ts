@@ -201,6 +201,84 @@ export class EvaluationComponent {
     }, _ => this.saving.set(false));
   }
 
+  // ===== Validação nota final 0..10 =====
+  blockInvalidScore(ev: KeyboardEvent) {
+    const allowedControl = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab','Home','End'];
+    if (allowedControl.includes(ev.key)) return;
+    // permitir um único ponto ou vírgula para decimais (será normalizado)
+    if (ev.key === ',' || ev.key === '.') {
+      const tgt = ev.target as HTMLInputElement;
+      if (tgt.value.includes('.') || tgt.value.includes(',')) {
+        ev.preventDefault();
+      }
+      return;
+    }
+    if (!/^[0-9]$/.test(ev.key)) {
+      ev.preventDefault();
+      return;
+    }
+  }
+
+  sanitizeScore(onBlur: boolean = false) {
+    if (this.score == null || (this.score as any) === '') return;
+    // Forçar número
+    if (typeof this.score !== 'number') {
+      const num = Number(String(this.score).replace(',', '.'));
+      this.score = isNaN(num) ? null : num;
+    }
+    if (this.score != null) {
+      if (this.score < 0) this.score = 0;
+      if (this.score > 10) this.score = 10;
+      // Limitar a 1 casa decimal se usuário digitou muitas
+      if (onBlur) {
+        this.score = Math.round(this.score * 10) / 10;
+      }
+    }
+  }
+
+  // ===== Nova lógica de input estrito (inteiro 0..10) =====
+  scoreDisplay(): string { return this.score == null ? '' : String(this.score); }
+
+  filterBeforeInput(e: InputEvent) {
+    const data = (e as any).data as string | null;
+    if (data == null) return; // deletions etc.
+    if (!/^[0-9]$/.test(data)) { e.preventDefault(); return; }
+    const input = e.target as HTMLInputElement;
+    const selStart = input.selectionStart ?? input.value.length;
+    const selEnd = input.selectionEnd ?? selStart;
+    const next = input.value.slice(0, selStart) + data + input.value.slice(selEnd);
+    if (next.length > 2) { e.preventDefault(); return; }
+    if (next === '') return;
+    const num = Number(next);
+    if (isNaN(num) || num > 10) { e.preventDefault(); }
+  }
+
+  handlePaste(e: ClipboardEvent) {
+    const txt = (e.clipboardData?.getData('text') || '').trim();
+    if (!/^[0-9]{1,2}$/.test(txt)) { e.preventDefault(); return; }
+    const num = Number(txt);
+    if (num > 10) { e.preventDefault(); return; }
+    this.score = num;
+    e.preventDefault();
+  }
+
+  handleScoreInput(e: Event) {
+    const input = e.target as HTMLInputElement;
+    let v = input.value.replace(/[^0-9]/g,'');
+    if (v.length > 2) v = v.slice(0,2);
+    if (v === '') { this.score = null; input.value = ''; return; }
+    let num = Number(v);
+    if (num > 10) num = 10;
+    this.score = num;
+    input.value = String(num);
+  }
+
+  finalizeScore() {
+    if (this.score == null) return;
+    if (this.score < 0) this.score = 0;
+    if (this.score > 10) this.score = 10;
+  }
+
   private loadStudentInfo() {
     if (!this.alunoId) return;
     this.preceptorService.studentInfo(this.alunoId, this.disciplineId).subscribe(info => {

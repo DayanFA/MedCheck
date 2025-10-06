@@ -38,7 +38,7 @@ public class AdminController {
                                        @RequestParam(value = "disciplineId", required = false) Long disciplineId,
                                        @RequestParam(value = "q", required = false) String q,
                                        @RequestParam(value = "page", defaultValue = "0") int page,
-                                       @RequestParam(value = "size", defaultValue = "50") int size,
+                                       @RequestParam(value = "size", defaultValue = "10") int size,
                                        @RequestParam(value = "fName", required = false, defaultValue = "true") boolean fName,
                                        @RequestParam(value = "fPhone", required = false, defaultValue = "true") boolean fPhone,
                                        @RequestParam(value = "fEmail", required = false, defaultValue = "true") boolean fEmail,

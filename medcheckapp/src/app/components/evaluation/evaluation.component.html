@@ -57,11 +57,7 @@
     </table>
   </div>
 
-  <!-- Texto informativo MFC -->
-  <div class="info-box p-3 mb-3 small lh-sm">
-    <strong>A Medicina de Família e Comunidade (MFC)</strong> é definida como a “especialidade médica que presta assistência à saúde de forma continuada, integral e abrangente para as pessoas, suas famílias e a comunidade” (Gusso & Lopes, Tratado de MFC).<br><br>
-    Atua no nível de atenção primária à saúde (APS), entendida como “oferta de cuidados essenciais de saúde baseados em métodos e tecnologias práticas, cientificamente bem fundamentadas e socialmente aceitáveis, colocadas ao alcance universal de indivíduos e famílias da comunidade, mediante sua plena participação e a um custo que a comunidade e o país podem manter em cada fase do seu desenvolvimento” (Gusso & Lopes, Tratado de MFC).
-  </div>
+  <!-- Texto informativo MFC removido conforme solicitação -->
 
   <!-- Tabela de avaliação da dimensão ativa -->
   <div class="table-responsive mb-3">
@@ -86,8 +82,20 @@
   <ng-container *ngIf="isLastDim()">
     <div class="row g-2 align-items-center mb-3">
       <div class="col-auto"><label class="form-label mb-0">Nota Final (0-10):</label></div>
-      <div class="col-auto" style="max-width:100px;">
-        <input type="number" class="form-control form-control-sm" [(ngModel)]="score" min="0" max="10" />
+      <div class="col-auto" style="max-width:110px;">
+        <input
+          type="text"
+          class="form-control form-control-sm"
+          [value]="scoreDisplay()"
+          (keydown)="blockInvalidScore($event)"
+          (beforeinput)="filterBeforeInput($event)"
+          (paste)="handlePaste($event)"
+          (input)="handleScoreInput($event)"
+          (blur)="finalizeScore()"
+          inputmode="numeric"
+          maxlength="2"
+          aria-label="Nota final de 0 a 10"
+        />
       </div>
       <div class="col text-danger small" *ngIf="score!=null && (score<0 || score>10)">Valor inválido</div>
     </div>

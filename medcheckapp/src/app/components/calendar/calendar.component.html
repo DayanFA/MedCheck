@@ -20,7 +20,7 @@
         <span class="legend-pill cumprido">Cumprido</span>
         <span class="legend-pill just">Justificado</span>
       </div>
-      <div class="ms-auto d-flex align-items-center gap-2 flex-wrap discipline-select" *ngIf="alunoId()">
+  <div class="ms-auto d-flex align-items-center gap-2 flex-wrap discipline-select" *ngIf="alunoId() && !isAlunoUser()">
         <ng-container *ngIf="disciplines(); else discLoading">
           <select class="form-select form-select-sm" [ngModel]="disciplineId()" (ngModelChange)="setDisciplineForView($event)">
             <option *ngFor="let d of disciplines()" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>

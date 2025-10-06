@@ -45,8 +45,8 @@ export class AdminUsersComponent {
   fEmail = true;
   fCpf = true;
   private searchTimer: any = null;
-  // Paginação
-  page = 0; size = 25; totalPages = 0; totalItems = 0;
+  // Paginação (limitado a 10 registros por página conforme requisição)
+  page = 0; size = 10; totalPages = 0; totalItems = 0;
 
   // Edição
   editingUser: any = null;

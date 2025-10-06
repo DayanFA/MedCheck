@@ -52,6 +52,7 @@ export class ReportComponent implements OnChanges {
   evaluationDetails: any = null; // cache da avaliação carregada (aluno view)
   showEvalModal = false;
   @ViewChild('fullReportRoot') fullReportRoot?: ElementRef<HTMLDivElement>;
+  generatingPdf = false; // controla estado de geração para evitar múltiplos cliques e flicker
 
   // Mapas para exibir textos completos das dimensões e questões na modal de detalhes
   dimensionTitles: Record<string,string> = {
@@ -402,6 +403,17 @@ export class ReportComponent implements OnChanges {
     if (idNum && this.coordinatorDisciplines && !this.coordinatorDisciplines.some(d => d.id === idNum)) return;
     if (this.disciplineId === idNum) return;
     this.disciplineId = idNum;
+    // Atualiza label imediatamente para evitar atraso visual até respostas assíncronas
+    if (this.disciplineId && this.coordinatorDisciplines) {
+      const d = this.coordinatorDisciplines.find(cd => cd.id === this.disciplineId);
+      if (d && d.code && d.name) {
+        this.disciplineLabel = `CURSO DE MEDICINA - ${d.code} - ${d.name}`;
+      } else {
+        this.disciplineLabel = 'CURSO DE MEDICINA';
+      }
+    } else {
+      this.disciplineLabel = 'CURSO DE MEDICINA';
+    }
     this.resetWeeksAndReload();
     const qp: any = { alunoId: this.alunoId };
     if (this.disciplineId) qp.disciplineId = this.disciplineId;
@@ -665,6 +677,12 @@ export class ReportComponent implements OnChanges {
     return order.filter(o => used.has(o)).join(', ');
   }
 
+  // Indica se o usuário logado é ALUNO (usado para ocultar seletor de disciplinas na visão de relatório)
+  get isAlunoUser(): boolean {
+    const u = this.auth.getUser();
+    return !!u && u.role === 'ALUNO';
+  }
+
   private classifyShift(startTime: string): 'Manhã'|'Tarde'|'Noite' {
     // startTime formato HH:mm
     const [hStr, mStr] = startTime.split(':');
@@ -761,6 +779,8 @@ export class ReportComponent implements OnChanges {
       alert('Para gerar o PDF é necessário primeiro registrar a avaliação.');
       return;
     }
+    // Evita múltiplos cliques rápidos
+    if (this.generatingPdf) return;
     // Garantir que todas as semanas estejam carregadas antes de gerar
     const unloaded = this.weeks.filter(w => !w.loaded).map(w => w.number);
     if (unloaded.length) {
@@ -779,83 +799,78 @@ export class ReportComponent implements OnChanges {
       return;
     }
     // --- Nova abordagem: capturar cada bloco (semana + formulário) individualmente para evitar cortes ---
-    await new Promise(r => setTimeout(r, 50));
-    const root = this.fullReportRoot?.nativeElement;
-    if (!root) { alert('Estrutura completa ainda não pronta para exportar.'); return; }
-    root.classList.remove('d-none');
-    let jsPDFMod: any; let html2canvasMod: any;
+    this.generatingPdf = true;
     try {
-      [jsPDFMod, html2canvasMod] = await Promise.all([
-        import('jspdf'),
-        import('html2canvas')
-      ]);
-    } catch (e) {
-      console.error('Falha ao carregar libs PDF/canvas', e); root.classList.add('d-none'); alert('Erro ao carregar bibliotecas para exportar PDF.'); return; }
-    const jsPDF = jsPDFMod.default || jsPDFMod;
-    const html2canvas = html2canvasMod.default || html2canvasMod;
-    const pdf = new jsPDF('p','pt','a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const marginX = 20;
-    const usableWidth = pageWidth - marginX*2;
+      await new Promise(r => setTimeout(r, 50));
+      const root = this.fullReportRoot?.nativeElement;
+      if (!root) { alert('Estrutura completa ainda não pronta para exportar.'); return; }
+      let jsPDFMod: any; let html2canvasMod: any;
+      try {
+        [jsPDFMod, html2canvasMod] = await Promise.all([
+          import('jspdf'),
+          import('html2canvas')
+        ]);
+      } catch (e) {
+        console.error('Falha ao carregar libs PDF/canvas', e); alert('Erro ao carregar bibliotecas para exportar PDF.'); return; }
+      const jsPDF = jsPDFMod.default || jsPDFMod;
+      const html2canvas = html2canvasMod.default || html2canvasMod;
+      const pdf = new jsPDF('p','pt','a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const marginX = 20;
+      const usableWidth = pageWidth - marginX*2;
 
-    // Selecionar todos os blocos semanais e formulário final
-    const blocks: HTMLElement[] = Array.from(root.querySelectorAll('.weekly-sheet')) as HTMLElement[];
-    const evalForm = root.querySelector('.evaluation-form-print') as HTMLElement | null;
-    if (evalForm) blocks.push(evalForm);
+      // Selecionar todos os blocos semanais e formulário final
+      const blocks: HTMLElement[] = Array.from(root.querySelectorAll('.weekly-sheet')) as HTMLElement[];
+      const evalForm = root.querySelector('.evaluation-form-print') as HTMLElement | null;
+      if (evalForm) blocks.push(evalForm);
 
-    // Ajustar largura para render
-    const originalWidth = root.style.width;
-    root.style.width = '1100px';
-    for (let i=0;i<blocks.length;i++) {
-      const b = blocks[i];
-      // Garantir pequeno delay para layout
-      await new Promise(r => setTimeout(r, 25));
-      const canvas = await html2canvas(b, { scale: 2, useCORS: true, backgroundColor:'#ffffff' });
-      const imgWidth = usableWidth;
-      const imgHeight = canvas.height * (imgWidth / canvas.width);
-      if (i>0) pdf.addPage();
-      const yStart = 20;
-      // Se imagem maior que página, escala adicional para caber (fit-to-page)
-      let drawWidth = imgWidth;
-      let drawHeight = imgHeight;
-      const maxHeight = pageHeight - 40; // margem vertical
-      if (drawHeight > maxHeight) {
-        const ratio = maxHeight / drawHeight;
-        drawHeight = maxHeight;
-        drawWidth = drawWidth * ratio;
+      // Ajustar largura para render (off-screen, sem flicker)
+      const originalWidth = root.style.width;
+      root.style.width = '1100px';
+      for (let i=0;i<blocks.length;i++) {
+        const b = blocks[i];
+        await new Promise(r => setTimeout(r, 25));
+        const canvas = await html2canvas(b, { scale: 2, useCORS: true, backgroundColor:'#ffffff' });
+        const imgWidth = usableWidth;
+        const imgHeight = canvas.height * (imgWidth / canvas.width);
+        if (i>0) pdf.addPage();
+        const yStart = 20;
+        let drawWidth = imgWidth;
+        let drawHeight = imgHeight;
+        const maxHeight = pageHeight - 40;
+        if (drawHeight > maxHeight) {
+          const ratio = maxHeight / drawHeight;
+          drawHeight = maxHeight;
+          drawWidth = drawWidth * ratio;
+        }
+        const xCentered = marginX + (usableWidth - drawWidth)/2;
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', xCentered, yStart, drawWidth, drawHeight, undefined, 'FAST');
       }
-      const xCentered = marginX + (usableWidth - drawWidth)/2;
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', xCentered, yStart, drawWidth, drawHeight, undefined, 'FAST');
+      root.style.width = originalWidth;
+      // Nome do arquivo: Relatorio_[codigoDisciplina]_[Aluno].pdf
+      const label = (this.disciplineLabel || '').trim();
+      let code = '';
+      const strictMatch = label.match(/\b([A-Za-z]{3,}\d{2,})\b/);
+      if (strictMatch) {
+        code = strictMatch[1];
+      } else {
+        const fallbackMatch = label.match(/\b([A-Za-z]{2,}\d{2,})\b/);
+        if (fallbackMatch) code = fallbackMatch[1];
+      }
+      if (!code) code = 'INTERNATO';
+      const slug = (v: string) => v
+        .normalize('NFD')
+        .replace(/\p{Diacritic}+/gu,'')
+        .replace(/[^A-Za-z0-9_-]/g,'')
+        .trim();
+      const normCode = slug(code);
+      const normAluno = slug(this.student.name.replace(/\s+/g,'_'));
+      pdf.save(`Relatorio_${normCode}_${normAluno}.pdf`);
+    } finally {
+      this.generatingPdf = false;
     }
-    root.style.width = originalWidth;
-    root.classList.add('d-none');
-  // Nome do arquivo conforme solicitado: Relatorio_[nome do internato]_[Nome do aluno].pdf
-  // O "nome do internato" será derivado do label da disciplina (antes do primeiro hífen, ou código + nome limpos)
-    // Agora apenas o código da disciplina (ex: CCSD459) no nome do PDF
-    const label = (this.disciplineLabel || '').trim();
-    // Tenta extrair padrão de código (sequência alfanumérica até primeiro espaço ou hífen)
-    // Geralmente formato "CCSD459 - Internato ..." então split por espaço/hífen e pega primeiro token com letras+digitos >=3
-    let code = '';
-    // Tenta capturar formato mais específico (ex: CCSD459). Se não achar, tenta padrão genérico depois.
-    const strictMatch = label.match(/\b([A-Za-z]{3,}\d{2,})\b/);
-    if (strictMatch) {
-      code = strictMatch[1];
-    } else {
-      const fallbackMatch = label.match(/\b([A-Za-z]{2,}\d{2,})\b/);
-      if (fallbackMatch) code = fallbackMatch[1];
-    }
-    if (!code) code = 'INTERNATO';
-    const slug = (v: string) => v
-      .normalize('NFD')
-      .replace(/\p{Diacritic}+/gu,'')
-      .replace(/[^A-Za-z0-9_-]/g,'')
-      .trim();
-    const normCode = slug(code);
-    const normAluno = slug(this.student.name.replace(/\s+/g,'_'));
-    pdf.save(`Relatorio_${normCode}_${normAluno}.pdf`);
   }
-  onSubmit() { console.log('Enviar relatório semana', this.selectedWeek.number, this.selectedWeek); }
   isPreceptorViewingStudent(): boolean {
     const u = this.auth.getUser();
     // ADMIN não deve avaliar interno: somente PRECEPTOR (e futuramente COORDENADOR se aplicável)

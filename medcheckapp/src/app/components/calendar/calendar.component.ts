@@ -121,6 +121,12 @@ export class UserCalendarComponent {
     }
   };
 
+  // Computed para indicar se usuário logado é ALUNO (acesso via auth no serviço api)
+  isAlunoUser(): boolean {
+    const user: any = (this.api as any)?.auth?.getUser?.() || (window as any).mc_user_cache;
+    return !!user && user.role === 'ALUNO';
+  }
+
   constructor(private weekSync: WeekSelectionService, private toast: ToastService, private evalApi: EvaluationService) {
     // Se usuário é preceptor e nenhum aluno selecionado (nem query param, nem contexto), redirecionar
     setTimeout(() => {

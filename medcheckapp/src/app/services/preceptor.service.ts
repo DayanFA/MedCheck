@@ -12,12 +12,14 @@ export class PreceptorService {
     return new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {});
   }
 
+  // Lista alunos que tiveram check-in com o preceptor no ano; aceita disciplineId opcional para filtrar
   students(
     year?: number,
     page: number = 0,
     size: number = 8,
     q?: string,
-    filters?: { fName?: boolean; fPhone?: boolean; fEmail?: boolean; fCpf?: boolean; statusIn?: boolean; statusOut?: boolean }
+    filters?: { fName?: boolean; fPhone?: boolean; fEmail?: boolean; fCpf?: boolean; statusIn?: boolean; statusOut?: boolean },
+    disciplineId?: string | number
   ): Observable<any> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (year) params = params.set('year', year);
@@ -30,6 +32,7 @@ export class PreceptorService {
       if (filters.statusIn !== undefined) params = params.set('statusIn', String(filters.statusIn));
       if (filters.statusOut !== undefined) params = params.set('statusOut', String(filters.statusOut));
     }
+    if (disciplineId) params = params.set('disciplineId', String(disciplineId));
     return this.http.get(`${this.base}/students`, { headers: this.authHeaders(), params });
   }
 

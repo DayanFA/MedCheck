@@ -58,7 +58,8 @@ public class PreceptorController {
                                       @RequestParam(required = false, defaultValue = "true") boolean fEmail,
                                       @RequestParam(required = false, defaultValue = "true") boolean fCpf,
                                       @RequestParam(required = false, defaultValue = "true") boolean statusIn,
-                                      @RequestParam(required = false, defaultValue = "true") boolean statusOut) {
+                                      @RequestParam(required = false, defaultValue = "true") boolean statusOut,
+                                      @RequestParam(required = false) Long disciplineId) {
         User preceptor = me(principal);
         if (preceptor.getRole() != Role.PRECEPTOR && preceptor.getRole() != Role.ADMIN) {
             return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
@@ -79,12 +80,33 @@ public class PreceptorController {
         boolean selEmail = anyField ? fEmail : true;
         boolean selCpf = anyField ? fCpf : true;
 
-        alunosPage = checkSessionRepository.findDistinctAlunosByPreceptorAndPeriodAdvanced(
-                preceptor, start, end,
-                qNorm, qDigits,
-                selName, selEmail, selCpf, selPhone,
-                statusAll, statusIn, statusOut,
-                pageable);
+        if (disciplineId != null) {
+            Discipline disc = disciplineRepository.findById(disciplineId).orElse(null);
+            if (disc == null) {
+                alunosPage = Page.empty(pageable);
+            } else {
+                // Se preceptor (não ADMIN) precisa estar vinculado à disciplina escolhida
+                if (preceptor.getRole() == Role.PRECEPTOR) {
+                    boolean linked = disciplineRepository.findByPreceptors_Id(preceptor.getId()).stream().anyMatch(d -> d.getId().equals(disc.getId()));
+                    if (!linked) {
+                        return ResponseEntity.status(403).body(Map.of("error", "Preceptor não vinculado à disciplina informada"));
+                    }
+                }
+                alunosPage = checkSessionRepository.findDistinctAlunosByPreceptorAndDisciplineAndPeriodAdvanced(
+                        preceptor, disc, start, end,
+                        qNorm, qDigits,
+                        selName, selEmail, selCpf, selPhone,
+                        statusAll, statusIn, statusOut,
+                        pageable);
+            }
+        } else {
+            alunosPage = checkSessionRepository.findDistinctAlunosByPreceptorAndPeriodAdvanced(
+                    preceptor, start, end,
+                    qNorm, qDigits,
+                    selName, selEmail, selCpf, selPhone,
+                    statusAll, statusIn, statusOut,
+                    pageable);
+        }
         List<Map<String,Object>> items = alunosPage.getContent().stream().map(a -> {
             Map<String,Object> m = new HashMap<>();
             m.put("id", a.getId());

@@ -1,6 +1,6 @@
 <div class="report-container container-fluid py-3">
   <!-- Barra superior de controles (disciplina) -->
-  <div class="d-flex flex-wrap align-items-center gap-3 mb-3" *ngIf="alunoId">
+  <div class="d-flex flex-wrap align-items-center gap-3 mb-3" *ngIf="alunoId && !isAlunoUser">
     <!-- Selector para COORDENADOR -->
     <div class="d-flex align-items-center gap-2" *ngIf="isCoordinator">
       <ng-container *ngIf="coordinatorDisciplines !== null; else coordLoading">
@@ -15,8 +15,8 @@
         </div>
       </ng-template>
     </div>
-    <!-- Selector para PRECEPTOR -->
-    <div class="d-flex align-items-center gap-2" *ngIf="preceptorDisciplines !== undefined && !isCoordinator">
+  <!-- Selector para PRECEPTOR -->
+  <div class="d-flex align-items-center gap-2" *ngIf="preceptorDisciplines !== undefined && !isCoordinator">
       <ng-container *ngIf="preceptorDisciplines === null; else discOk">
         <div class="d-flex align-items-center gap-2 small text-muted">
           <div class="spinner-border spinner-border-sm text-primary" role="status">
@@ -32,8 +32,8 @@
       </ng-template>
     </div>
   </div>
-  <!-- Hidden full printable wrapper for PDF generation -->
-  <div class="full-report-print d-none" #fullReportRoot>
+  <!-- Hidden full printable wrapper for PDF generation (mantido sempre fora da tela para evitar flicker) -->
+  <div class="full-report-print" #fullReportRoot aria-hidden="true">
     <!-- 10 Folhas de Presença (uma por semana) -->
     <ng-container *ngFor="let w of weeks; let wi = index">
       <div class="weekly-sheet mb-5">
@@ -138,11 +138,7 @@
           </tbody>
         </table>
       </div>
-      <!-- Caixa de informação introdutória MFC -->
-      <div class="info-box bordered-box p-3 mb-3 small lh-sm">
-        <strong>A Medicina de Família e Comunidade (MFC)</strong> é definida como a “especialidade médica que presta assistência à saúde de forma continuada, integral e abrangente para as pessoas, suas famílias e a comunidade” (Gusso & Lopes, Tratado de MFC).<br><br>
-        Atua no nível de atenção primária à saúde (APS), entendida como “oferta de cuidados essenciais de saúde baseados em métodos e tecnologias práticas, cientificamente bem fundamentadas e socialmente aceitáveis, colocadas ao alcance universal de indivíduos e famílias da comunidade, mediante sua plena participação e a um custo que a comunidade e o país podem manter em cada fase do seu desenvolvimento” (Gusso & Lopes, Tratado de MFC).
-      </div>
+      <!-- Caixa de informação introdutória MFC removida conforme solicitação -->
       <!-- Dimensões -->
       <div *ngIf="ev.details?.dimensions as dimsPrint">
         <div class="dimension-print mb-4" *ngFor="let dim of dimsPrint; let di = index">
@@ -341,10 +337,10 @@
         </button>
       </div>
       <div class="d-flex align-items-center gap-2 ms-auto">
-        <button class="btn btn-outline-secondary btn-sm" (click)="onGeneratePdf()" [disabled]="!hasGlobalEvaluation">
-          <i class="bi bi-filetype-pdf"></i> Gerar PDF
+        <button class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1" (click)="onGeneratePdf()" [disabled]="!hasGlobalEvaluation || generatingPdf">
+          <span *ngIf="!generatingPdf"><i class="bi bi-filetype-pdf"></i> Gerar PDF</span>
+          <span *ngIf="generatingPdf" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Gerando...</span>
         </button>
-        <button class="btn btn-primary btn-sm" (click)="onSubmit()">Enviar</button>
       </div>
     </div>
   </div>

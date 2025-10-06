@@ -72,6 +72,45 @@ public interface CheckSessionRepository extends JpaRepository<CheckSession, Long
                                                   @Param("statusOut") boolean statusOut,
                                                   Pageable pageable);
 
+    // Same as above but constrained to a specific discipline for the preceptor
+    @Query("""
+       SELECT cs.aluno FROM CheckSession cs
+       WHERE cs.preceptor = :preceptor
+        AND cs.discipline = :discipline
+        AND cs.checkInTime BETWEEN :start AND :end
+        AND (
+            :q IS NULL OR :q = '' OR (
+                (:nameSel  = true AND LOWER(cs.aluno.name) LIKE LOWER(CONCAT('%',:q,'%'))) OR
+                (:emailSel = true AND LOWER(cs.aluno.institutionalEmail) LIKE LOWER(CONCAT('%',:q,'%'))) OR
+                (:cpfSel   = true AND :qDigits IS NOT NULL AND :qDigits <> '' AND cs.aluno.cpf LIKE CONCAT('%',:qDigits,'%')) OR
+                (:phoneSel = true AND (
+                    (:q IS NOT NULL AND :q <> '' AND LOWER(cs.aluno.phone) LIKE LOWER(CONCAT('%',:q,'%'))) OR
+                    (:qDigits IS NOT NULL AND :qDigits <> '' AND REPLACE(REPLACE(REPLACE(REPLACE(cs.aluno.phone,'(',''),')',''),'-',''),' ','') LIKE CONCAT('%',:qDigits,'%'))
+                ))
+            )
+        )
+        AND (
+            :statusAll = true OR
+            (:statusIn  = true AND EXISTS (SELECT 1 FROM CheckSession s2 WHERE s2.aluno = cs.aluno AND s2.preceptor = :preceptor AND s2.discipline = :discipline AND s2.checkOutTime IS NULL)) OR
+            (:statusOut = true AND NOT EXISTS (SELECT 1 FROM CheckSession s3 WHERE s3.aluno = cs.aluno AND s3.preceptor = :preceptor AND s3.discipline = :discipline AND s3.checkOutTime IS NULL))
+        )
+       GROUP BY cs.aluno
+       """)
+    Page<User> findDistinctAlunosByPreceptorAndDisciplineAndPeriodAdvanced(@Param("preceptor") User preceptor,
+                                                                           @Param("discipline") Discipline discipline,
+                                                                           @Param("start") LocalDateTime start,
+                                                                           @Param("end") LocalDateTime end,
+                                                                           @Param("q") String q,
+                                                                           @Param("qDigits") String qDigits,
+                                                                           @Param("nameSel") boolean nameSel,
+                                                                           @Param("emailSel") boolean emailSel,
+                                                                           @Param("cpfSel") boolean cpfSel,
+                                                                           @Param("phoneSel") boolean phoneSel,
+                                                                           @Param("statusAll") boolean statusAll,
+                                                                           @Param("statusIn") boolean statusIn,
+                                                                           @Param("statusOut") boolean statusOut,
+                                                                           Pageable pageable);
+
         // ADMIN: todos os alunos com ao menos um check-in em qualquer disciplina/período (filtros semelhantes)
         @Query("""
                 SELECT cs.aluno FROM CheckSession cs

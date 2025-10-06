@@ -31,6 +31,7 @@ export class ShellComponent implements OnInit, OnDestroy, AfterViewInit {
   private LOCAL_DISC_KEY = 'mc_current_discipline_id';
   selectedAlunoName: string = '';
   showWelcome: boolean = true; // control to hide welcome text before wrapping
+  userRole: string = '';
 
   // Template element refs for dynamic measurement
   @ViewChild('topBar') topBarRef?: ElementRef<HTMLElement>;
@@ -67,9 +68,11 @@ export class ShellComponent implements OnInit, OnDestroy, AfterViewInit {
     const cached: any = (this.auth as any).getUser?.();
     if (cached && cached.name) {
       this.userName = (cached.name || '').split(' ')[0];
+      this.userRole = cached.role || '';
     } else {
       const u = this.userService.getCurrentUser();
       this.userName = (u.name || '').split(' ')[0];
+  this.userRole = (u as any).role || '';
     }
     // Carrega avatar apenas no browser (evita SSR sem token)
     if (isPlatformBrowser(this.platformId)) {

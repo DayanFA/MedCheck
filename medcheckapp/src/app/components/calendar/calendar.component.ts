@@ -68,6 +68,12 @@ export class UserCalendarComponent {
     return d ? js.find((j: any) => j.date === d) : undefined;
   });
 
+  // Confirmation modal state
+  confirmOpen = signal(false);
+  confirmContext = signal<'plan'|'just'|null>(null);
+  confirmPayload = signal<any>(null);
+  confirmMessage = signal<string>('Tem certeza que deseja excluir?');
+
   weeks = computed(() => {
     const ds = this.data()?.days ?? [];
     const ymFirst = new Date(this.year(), this.month()-1, 1);
@@ -400,16 +406,7 @@ export class UserCalendarComponent {
       this.toast.show('warning', 'Semana já avaliada. Planos bloqueados.');
       return;
     }
-    this.api.deletePlan(id).subscribe(() => {
-      const cur = this.data();
-      if (cur) {
-        const plans = (cur.plans || []).filter((p: any) => p.id !== id);
-        this.data.set({ ...cur, plans });
-      }
-      // Optional: reload to confirm server state
-      this.load();
-      this.refreshMonth(true);
-    });
+    this.openConfirm('plan', { id }, 'Excluir este plano? Esta ação não pode ser desfeita.');
   }
 
   refreshDay() {
@@ -442,14 +439,7 @@ export class UserCalendarComponent {
 
   deleteJustify(j: any) {
     if (j?.status !== 'PENDING') return; // guard
-    const ok = typeof window !== 'undefined' ? window.confirm('Excluir justificativa?') : true;
-    if (!ok) return;
-    const dateIso = this.selectedDate();
-    if (dateIso) {
-      this.api.deleteJustificationByDate(dateIso).subscribe(() => this.load());
-    } else if (j?.id) {
-      this.api.deleteJustification(j.id).subscribe(() => this.load());
-    }
+    this.openConfirm('just', { j }, 'Excluir justificativa?');
   }
 
   review(action: 'APPROVED'|'REJECTED') {
@@ -457,13 +447,7 @@ export class UserCalendarComponent {
     const dateIso = this.selectedDate();
     if (!alunoId || !dateIso) return;
     const msg = action === 'APPROVED' ? 'Confirmar aprovação desta justificativa?' : 'Confirmar reprovação desta justificativa?';
-    const ok = typeof window !== 'undefined' ? window.confirm(msg) : true;
-    if (!ok) return;
-    const note = (this.reviewNote() || '').trim() || undefined;
-    this.api.reviewJustification({ alunoId, date: dateIso, action, note }).subscribe({
-      next: () => { this.load(); this.refreshMonth(true); },
-      error: () => { this.load(); this.refreshMonth(true); },
-    });
+    this.openConfirm('just', { actionReview: action }, msg);
   }
 
   // Modal de revisão (Bootstrap)
@@ -502,6 +486,58 @@ export class UserCalendarComponent {
         instance.hide();
       }
     } catch {}
+  }
+
+  // --- Confirmation modal helpers ---
+  openConfirm(ctx: 'plan'|'just', payload: any, message: string) {
+    this.confirmContext.set(ctx);
+    this.confirmPayload.set(payload);
+    this.confirmMessage.set(message || 'Tem certeza?');
+    this.confirmOpen.set(true);
+  }
+  cancelConfirm() {
+    this.confirmOpen.set(false);
+    this.confirmContext.set(null);
+    this.confirmPayload.set(null);
+  }
+  confirmYes() {
+    const ctx = this.confirmContext();
+    const payload = this.confirmPayload();
+    if (!ctx) { this.cancelConfirm(); return; }
+    if (ctx==='plan' && payload?.id) {
+      this.api.deletePlan(payload.id).subscribe(() => {
+        const cur = this.data();
+        if (cur) {
+          const plans = (cur.plans || []).filter((p: any) => p.id !== payload.id);
+          this.data.set({ ...cur, plans });
+        }
+        this.load();
+        this.refreshMonth(true);
+      });
+    } else if (ctx==='just') {
+      // Two contexts: deletion or review action
+      if (payload?.j) {
+        const j = payload.j;
+        const dateIso = this.selectedDate();
+        if (dateIso) {
+          this.api.deleteJustificationByDate(dateIso).subscribe(() => this.load());
+        } else if (j?.id) {
+          this.api.deleteJustification(j.id).subscribe(() => this.load());
+        }
+      } else if (payload?.actionReview) {
+        const alunoId = this.alunoId();
+        const dateIso = this.selectedDate();
+        const action = payload.actionReview as 'APPROVED'|'REJECTED';
+        if (alunoId && dateIso && action) {
+          const note = (this.reviewNote() || '').trim() || undefined;
+          this.api.reviewJustification({ alunoId, date: dateIso, action, note }).subscribe({
+            next: () => { this.load(); this.refreshMonth(true); },
+            error: () => { this.load(); this.refreshMonth(true); },
+          });
+        }
+      }
+    }
+    this.cancelConfirm();
   }
 
   private loadDaySessions(dateIso: string) {
@@ -609,5 +645,84 @@ export class UserCalendarComponent {
         });
       }
     });
+  }
+
+  monthLabel = computed(() => {
+    const dt = new Date(this.year(), this.month()-1, 1);
+    return dt.toLocaleString('pt-BR', { month:'long', year:'numeric' });
+  });
+  todayIso = new Date().toISOString().slice(0,10);
+  isToday(dateIso?: string) { return !!dateIso && dateIso === this.todayIso; }
+  dayAriaLabel(cell: {date?:string;day?:number;d?:CalendarDay}) {
+    if(!cell.date || !cell.day) return 'Vazio';
+    const parts: string[] = [];
+    parts.push(`Dia ${cell.day}`);
+    if (this.isToday(cell.date)) parts.push('Hoje');
+    if (cell.date === this.selectedDate()) parts.push('Selecionado');
+    if (cell.d) {
+      const st = cell.d.status;
+      switch(st){
+        case 'BLUE': parts.push('Futuro'); break;
+        case 'RED': parts.push('Faltou'); break;
+        case 'YELLOW': parts.push('Incompleto'); break;
+        case 'GREEN': parts.push('Cumprido'); break;
+        case 'ORANGE': parts.push('Justificado'); break;
+      }
+      if (cell.d.workedSeconds) {
+        const horas = (cell.d.workedSeconds/3600).toFixed(1);
+        parts.push(`${horas} horas trabalhadas`);
+      }
+    }
+    return parts.join(', ');
+  }
+
+  formatDateHuman(iso?: string) {
+    if(!iso) return '';
+    try {
+      const d = new Date(iso + 'T00:00:00');
+      return d.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' }).replace(/\b(\w)/g, m => m.toUpperCase());
+    } catch { return iso; }
+  }
+  formatDateShort(iso?: string) {
+    if(!iso) return '';
+    try { const d = new Date(iso + 'T00:00:00'); return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit'}); } catch { return iso; }
+  }
+
+  get daySessionsProcessed() {
+    const list = this.sessionsForDay() || [];
+    return list.map(s => {
+      let worked: string | undefined;
+      if (s.checkInTime && s.checkOutTime) {
+        try {
+          const start = new Date(s.checkInTime).getTime();
+          const end = new Date(s.checkOutTime).getTime();
+          if (end > start) {
+            const diff = Math.floor((end - start)/1000);
+            const h = Math.floor(diff/3600);
+            const m = Math.floor((diff%3600)/60);
+            worked = h ? `${h}h ${m.toString().padStart(2,'0')}m` : `${m}m`;
+          }
+        } catch {}
+      }
+      return { ...s, _workedDisplay: worked };
+    });
+  }
+  get dayTotalHoursLabel(): string {
+    const list = this.daySessionsProcessed;
+    let totalSecs = 0;
+    for (const s of list) {
+      if (s.checkInTime && s.checkOutTime) {
+        const start = new Date(s.checkInTime).getTime();
+        const end = new Date(s.checkOutTime).getTime();
+        if (end > start) totalSecs += Math.floor((end-start)/1000);
+      }
+    }
+    if (!totalSecs) return '';
+    const h = Math.floor(totalSecs/3600); const m = Math.floor((totalSecs%3600)/60);
+    return h ? `${h}h ${m.toString().padStart(2,'0')}m` : `${m}m`;
+  }
+  get dayRecordsLabel(): string {
+    const n = (this.sessionsForDay()||[]).length;
+    if (n===0) return '0 registros'; if (n===1) return '1 registro'; return `${n} registros`;
   }
 }

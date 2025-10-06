@@ -8,41 +8,59 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
   standalone: true,
   imports: [CommonModule],
   template: `
-  <div class="modal-backdrop fade show" (click)="close()"></div>
-  <div class="loc-modal card shadow-lg">
-    <div class="card-header d-flex align-items-center justify-content-between py-2">
-      <h6 class="mb-0">Localização</h6>
-      <button type="button" class="btn-close btn-sm" (click)="close()"></button>
-    </div>
-    <div class="card-body p-0 position-relative">
-      <iframe class="map-container border-0" allowfullscreen
-        referrerpolicy="no-referrer-when-downgrade"
-        [src]="googleEmbedSafeUrl" loading="lazy"></iframe>
-      <div *ngIf="loading" class="map-loading-overlay d-flex flex-column align-items-center justify-content-center">
-        <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-        <div class="small text-muted">Carregando mapa...</div>
+  <div class="loc-modal-backdrop" (click)="close()"></div>
+  <div class="loc-modal-wrapper" role="dialog" aria-modal="true" aria-label="Modal de Localização">
+    <div class="loc-modal-card animate-pop">
+      <div class="loc-modal-head d-flex align-items-center justify-content-between">
+        <h6 class="mb-0 fw-semibold d-flex align-items-center gap-2">
+          <i class="bi bi-geo-alt text-primary"></i>
+          <span>Localização</span>
+        </h6>
+        <button type="button" class="btn btn-sm btn-outline-secondary close-btn" (click)="close()">
+          <i class="bi bi-x"></i>
+        </button>
       </div>
-      <div class="p-3 border-top small">
-        <div *ngIf="address; else coordsTpl">{{ address }}</div>
+      <div class="loc-modal-body position-relative">
+        <iframe class="map-frame" allowfullscreen
+          referrerpolicy="no-referrer-when-downgrade"
+          [src]="googleEmbedSafeUrl" loading="lazy"></iframe>
+        <div *ngIf="loading" class="map-loading-overlay d-flex flex-column align-items-center justify-content-center">
+          <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+          <div class="small text-muted">Carregando mapa...</div>
+        </div>
+      </div>
+      <div class="loc-modal-footer small">
+        <div *ngIf="address; else coordsTpl" class="address-line">{{ address }}</div>
         <ng-template #coordsTpl>
-          <div>
-            Lat: {{ lat | number:'1.6-6' }}<br>
-            Lng: {{ lng | number:'1.6-6' }}
+          <div class="coords-line">
+            Lat: {{ lat | number:'1.6-6' }} · Lng: {{ lng | number:'1.6-6' }}
           </div>
         </ng-template>
-        <div class="mt-2 d-flex gap-2 flex-wrap">
-          <a class="btn btn-outline-primary btn-sm" target="_blank" [href]="googleMapsUrl">Google Maps</a>
-          <a class="btn btn-outline-secondary btn-sm" target="_blank" [href]="openStreetMapUrl">OpenStreetMap</a>
+        <div class="links d-flex gap-2 flex-wrap mt-2">
+          <a class="btn btn-outline-primary btn-sm" target="_blank" [href]="googleMapsUrl"><i class="bi bi-box-arrow-up-right"></i> Google</a>
+          <a class="btn btn-outline-secondary btn-sm" target="_blank" [href]="openStreetMapUrl"><i class="bi bi-box-arrow-up-right"></i> OSM</a>
         </div>
       </div>
     </div>
   </div>
   `,
   styles: [`
-    .loc-modal{position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:520px; max-width:95vw; z-index:1060; border-radius:14px;}
-    .modal-backdrop{z-index:1055; background:rgba(33,37,41,.55);}
-  .map-container{width:100%; height:320px; border-top-left-radius:0; border-top-right-radius:0;}
-  .map-loading-overlay{position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,.85);}
+  .loc-modal-backdrop{position:fixed; inset:0; background:rgba(15,20,30,.55); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); z-index:1098; animation:fadeIn .35s ease;}
+  .loc-modal-wrapper{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:1.25rem; z-index:1100;}
+  .loc-modal-card{width:580px; max-width:100%; background:rgba(255,255,255,.86); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-radius:22px; box-shadow:0 8px 32px -8px rgba(0,0,0,.35),0 2px 6px -2px rgba(0,0,0,.12); overflow:hidden; border:1px solid rgba(255,255,255,.45);}
+  .loc-modal-head{padding:1rem 1.25rem; border-bottom:1px solid rgba(0,0,0,.08);}
+  .close-btn{border-radius:10px;}
+  .loc-modal-body{position:relative;}
+  .map-frame{display:block; width:100%; height:340px; border:0;}
+  .map-loading-overlay{position:absolute; inset:0; background:linear-gradient(140deg,rgba(255,255,255,.9),rgba(255,255,255,.75));}
+  .loc-modal-footer{padding:1rem 1.25rem 1.25rem; background:linear-gradient(180deg,rgba(255,255,255,.0),rgba(255,255,255,.55));}
+  .address-line,.coords-line{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; line-height:1.3;}
+  .links a{display:inline-flex; align-items:center; gap:.35rem;}
+  @keyframes fadeIn{from{opacity:0} to{opacity:1}}
+  @media (max-width: 575.98px){
+    .loc-modal-card{border-radius:16px;}
+    .map-frame{height:300px;}
+  }
   `]
 })
 export class LocationModalComponent implements OnInit, OnDestroy {

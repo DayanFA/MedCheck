@@ -1,79 +1,141 @@
-<div class="aluno-checkin-wrapper">
-  <div class="card p-4 unified-card">
+<div class="aluno-checkin-wrapper position-relative">
+  <!-- Ambient background borrowed from home -->
+  <div class="content-box animate-fade-slide">
     <div class="row g-4">
-      <div class="col-12 col-xl-4">
-        <!-- Seção de status movida para Home -->
-        <!-- Barra de botões removida (Iniciar/Atualizar) conforme solicitação -->
-  <div class="mt-2 small" [class.text-success]="message.includes('realizado')" [class.text-danger]="message.startsWith('Falha')">{{message}}</div>
-        <h6 class="mb-3 d-flex align-items-center gap-3">Registrar Check-In
-          <button type="button" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 camera-btn" (click)="toggleScan()">
-            <i class="bi" [ngClass]="scanning ? 'bi-camera-video-off' : 'bi-camera'" style="font-size:1.4rem; color:#0d6efd;"></i>
-            <span class="fw-semibold text-primary">{{ scanning ? 'Parar' : 'Ler QR' }}</span>
-          </button>
-        </h6>
-        <div *ngIf="scanning" class="mb-3">
-          <div class="row g-2 align-items-end mb-2">
-            <div class="col-sm-6">
-              <label class="form-label small mb-1">Câmera</label>
-              <select class="form-select form-select-sm" [(ngModel)]="selectedDeviceId" (change)="onChangeDevice()">
-                <option *ngFor="let d of videoDevices" [value]="d.deviceId">{{ d.label || 'Câmera' }}</option>
-              </select>
-            </div>
-            <div class="col-sm-6 text-sm-end small text-muted" *ngIf="!videoDevices.length">Listando câmeras...</div>
-          </div>
-          <div class="qr-video-wrapper mb-2">
-            <video #qrVideo class="qr-video rounded border" playsinline muted autoplay></video>
-          </div>
-          <div class="small text-muted">Aponte para o QR do preceptor para preencher automaticamente.</div>
-        </div>
-        <div class="row g-2 align-items-end">
-          <!-- Select de disciplina removido para o aluno: disciplina vem da preferência/global -->
-          <div class="col-6">
-            <label class="form-label small">ID Preceptor</label>
-            <input type="number" class="form-control form-control-sm" [(ngModel)]="preceptorId" />
-          </div>
-          <div class="col-6">
-            <label class="form-label small">Código</label>
-            <input type="text" class="form-control form-control-sm" [(ngModel)]="code" />
-          </div>
-          <div class="col-12 d-grid">
-            <button class="btn btn-primary btn-sm" (click)="submitCheckIn()" [disabled]="submitting || status?.inService">Check-In</button>
-          </div>
-          <div class="col-12 d-grid mt-2" *ngIf="status?.inService">
-            <button class="btn btn-warning btn-sm" (click)="openCheckoutConfirm()" [disabled]="submitting">Realizar Check-Out</button>
-          </div>
-          <div *ngIf="showCheckoutConfirm" class="checkout-modal-backdrop">
-            <div class="checkout-modal card p-3 p-sm-4">
-              <h6 class="fw-semibold mb-3">Confirmar Check-Out</h6>
-              <p class="small mb-2">Você realmente deseja encerrar seu turno agora?</p>
-              <p class="small mb-3">Horas de hoje até o momento: <strong>{{ workedToday }}</strong></p>
-              <div class="d-flex flex-wrap gap-2 justify-content-end">
-                <button class="btn btn-outline-secondary btn-sm" (click)="cancelCheckout()" [disabled]="submitting">Cancelar</button>
-                <button class="btn btn-warning btn-sm" (click)="confirmCheckout()" [disabled]="submitting">Confirmar</button>
+      <!-- Left: Check-In Form / Scanner -->
+      <div class="col-12 col-xl-4 order-1 order-xl-0">
+        <div class="mini-metrics row g-2 mb-3">
+          <div class="col-4">
+            <div class="mini-metric-card status" [class.on]="status?.inService" [class.off]="!status?.inService">
+              <div class="mm-label">Status</div>
+              <div class="mm-value d-flex align-items-center gap-1">
+                <i class="bi" [ngClass]="status?.inService ? 'bi-play-circle-fill text-success' : 'bi-pause-circle text-danger'"></i>
+                <span>{{ status?.inService ? 'Em serviço' : 'Fora de Serviço' }}</span>
               </div>
             </div>
           </div>
+          <div class="col-4">
+            <div class="mini-metric-card time">
+              <div class="mm-label">Hoje</div>
+              <div class="mm-value mono">{{ workedToday }}</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="mini-metric-card disc" *ngIf="disciplineId; else noDisc">
+              <div class="mm-label">Disciplina</div>
+              <div class="mm-value" title="{{(disciplines|json)}}">{{ getDisciplineCode() || '—' }}</div>
+            </div>
+            <ng-template #noDisc>
+              <div class="mini-metric-card disc empty">
+                <div class="mm-label">Disciplina</div>
+                <div class="mm-value text-muted">—</div>
+              </div>
+            </ng-template>
+          </div>
         </div>
-        <!-- Texto antigo removido conforme solicitação -->
+        <div class="section-head d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+          <h6 class="mb-0 d-flex align-items-center gap-2 fw-semibold">
+            <i class="bi bi-qr-code-scan text-primary" style="font-size:1.1rem"></i>
+            <span>Registrar Check-In</span>
+          </h6>
+          <button type="button" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 camera-btn" (click)="toggleScan()">
+            <i class="bi" [ngClass]="scanning ? 'bi-camera-video-off' : 'bi-camera'" style="font-size:1.15rem;"></i>
+            <span class="fw-semibold">{{ scanning ? 'Parar' : 'Ler QR' }}</span>
+          </button>
+        </div>
+     <div class="status-message small mb-2"
+       aria-live="polite"
+       [class.text-success]="message.includes('realizado') && !preceptorCodeError && !codeInvalidError"
+       [class.text-danger]="message.startsWith('Falha') && !preceptorCodeError && !codeInvalidError"
+       [class.error-banner]="preceptorCodeError || codeInvalidError">
+          {{message}}
+        </div>
+        <div *ngIf="scanning" class="scan-block mb-3 animate-fade-slide">
+          <div class="row g-2 align-items-end mb-2 camera-select-group">
+            <div class="col-8">
+              <label class="form-label tiny mb-1">Câmera</label>
+              <select class="form-select form-select-sm compact-select" [(ngModel)]="selectedDeviceId" (change)="onChangeDevice()">
+                <option *ngFor="let d of videoDevices" [value]="d.deviceId">{{ d.label || 'Câmera' }}</option>
+              </select>
+            </div>
+            <div class="col-4 text-end small text-muted" *ngIf="!videoDevices.length">Listando...</div>
+          </div>
+          <div class="qr-video-wrapper rounded shadow-xs mb-2">
+            <video #qrVideo class="qr-video" playsinline muted autoplay></video>
+          </div>
+          <div class="small text-muted">Aponte para o QR do preceptor para preencher automaticamente.</div>
+        </div>
+  <div class="form-grid row g-2 align-items-end mb-2">
+          <div class="col-6">
+            <label class="form-label tiny d-flex justify-content-between align-items-center">ID Preceptor</label>
+            <input
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              maxlength="12"
+              class="form-control form-control-sm"
+              [ngModel]="preceptorId"
+              (ngModelChange)="onPreceptorChange($event)"
+              (keydown)="filterDigitKey($event)"
+              (paste)="filterPaste($event)"
+              [ngClass]="{'is-invalid': preceptorCodeError}"
+              autocomplete="off"
+              placeholder="Somente números"
+            />
+            <div *ngIf="preceptorCodeError" class="invalid-feedback d-block tiny">Informe Preceptor e Código</div>
+          </div>
+          <div class="col-6">
+            <label class="form-label tiny d-flex justify-content-between align-items-center">Código</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="code" (ngModelChange)="onCodeChange($event)" [ngClass]="{'is-invalid': preceptorCodeError || codeInvalidError}" />
+            <div *ngIf="preceptorCodeError" class="invalid-feedback d-block tiny">Informe Preceptor e Código</div>
+            <div *ngIf="codeInvalidError" class="invalid-feedback d-block tiny">Código inválido ou expirado</div>
+          </div>
+          <div class="col-12"><div class="divider-space my-1"></div></div>
+          <div class="col-12 d-grid mt-2">
+            <button class="btn btn-primary action-btn btn-sm d-flex justify-content-center align-items-center gap-2" (click)="submitCheckIn()" [disabled]="submitting || status?.inService">
+              <i class="bi bi-box-arrow-in-right"></i>
+              <span>Check-In</span>
+            </button>
+          </div>
+          <div class="col-12 d-grid mt-2" *ngIf="status?.inService">
+            <button class="btn btn-warning action-btn btn-sm d-flex justify-content-center align-items-center gap-2" (click)="openCheckoutConfirm()" [disabled]="submitting">
+              <i class="bi bi-box-arrow-right"></i>
+              <span>Check-Out</span>
+            </button>
+          </div>
+        </div>
       </div>
-      <div class="col-12 col-xl-8">
-        <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
+      <!-- Right: History Table -->
+      <div class="col-12 col-xl-8 order-0 order-xl-1">
+        <div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2 section-head">
           <div class="d-flex align-items-center gap-2 flex-wrap">
-            <h6 class="mb-0">Histórico</h6>
-            <div class="btn-group btn-group-sm">
-              <button class="btn btn-outline-secondary" (click)="loadHistory('today')">Hoje</button>
-              <button class="btn btn-outline-secondary" (click)="loadHistory('3d')">3 dias</button>
-              <button class="btn btn-outline-secondary" (click)="loadHistory('3w')">3 semanas</button>
-              <button class="btn btn-outline-secondary" (click)="loadHistory('all')">Tudo</button>
+            <h6 class="mb-0 fw-semibold">Histórico</h6>
+            <div class="btn-group btn-group-sm history-range-group" role="group" aria-label="Intervalos rápidos de histórico">
+              <button class="btn btn-outline-secondary history-range-btn" [class.active-range]="currentRange==='today'" (click)="!loadingHistory && loadHistory('today')" [attr.aria-pressed]="currentRange==='today'" title="Registros de hoje" [disabled]="loadingHistory"> 
+                <span *ngIf="loadingHistory && currentRange==='today'" class="spinner-border spinner-border-sm me-1"></span>
+                Hoje
+              </button>
+              <button class="btn btn-outline-secondary history-range-btn" [class.active-range]="currentRange==='3d'" (click)="!loadingHistory && loadHistory('3d')" [attr.aria-pressed]="currentRange==='3d'" title="Últimos 3 dias" [disabled]="loadingHistory">
+                <span *ngIf="loadingHistory && currentRange==='3d'" class="spinner-border spinner-border-sm me-1"></span>
+                3 dias
+              </button>
+              <button class="btn btn-outline-secondary history-range-btn" [class.active-range]="currentRange==='3w'" (click)="!loadingHistory && loadHistory('3w')" [attr.aria-pressed]="currentRange==='3w'" title="Últimas 3 semanas" [disabled]="loadingHistory">
+                <span *ngIf="loadingHistory && currentRange==='3w'" class="spinner-border spinner-border-sm me-1"></span>
+                3 semanas
+              </button>
+              <button class="btn btn-outline-secondary history-range-btn" [class.active-range]="currentRange==='all'" (click)="!loadingHistory && loadHistory('all')" [attr.aria-pressed]="currentRange==='all'" title="Últimos 6 meses" [disabled]="loadingHistory">
+                <span *ngIf="loadingHistory && currentRange==='all'" class="spinner-border spinner-border-sm me-1"></span>
+                Tudo
+              </button>
             </div>
           </div>
           <form class="d-flex align-items-end gap-2 flex-wrap" (submit)="$event.preventDefault(); applyDateFilter();">
             <div>
-              <label class="form-label small mb-1">Início</label>
+              <label class="form-label tiny mb-1">Início</label>
               <input type="date" class="form-control form-control-sm" [(ngModel)]="startDate" name="startDate" />
             </div>
             <div>
-              <label class="form-label small mb-1">Fim</label>
+              <label class="form-label tiny mb-1">Fim</label>
               <input type="date" class="form-control form-control-sm" [(ngModel)]="endDate" name="endDate" />
             </div>
             <div class="pb-1">
@@ -81,10 +143,27 @@
             </div>
           </form>
         </div>
-        <div class="small text-muted mb-2" *ngIf="filterMessage">{{filterMessage}}</div>
-        <div *ngIf="loadingHistory" class="small text-muted">Carregando...</div>
-        <div *ngIf="!loadingHistory && !history.length" class="small text-muted">Sem registros.</div>
-        <div class="table-responsive">
+        <div class="filter-summary mb-2 animate-fade-slide">
+          <div class="fs-pill d-inline-flex align-items-center gap-3 px-3 py-1 rounded flex-wrap">
+            <span class="d-inline-flex align-items-center gap-2 small fw-semibold">
+              <i class="bi bi-calendar-range text-primary"></i> {{ periodLabel }}
+            </span>
+            <span class="badge rounded-pill bg-light text-dark border small fw-normal px-2 py-1">{{ recordsLabel }}</span>
+            <span *ngIf="periodTotalHours" class="small text-muted d-inline-flex align-items-center gap-1">
+              <i class="bi bi-clock"></i>{{ periodTotalHours }}
+            </span>
+            <span *ngIf="filterMessage && filterMessage!=='OK' && !filterMessage.startsWith('Período')" class="small text-danger">{{filterMessage}}</span>
+          </div>
+        </div>
+        <div *ngIf="loadingHistory" class="history-skeleton mt-2">
+          <div class="sk-row" *ngFor="let i of [1,2,3,4,5]"></div>
+        </div>
+        <div *ngIf="!loadingHistory && !history.length" class="empty-history text-center py-4">
+          <div class="emoji mb-2">🗂️</div>
+          <div class="fw-semibold mb-1">Nenhum registro no período</div>
+          <div class="text-muted small">Faça um Check-In para começar a registrar suas horas.</div>
+        </div>
+        <div class="table-wrapper table-responsive shadow-xs rounded">
           <table *ngIf="!loadingHistory && history.length" class="table table-sm align-middle mb-0">
             <thead>
               <tr>
@@ -98,21 +177,23 @@
             <tbody>
               <tr *ngFor="let h of pagedHistory">
                 <td>{{h.checkInTime | date:'dd/MM HH:mm'}}</td>
-                <td class="text-center" style="width:120px;">
+                <td class="text-center loc-cell">
                   <ng-container *ngIf="h.checkInLat!=null && h.checkInLng!=null; else noInLoc">
                     <small class="d-block text-muted">{{h.checkInLat | number:'1.4-4'}}, {{h.checkInLng | number:'1.4-4'}}</small>
-                    <button class="btn btn-link p-0" title="Ver local de entrada" (click)="openLocation(h.checkInLat,h.checkInLng)">
-                      <i class="bi bi-geo-alt-fill text-primary"></i>
+                    <button class="btn btn-sm btn-outline-primary px-2 py-1 d-inline-flex align-items-center gap-1" title="Ver local de entrada" (click)="openLocation(h.checkInLat,h.checkInLng)">
+                      <i class="bi bi-geo-alt"></i>
+                      <span class="d-none d-xl-inline">In</span>
                     </button>
                   </ng-container>
                   <ng-template #noInLoc><span class="badge bg-secondary">sem loc</span></ng-template>
                 </td>
                 <td>{{h.checkOutTime ? (h.checkOutTime | date:'dd/MM HH:mm') : '-'}} </td>
-                <td class="text-center" style="width:120px;">
+                <td class="text-center loc-cell">
                   <ng-container *ngIf="h.checkOutLat!=null && h.checkOutLng!=null; else noOutLoc">
                     <small class="d-block text-muted">{{h.checkOutLat | number:'1.4-4'}}, {{h.checkOutLng | number:'1.4-4'}}</small>
-                    <button class="btn btn-link p-0" title="Ver local de saída" (click)="openLocation(h.checkOutLat,h.checkOutLng)">
-                      <i class="bi bi-geo-alt text-success"></i>
+                    <button class="btn btn-sm btn-outline-success px-2 py-1 d-inline-flex align-items-center gap-1" title="Ver local de saída" (click)="openLocation(h.checkOutLat,h.checkOutLng)">
+                      <i class="bi bi-geo"></i>
+                      <span class="d-none d-xl-inline">Out</span>
                     </button>
                   </ng-container>
                   <ng-template #noOutLoc><span class="badge bg-secondary">sem loc</span></ng-template>
@@ -124,19 +205,35 @@
           <ng-container *ngIf="showLocModal">
             <app-location-modal [lat]="locLat!" [lng]="locLng!" [onClose]="closeLocation"></app-location-modal>
           </ng-container>
-          <nav *ngIf="!loadingHistory && totalPages > 1" class="mt-2">
-            <ul class="pagination pagination-sm mb-0 flex-wrap">
-              <li class="page-item" [class.disabled]="currentPage === 1">
-                <button class="page-link" (click)="prevPage()" [disabled]="currentPage===1">«</button>
-              </li>
-              <li class="page-item" *ngFor="let p of pages" [class.active]="p===currentPage">
-                <button class="page-link" (click)="setPage(p)">{{p}}</button>
-              </li>
-              <li class="page-item" [class.disabled]="currentPage === totalPages">
-                <button class="page-link" (click)="nextPage()" [disabled]="currentPage===totalPages">»</button>
-              </li>
-            </ul>
-          </nav>
+        </div>
+        <nav *ngIf="!loadingHistory && totalPages > 1" class="mt-2">
+          <ul class="pagination pagination-sm mb-0 flex-wrap">
+            <li class="page-item" [class.disabled]="currentPage === 1">
+              <button class="page-link" (click)="prevPage()" [disabled]="currentPage===1">«</button>
+            </li>
+            <li class="page-item" *ngFor="let p of pages" [class.active]="p===currentPage">
+              <button class="page-link" (click)="setPage(p)">{{p}}</button>
+            </li>
+            <li class="page-item" [class.disabled]="currentPage === totalPages">
+              <button class="page-link" (click)="nextPage()" [disabled]="currentPage===totalPages">»</button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Checkout estilo unificado -->
+  <div *ngIf="showCheckoutConfirm">
+    <div class="checkout-confirm-backdrop"></div>
+    <div class="checkout-confirm-wrapper">
+      <div class="checkout-confirm-modal signup-like-modal p-4 p-sm-5 animate-pop" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">
+        <h5 id="checkoutTitle" class="fw-semibold mb-3">Confirmar Check-Out</h5>
+        <p class="small mb-2">Você realmente deseja encerrar seu turno agora?</p>
+        <p class="small mb-4">Horas de hoje até o momento: <strong>{{ workedToday }}</strong></p>
+        <div class="d-flex flex-wrap gap-2 justify-content-end">
+          <button class="btn btn-outline-secondary btn-sm" (click)="cancelCheckout()" [disabled]="submitting">Cancelar</button>
+          <button class="btn confirm-btn btn-sm" (click)="confirmCheckout()" [disabled]="submitting">Confirmar</button>
         </div>
       </div>
     </div>

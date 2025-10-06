@@ -1,115 +1,131 @@
-<div class="home-container p-0" *ngIf="!loading; else loadingTpl">
-  <div class="content-box mx-auto">
-    <div class="row g-4 align-items-start profile-row">
-      <div class="col-12 col-md-3 text-center mb-3 mb-md-0">
-        <div class="profile-pic rounded d-flex align-items-center justify-content-center overflow-hidden mx-auto">
+<div class="home-wrapper" *ngIf="!loading; else loadingTpl">
+  <div class="content-box mx-auto animate-fade-slide">
+    <!-- Header / Profile Block -->
+    <div class="d-flex flex-column flex-md-row gap-4 align-items-md-center profile-block">
+      <div class="avatar-shell mx-auto mx-md-0">
+        <div class="profile-pic shadow-sm position-relative">
           <img *ngIf="avatarUrl" [src]="avatarUrl" alt="Foto de perfil" class="w-100 h-100 object-fit-cover" />
-          <i *ngIf="!avatarUrl" class="bi bi-person-fill fs-1"></i>
+          <div *ngIf="!avatarUrl" class="placeholder-icon d-flex align-items-center justify-content-center h-100 w-100">
+            <i class="bi bi-person-fill display-6"></i>
+          </div>
+          <span class="status-dot" [class.on]="inService" [class.off]="!inService" title="{{ inService ? 'Em serviço' : 'Fora de serviço' }}"></span>
         </div>
       </div>
-      <div class="col-12 col-md-9 profile-details small ps-md-3 text-break">
-        <p class="mb-1"><strong>Nome:</strong> {{user.name}}</p>
-        <p class="mb-1"><strong>Matrícula:</strong> {{user.matricula}}</p>
-  <p class="mb-1"><strong>CPF:</strong> {{ formatCpf(user.cpf) }}</p>
-  <p class="mb-1"><strong>E-mail:</strong> {{user.email}}</p>
-      </div>
-    </div>
-    <hr class="my-4" />
-    <div class="row row-cols-1 row-cols-sm-3 g-3 g-sm-0 text-center align-items-center mb-4">
-      <div class="col status small">
-        <strong>Status:</strong>
-        <span [class.text-success]="inService" [class.text-danger]="!inService">
-          {{ inService ? 'Em Serviço' : 'Fora de Serviço' }}
-        </span>
-        <div class="small mt-1" *ngIf="inService && sessionStart">Início: {{ sessionStart | date:'HH:mm' }}</div>
-      </div>
-      <div class="col">
-        <div class="small fw-semibold">Hora Atual:</div>
-        <div class="time-display" id="currentTime">{{currentTime}}</div>
-      </div>
-      <div class="col">
-        <div class="small fw-semibold">Horas (Hoje):</div>
-        <div class="hours-display">{{workedToday}}</div>
-      </div>
-    </div>
-    <div class="row mb-3" *ngIf="role==='ALUNO' || role==='ADMIN'">
-      <div class="col-12 col-md-6">
-        <label class="form-label small fw-semibold">Disciplina de Contexto</label>
-        <select class="form-select form-select-sm" [(ngModel)]="selectedDisciplineId" (ngModelChange)="onChangeDiscipline()">
-          <option *ngFor="let d of disciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
-        </select>
-        <div class="form-text" *ngIf="role==='ALUNO'">O histórico, calendário e validação de check-in serão filtrados por esta disciplina.</div>
-        <div class="form-text" *ngIf="role==='ADMIN'">Usada como disciplina padrão em relatórios e futuras ações administrativas contextuais.</div>
-        <div *ngIf="disciplines.length === 0" class="text-warning small mt-1">
-          Nenhuma disciplina disponível para este usuário.
+      <div class="flex-grow-1 profile-meta small">
+        <div class="row g-2">
+          <div class="col-12 col-sm-6 col-lg-4"><span class="label">Nome</span><div class="val text-truncate" title="{{user.name}}">{{user.name}}</div></div>
+          <div class="col-6 col-lg-2"><span class="label">Matrícula</span><div class="val">{{user.matricula}}</div></div>
+          <div class="col-6 col-lg-2"><span class="label">CPF</span><div class="val">{{ formatCpf(user.cpf) }}</div></div>
+          <div class="col-12 col-sm-6 col-lg-4"><span class="label">E‑mail</span><div class="val text-truncate" title="{{user.email}}">{{user.email}}</div></div>
         </div>
       </div>
     </div>
-    <div class="text-center position-relative d-grid d-sm-block">
+
+    <!-- Metrics Row -->
+    <div class="row g-3 metrics-row mt-4">
+      <div class="col-12 col-sm-4">
+        <div class="metric-card h-100">
+          <div class="metric-label">Status</div>
+          <div class="metric-value" [class.text-success]="inService" [class.text-danger]="!inService">{{ inService ? 'Em Serviço' : 'Fora de Serviço' }}</div>
+          <div class="metric-sub small" *ngIf="inService && sessionStart">Início: {{ sessionStart | date:'HH:mm' }}</div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-4">
+        <div class="metric-card h-100">
+          <div class="metric-label">Hora Atual</div>
+          <div class="metric-clock" id="currentTime">{{currentTime}}</div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-4">
+        <div class="metric-card h-100">
+          <div class="metric-label">Horas (Hoje)</div>
+          <div class="metric-hours">{{workedToday}}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Discipline Selector -->
+    <div class="row mt-4" *ngIf="role==='ALUNO' || role==='ADMIN'">
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-xs selector-card">
+          <div class="card-body p-3 p-sm-4">
+            <label class="form-label small fw-semibold mb-2">Disciplina de Contexto</label>
+            <div class="input-group input-group-sm context-select mb-2">
+              <span class="input-group-text"><i class="bi bi-book"></i></span>
+              <select class="form-select compact-select" [(ngModel)]="selectedDisciplineId" (ngModelChange)="onChangeDiscipline()">
+                <option *ngFor="let d of disciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
+              </select>
+            </div>
+            <div class="form-text" *ngIf="role==='ALUNO'">Filtra calendário, relatórios e validação de check-in.</div>
+            <div class="form-text" *ngIf="role==='ADMIN'">Usada como disciplina base para ações administrativas.</div>
+            <div *ngIf="disciplines.length === 0" class="text-warning small mt-2">Nenhuma disciplina disponível.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Primary Action -->
+    <div class="action-zone mt-4">
       <button (click)="onPrimaryAction()"
-              class="btn fw-semibold px-4 w-100 w-sm-auto"
+              class="btn action-btn px-4 py-2 fw-semibold"
               [ngClass]="inService ? 'btn-warning' : 'btn-primary'"
               [disabled]="performing || submitting">
-        <ng-container *ngIf="!inService; else checkoutLabel">
+        <ng-container *ngIf="!inService; else checkoutLabel2">
           {{ performing ? 'Abrindo...' : 'Fazer Check-In' }}
         </ng-container>
-        <ng-template #checkoutLabel>
+        <ng-template #checkoutLabel2>
           {{ submitting ? 'Encerrando...' : 'Fazer Check-Out' }}
         </ng-template>
       </button>
     </div>
-    <div *ngIf="showCheckoutConfirm" class="checkout-modal-backdrop">
-      <div class="checkout-modal card p-3 p-sm-4">
-        <h6 class="fw-semibold mb-3">Confirmar Check-Out</h6>
-        <p class="small mb-2">Você realmente deseja encerrar seu turno agora?</p>
-        <p class="small mb-3">Horas de hoje até o momento: <strong>{{ workedToday }}</strong></p>
-        <div class="d-flex flex-wrap gap-2 justify-content-end">
-          <button class="btn btn-outline-secondary btn-sm" (click)="showCheckoutConfirm=false" [disabled]="submitting">Cancelar</button>
-          <button class="btn btn-warning btn-sm" (click)="confirmCheckout()" [disabled]="submitting">Confirmar</button>
-        </div>
-      </div>
-    </div>
+
   </div>
-  <!-- Bloco administrativo: listagem de usuários -->
-  <div *ngIf="role==='ADMIN'" class="content-box mx-auto mt-4">
-    <div class="d-flex flex-wrap align-items-end justify-content-between mb-3 gap-3">
+
+  <!-- Admin Block -->
+  <div *ngIf="role==='ADMIN'" class="content-box mx-auto mt-4 animate-fade-slide">
+    <div class="admin-header d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
       <div>
         <h6 class="m-0">Usuários do Sistema</h6>
         <small class="text-muted">Gestão rápida (filtro por disciplina)</small>
       </div>
-      <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
-        <div class="d-flex flex-column">
+      <div class="d-flex flex-wrap align-items-center gap-3 ms-auto admin-filters">
+        <div class="filter-group">
           <label class="form-label small mb-1">Disciplina</label>
-          <select class="form-select form-select-sm" [(ngModel)]="adminDisciplineId" (ngModelChange)="loadAdminUsers(true)" style="min-width:200px">
+          <select class="form-select form-select-sm" [(ngModel)]="adminDisciplineId" (ngModelChange)="loadAdminUsers(true)">
             <option value="">Todas</option>
             <option *ngFor="let d of adminDisciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
           </select>
         </div>
-        <div class="d-flex flex-column">
+        <div class="filter-group">
           <label class="form-label small mb-1">Buscar</label>
-          <div class="input-group input-group-sm">
+          <div class="input-group input-group-sm search-group">
             <input type="text" class="form-control" [(ngModel)]="adminQ" (keydown)="adminSearchEnter($event)" placeholder="Nome, CPF, email...">
             <button class="btn btn-outline-secondary" (click)="loadAdminUsers(true)" [disabled]="adminLoading"><i class="bi bi-search"></i></button>
             <button class="btn btn-outline-light border" (click)="adminClearSearch()" [disabled]="!adminQ"><i class="bi bi-x"></i></button>
           </div>
         </div>
-        <button class="btn btn-outline-secondary btn-sm align-self-end" (click)="loadAdminUsers()" [disabled]="adminLoading"><i class="bi bi-arrow-clockwise"></i></button>
+        <button class="btn btn-outline-secondary btn-sm align-self-end refresh-btn" (click)="loadAdminUsers()" [disabled]="adminLoading" title="Recarregar"><i class="bi bi-arrow-clockwise"></i></button>
       </div>
     </div>
-    <div *ngIf="adminMsg" class="alert alert-info py-2">{{ adminMsg }}</div>
-    <div *ngIf="adminLoading" class="text-center py-4"><div class="spinner-border text-primary"></div></div>
-    <div *ngIf="!adminLoading" class="table-responsive">
-      <table class="table table-sm align-middle">
+    <div *ngIf="adminMsg" class="alert alert-info py-2 mb-3">{{ adminMsg }}</div>
+    <div *ngIf="adminLoading" class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+    <div *ngIf="!adminLoading" class="table-responsive admin-table-wrapper">
+      <table class="table table-sm align-middle mb-0">
         <thead>
           <tr>
-            <th>Nome</th><th>CPF</th><th>Email</th><th>Role</th><th>Disciplina Atual</th><th class="text-end">Ações</th>
+            <th>Nome</th>
+            <th>CPF</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Disciplina Atual</th>
+            <th class="text-end">Ações</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let u of adminUsers">
-            <td>{{u.name}}</td>
+            <td class="text-truncate" style="max-width:180px" title="{{u.name}}">{{u.name}}</td>
             <td>{{ formatCpf(u.cpf) }}</td>
-            <td>{{u.email}}</td>
+            <td class="text-truncate" style="max-width:220px" title="{{u.email}}">{{u.email}}</td>
             <td>
               <select class="form-select form-select-sm w-auto" [ngModel]="u.role" (ngModelChange)="adminChangeRole(u,$event)">
                 <option value="ALUNO">ALUNO</option>
@@ -124,13 +140,13 @@
             </td>
             <td class="text-end">
               <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-danger" (click)="adminDeleteUser(u)"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-outline-danger" (click)="adminDeleteUser(u)" title="Excluir"><i class="bi bi-trash"></i></button>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
-      <div class="d-flex flex-wrap align-items-center justify-content-between mt-3 gap-2">
+      <div class="d-flex flex-wrap align-items-center justify-content-between mt-3 gap-2 pagination-bar">
         <div class="small text-muted">Página {{ adminPage + 1 }} de {{ adminTotalPages || 1 }} • {{ adminTotalItems }} registros</div>
         <div class="btn-group btn-group-sm">
           <button class="btn btn-outline-secondary" (click)="adminFirstPage()" [disabled]="adminPage===0">«</button>
@@ -149,3 +165,19 @@
     </div>
   </div>
 </ng-template>
+
+<!-- Checkout Modal (fora da content-box para cobrir a viewport inteira) -->
+<ng-container *ngIf="showCheckoutConfirm">
+  <div class="checkout-confirm-backdrop" (click)="showCheckoutConfirm=false"></div>
+  <div class="checkout-confirm-wrapper d-flex align-items-center justify-content-center">
+    <div role="dialog" aria-labelledby="checkoutConfirmTitle" aria-modal="true" class="checkout-confirm-modal signup-like-modal bg-white rounded shadow p-4 animate-pop" style="max-width:360px;width:100%;" (click)="$event.stopPropagation()">
+      <h5 id="checkoutConfirmTitle" class="fw-bold mb-2">Confirmar Check-Out</h5>
+      <p class="mb-3 small text-muted">Tem certeza que deseja encerrar seu turno agora? Esta ação registrará o fim do seu período atual.</p>
+      <p class="mb-4 small"><span class="text-muted">Horas de hoje:&nbsp;</span><strong>{{ workedToday }}</strong></p>
+      <div class="text-end d-flex flex-wrap gap-2 justify-content-end">
+        <button class="btn btn-outline-secondary btn-sm" (click)="showCheckoutConfirm=false" [disabled]="submitting" autofocus>Cancelar</button>
+        <button class="btn btn-primary btn-sm confirm-btn" (click)="confirmCheckout()" [disabled]="submitting">{{ submitting ? 'Encerrando...' : 'Confirmar' }}</button>
+      </div>
+    </div>
+  </div>
+</ng-container>

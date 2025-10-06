@@ -18,6 +18,8 @@ import { HttpClient } from '@angular/common/http';
 export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   preceptorId: number | null = null;
   code = '';
+  preceptorCodeError = false; // controla destaque visual quando faltar campos
+  codeInvalidError = false; // código informado mas backend invalidou / expirado
   status: any = null;
   history: any[] = [];
   // Paginação
@@ -28,6 +30,9 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   submitting = false;
   message = '';
   filterMessage = '';
+  periodLabel = '';
+  recordsLabel = '';
+  periodTotalHours = '';
   startDate = todayAcreISODate();
   endDate = todayAcreISODate();
   private timerId?: any;
@@ -45,6 +50,44 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   private browserReady = typeof window !== 'undefined' && typeof document !== 'undefined';
   private jsqrLoadingPromise: Promise<void> | null = null; // evita múltiplos loads
   showCheckoutConfirm = false;
+  private escListener = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && this.showCheckoutConfirm) {
+      this.cancelCheckout();
+    }
+  };
+
+  getDisciplineCode(): string | undefined {
+    if (!this.disciplineId) return undefined;
+    const d = this.disciplines?.find(x => x.id === this.disciplineId);
+    return d?.code;
+  }
+
+  // ===================== INPUT VALIDATION (Preceptor ID) =====================
+  onPreceptorChange(val: any) {
+    if (val === null || val === undefined || val === '') { this.preceptorId = null; return; }
+    const onlyDigits = String(val).replace(/\D+/g,'').slice(0,12);
+    this.preceptorId = onlyDigits ? Number(onlyDigits) : null;
+    this.evaluatePreceptorCodeError();
+  }
+  onCodeChange(val:any){ this.code = val || ''; this.evaluatePreceptorCodeError(); }
+  filterDigitKey(ev: KeyboardEvent) {
+    const allowedControl = ['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'];
+    if (allowedControl.includes(ev.key)) return;
+    if (/^[0-9]$/.test(ev.key)) return;
+    ev.preventDefault();
+  }
+  filterPaste(ev: ClipboardEvent) {
+    const data = ev.clipboardData?.getData('text') || '';
+    if (!/^\d+$/.test(data)) {
+      ev.preventDefault();
+    }
+  }
+  private evaluatePreceptorCodeError(){
+    // erro somente se usuário tentou interagir (mensagem gerada no submit) ou campos alterados sem preencher
+    if (this.message === 'Informe Preceptor e Código' || this.preceptorCodeError){
+      this.preceptorCodeError = !this.preceptorId || !this.code?.trim();
+    }
+  }
   // Baseline retornado pela API (segundos já contabilizados até o último refresh)
   private baselineWorkedSeconds = 0;
   private baselineCaptureTs = 0; // timestamp em ms de quando baseline foi definido
@@ -150,7 +193,12 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   async submitCheckIn() {
     if (this.submitting) return;
     if (!this.disciplineId) { this.message = 'Selecione uma disciplina antes.'; return; }
-    if (!this.preceptorId || !this.code) { this.message='Informe Preceptor e Código'; return; }
+    if (!this.preceptorId || !this.code) { 
+      this.message='Informe Preceptor e Código'; 
+      this.preceptorCodeError = true; 
+      this.codeInvalidError = false;
+      return; 
+    }
     // Verifica permissão de geolocalização antes de tentar
     try {
       if ((navigator as any).permissions?.query) {
@@ -173,6 +221,8 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
     this.check.checkIn(this.preceptorId!, this.code.trim().toUpperCase(), this.disciplineId, lat, lng).subscribe({
       next: _ => {
         this.message='Check-In realizado';
+        this.preceptorCodeError = false;
+        this.codeInvalidError = false;
         this.code='';
         this.refreshStatus();
         this.loadHistory('today');
@@ -180,15 +230,26 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
         this.updateCachedUserStatus(true);
         this.broadcastServiceStatus(true);
       },
-      error: err => { this.message = err?.error?.error || 'Falha no Check-In'; this.submitting=false; }
+      error: err => { 
+        this.message = err?.error?.error || 'Falha no Check-In'; 
+        this.submitting=false; 
+        this.preceptorCodeError = (this.message === 'Informe Preceptor e Código');
+        this.codeInvalidError = (this.message === 'Código inválido ou expirado');
+      }
     });
   }
 
   openCheckoutConfirm() {
     if (!this.status?.inService) return; // nada a confirmar
     this.showCheckoutConfirm = true;
+    setTimeout(()=>{
+      try {
+        const btn = document.querySelector('.checkout-confirm-modal .btn-outline-secondary') as HTMLButtonElement | null;
+        btn?.focus();
+      } catch {}
+    }, 30);
+    window.addEventListener('keydown', this.escListener, { once: false });
   }
-  cancelCheckout() { this.showCheckoutConfirm = false; }
   confirmCheckout() {
     if (this.submitting) return;
     this.submitting = true; this.message = 'Obtendo localização...';
@@ -199,19 +260,24 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
       next: _ => {
         this.message='Check-Out realizado';
         this.showCheckoutConfirm=false;
+        window.removeEventListener('keydown', this.escListener as any);
         this.refreshStatus();
         this.loadHistory('today');
         this.submitting=false;
         this.updateCachedUserStatus(false);
         this.broadcastServiceStatus(false);
       },
-      error: err => { this.message = err?.error?.error || 'Falha no Check-Out'; this.showCheckoutConfirm=false; this.submitting=false; }
+      error: err => { this.message = err?.error?.error || 'Falha no Check-Out'; this.showCheckoutConfirm=false; this.submitting=false; window.removeEventListener('keydown', this.escListener as any); }
       });
     });
   }
 
+  cancelCheckout() { this.showCheckoutConfirm = false; window.removeEventListener('keydown', this.escListener as any); }
+
+  currentRange: 'today'|'3d'|'3w'|'all'|null = 'today';
   loadHistory(range: 'today'|'3d'|'3w'|'all'|null, customStart?: string, customEnd?: string) {
     this.loadingHistory = true;
+    if (range) this.currentRange = range; else this.currentRange = null;
     let sStr: string; let eStr: string;
     if (range) {
       const end = new Date();
@@ -232,7 +298,10 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
         this.history = list;
         this.currentPage = 1; // reset página a cada novo carregamento
         this.loadingHistory=false;
-        this.filterMessage = `Período: ${sStr} a ${eStr} (${list.length} registro(s))`;
+        this.filterMessage = 'OK';
+        this.periodLabel = this.buildPeriodLabel(sStr, eStr);
+        this.recordsLabel = this.buildRecordsLabel(list.length);
+        this.periodTotalHours = this.buildTotalWorkedLabel(list);
       },
       error: _ => { this.loadingHistory=false; this.filterMessage='Falha ao buscar histórico'; }
     });
@@ -303,8 +372,46 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   applyDateFilter() {
     if (!this.startDate || !this.endDate) { this.filterMessage = 'Informe datas inicial e final'; return; }
     if (this.startDate > this.endDate) { this.filterMessage = 'Data inicial maior que a final'; return; }
-    this.filterMessage = 'Filtrando...';
+    this.filterMessage = 'Filtrando...'; this.periodLabel=''; this.recordsLabel=''; this.periodTotalHours='';
     this.loadHistory(null, this.startDate, this.endDate);
+  }
+
+  private buildPeriodLabel(start: string, end: string): string {
+    const fmt = (iso: string) => {
+      const [y,m,d] = iso.split('-');
+      return `${d}/${m}/${y}`;
+    };
+    const today = todayAcreISODate();
+    if (start === end) {
+      if (start === today) return 'Hoje';
+      return fmt(start);
+    }
+    return `${fmt(start)} → ${fmt(end)}`;
+  }
+  private buildRecordsLabel(n: number): string {
+    if (n === 0) return '0 registros';
+    if (n === 1) return '1 registro';
+    return `${n} registros`;
+  }
+
+  private buildTotalWorkedLabel(list: any[]): string {
+    // Soma durations fechadas (checkOutTime != null) se propriedade worked disponível no item; caso contrário calcula.
+    let totalSecs = 0;
+    for (const h of list) {
+      if (h.checkInTime) {
+        if (h.checkOutTime) {
+          const start = new Date(h.checkInTime).getTime();
+          const end = new Date(h.checkOutTime).getTime();
+          if (end > start) totalSecs += Math.floor((end - start)/1000);
+        } else if (h.workedSeconds) {
+          totalSecs += h.workedSeconds; // fallback caso API forneça
+        }
+      }
+    }
+    if (!totalSecs) return '';
+    const h = Math.floor(totalSecs/3600);
+    const m = Math.floor((totalSecs%3600)/60);
+    return h ? `${h}h ${m.toString().padStart(2,'0')}m` : `${m}m`;
   }
 
   // Helpers de paginação

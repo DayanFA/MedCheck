@@ -1,6 +1,7 @@
 import { APP_BASE_HREF } from '@angular/common';
 import { CommonEngine } from '@angular/ssr';
 import express from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import bootstrap from './src/main.server';
@@ -16,6 +17,15 @@ export function app(): express.Express {
 
   server.set('view engine', 'html');
   server.set('views', browserDistFolder);
+
+  // Proxy /api -> backend URL provided by Render via env var API_URL
+  const apiUrl = process.env['API_URL'];
+  if (apiUrl) {
+    server.use('/api', createProxyMiddleware({
+      target: apiUrl,
+      changeOrigin: true,
+    }));
+  }
 
   // Example Express Rest API endpoints
   // server.get('/api/**', (req, res) => { });

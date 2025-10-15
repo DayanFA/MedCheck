@@ -56,8 +56,10 @@ public class SecurityConfig {
 
         http.cors(cors -> cors.configurationSource(request -> {
             CorsConfiguration configuration = new CorsConfiguration();
-            // allow localhost on any port (use allowedOriginPatterns to accept dynamic dev ports)
-            configuration.setAllowedOriginPatterns(java.util.List.of("http://localhost:*", "https://localhost:*"));
+            String origins = System.getenv().getOrDefault("FRONTEND_ORIGINS", "http://localhost:*;https://localhost:*");
+            java.util.List<String> patterns = java.util.Arrays.stream(origins.split("[;, ]+"))
+                    .filter(s -> !s.isBlank()).toList();
+            configuration.setAllowedOriginPatterns(patterns.isEmpty() ? java.util.List.of("http://localhost:*", "https://localhost:*") : patterns);
             configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
             configuration.setAllowedHeaders(java.util.List.of("*"));
             configuration.setAllowCredentials(true);

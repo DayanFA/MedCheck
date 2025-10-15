@@ -1,37 +1,16 @@
 services:
-  # MySQL as a private service inside Render
-  - name: mysql
-    type: private_service
-    env: docker
-    plan: starter
-    rootDir: infra
-    dockerfilePath: ./mysql.Dockerfile
-    envVars:
-      - key: MYSQL_ROOT_PASSWORD
-        value: changeMeRoot
-      - key: MYSQL_DATABASE
-        value: medcheck
-      - key: MYSQL_USER
-        value: meduser
-      - key: MYSQL_PASSWORD
-        value: changeMeUser
-    disk:
-      name: mysql-data
-      mountPath: /var/lib/mysql
-      sizeGB: 10
-
   # Spring Boot API
   - name: medcheck-api
     type: web
     rootDir: medcheckapi
     plan: starter
     autoDeploy: true
-    buildCommand: ./mvnw -DskipTests package
+    buildCommand: mvn -DskipTests package
     startCommand: >-
       java -Dserver.port=$PORT
-           -Dspring.datasource.url=jdbc:mysql://mysql:3306/medcheck?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Rio_Branco
-           -Dspring.datasource.username=meduser
-           -Dspring.datasource.password=changeMeUser
+           -Dspring.datasource.url=$SPRING_DATASOURCE_URL
+           -Dspring.datasource.username=$SPRING_DATASOURCE_USERNAME
+           -Dspring.datasource.password=$SPRING_DATASOURCE_PASSWORD
            -Dspring.sql.init.mode=never
            -Dapp.jwt-secret=$APP_JWT_SECRET
            -Dapp.reset.base-url=$APP_RESET_BASE_URL
@@ -49,6 +28,13 @@ services:
           name: medcheck-web
           type: web
           property: url
+      # Preencha a seguir com as credenciais do seu banco MySQL (gerenciado no Render)
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:mysql://YOUR_MYSQL_HOST:3306/YOUR_DB?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Rio_Branco
+      - key: SPRING_DATASOURCE_USERNAME
+        value: YOUR_DB_USER
+      - key: SPRING_DATASOURCE_PASSWORD
+        value: YOUR_DB_PASSWORD
 
   # Angular SSR Web (serving the app and proxying /api to the backend)
   - name: medcheck-web

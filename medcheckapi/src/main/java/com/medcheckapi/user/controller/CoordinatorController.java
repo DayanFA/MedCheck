@@ -168,6 +168,21 @@ public class CoordinatorController {
         return ResponseEntity.ok(list);
     }
 
+    // Lista todos os coordenadores disponíveis para vínculo
+    @GetMapping("/coordenadores")
+    public ResponseEntity<?> listCoordinators(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
+        ensureCoordinatorOrAdmin(principal);
+        List<Map<String, Object>> list = userRepository.findByRole(Role.COORDENADOR).stream().map(c -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", c.getId());
+            m.put("name", c.getName());
+            m.put("cpf", c.getCpf());
+            m.put("email", c.getInstitutionalEmail());
+            return m;
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(list);
+    }
+
     @GetMapping("/disciplinas")
     public ResponseEntity<?> listDisciplines(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
         ensureCoordinatorOrAdmin(principal);
@@ -195,7 +210,25 @@ public class CoordinatorController {
         return ResponseEntity.ok(list);
     }
 
+    @GetMapping("/disciplinas/{id}/coordenadores")
+    public ResponseEntity<?> listDisciplineCoordinators(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                                        @PathVariable Long id) {
+        ensureCoordinatorOrAdmin(principal);
+        Discipline d = disciplineRepository.findById(id).orElseThrow();
+        List<Map<String, Object>> list = d.getCoordinators().stream().map(c -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", c.getId());
+            m.put("name", c.getName());
+            m.put("cpf", c.getCpf());
+            m.put("email", c.getInstitutionalEmail());
+            return m;
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(list);
+    }
+
     public static class LinkRequest { public Long preceptorId; }
+
+    public static class LinkCoordinatorRequest { public Long coordinatorId; }
 
     @PostMapping("/disciplinas/{id}/preceptores")
     public ResponseEntity<?> linkPreceptor(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
@@ -211,6 +244,20 @@ public class CoordinatorController {
         return ResponseEntity.ok(Map.of("ok", true));
     }
 
+    @PostMapping("/disciplinas/{id}/coordenadores")
+    public ResponseEntity<?> linkCoordinator(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                             @PathVariable Long id,
+                                             @RequestBody LinkCoordinatorRequest req) {
+        ensureCoordinatorOrAdmin(principal);
+        if (req == null || req.coordinatorId == null) return ResponseEntity.badRequest().body(Map.of("error", "coordinatorId obrigatório"));
+        Discipline d = disciplineRepository.findById(id).orElseThrow();
+        User c = userRepository.findById(req.coordinatorId).orElseThrow();
+        if (c.getRole() != Role.COORDENADOR) return ResponseEntity.badRequest().body(Map.of("error", "Usuário não é COORDENADOR"));
+        d.getCoordinators().add(c);
+        disciplineRepository.save(d);
+        return ResponseEntity.ok(Map.of("ok", true));
+    }
+
     @DeleteMapping("/disciplinas/{id}/preceptores/{preceptorId}")
     public ResponseEntity<?> unlinkPreceptor(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
                                              @PathVariable Long id,
@@ -218,6 +265,18 @@ public class CoordinatorController {
         ensureCoordinatorOrAdmin(principal);
         Discipline d = disciplineRepository.findById(id).orElseThrow();
         boolean removed = d.getPreceptors().removeIf(u -> Objects.equals(u.getId(), preceptorId));
+        if (!removed) return ResponseEntity.notFound().build();
+        disciplineRepository.save(d);
+        return ResponseEntity.ok(Map.of("ok", true));
+    }
+
+    @DeleteMapping("/disciplinas/{id}/coordenadores/{coordinatorId}")
+    public ResponseEntity<?> unlinkCoordinator(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                               @PathVariable Long id,
+                                               @PathVariable Long coordinatorId) {
+        ensureCoordinatorOrAdmin(principal);
+        Discipline d = disciplineRepository.findById(id).orElseThrow();
+        boolean removed = d.getCoordinators().removeIf(u -> Objects.equals(u.getId(), coordinatorId));
         if (!removed) return ResponseEntity.notFound().build();
         disciplineRepository.save(d);
         return ResponseEntity.ok(Map.of("ok", true));

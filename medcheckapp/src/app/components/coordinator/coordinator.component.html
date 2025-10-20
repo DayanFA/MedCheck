@@ -4,7 +4,7 @@
   <div class="row g-3 align-items-end my-2">
     <div class="col-md-6">
       <label class="form-label">Disciplina</label>
-      <select class="form-select" [(ngModel)]="selecionadaId" (ngModelChange)="onSelectDisciplina()">
+  <select class="form-select select-caret" [(ngModel)]="selecionadaId" (ngModelChange)="onSelectDisciplina()">
         <option *ngFor="let d of disciplinas" [value]="d.id">{{ d.code }} - {{ d.name }}</option>
       </select>
     </div>

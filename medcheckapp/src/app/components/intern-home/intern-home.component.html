@@ -52,7 +52,7 @@
             <label class="form-label small fw-semibold mb-2">Disciplina de Contexto</label>
             <div class="input-group input-group-sm context-select mb-2">
               <span class="input-group-text"><i class="bi bi-book"></i></span>
-              <select class="form-select compact-select" [(ngModel)]="selectedDisciplineId" (ngModelChange)="onChangeDiscipline()">
+              <select class="form-select compact-select select-caret" [(ngModel)]="selectedDisciplineId" (ngModelChange)="onChangeDiscipline()">
                 <option *ngFor="let d of disciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
               </select>
             </div>
@@ -91,7 +91,7 @@
       <div class="d-flex flex-wrap align-items-center gap-3 ms-auto admin-filters">
         <div class="filter-group">
           <label class="form-label small mb-1">Disciplina</label>
-          <select class="form-select form-select-sm" [(ngModel)]="adminDisciplineId" (ngModelChange)="loadAdminUsers(true)">
+          <select class="form-select form-select-sm select-caret" [(ngModel)]="adminDisciplineId" (ngModelChange)="loadAdminUsers(true)">
             <option value="">Todas</option>
             <option *ngFor="let d of adminDisciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
           </select>

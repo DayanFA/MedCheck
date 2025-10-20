@@ -4,7 +4,7 @@
     <!-- Selector para COORDENADOR -->
     <div class="d-flex align-items-center gap-2" *ngIf="isCoordinator">
       <ng-container *ngIf="coordinatorDisciplines !== null; else coordLoading">
-        <select class="form-select form-select-sm" style="min-width:220px" [ngModel]="disciplineId" (ngModelChange)="setDisciplineForCoordinator($event)">
+  <select class="form-select form-select-sm select-caret" style="min-width:220px" [ngModel]="disciplineId" (ngModelChange)="setDisciplineForCoordinator($event)">
           <option *ngFor="let d of coordinatorDisciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
         </select>
       </ng-container>
@@ -26,7 +26,7 @@
         </div>
       </ng-container>
       <ng-template #discOk>
-        <select class="form-select form-select-sm" style="min-width:220px" [ngModel]="disciplineId" (ngModelChange)="setDisciplineForPreceptor($event)">
+  <select class="form-select form-select-sm select-caret" style="min-width:220px" [ngModel]="disciplineId" (ngModelChange)="setDisciplineForPreceptor($event)">
           <option *ngFor="let d of preceptorDisciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
         </select>
       </ng-template>

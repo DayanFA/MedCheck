@@ -20,13 +20,13 @@ import { ReportComponent } from '../report/report.component';
     <div *ngIf="alunoId(); else noAluno" class="d-flex flex-wrap gap-3 align-items-end">
       <div>
         <label class="form-label small mb-1">Semana</label>
-        <select class="form-select form-select-sm" [(ngModel)]="week" (change)="onWeekChange()">
+  <select class="form-select form-select-sm select-caret" [(ngModel)]="week" (change)="onWeekChange()">
           <option *ngFor="let w of weeks" [ngValue]="w">Semana {{w}}</option>
         </select>
       </div>
       <div *ngIf="disciplines().length > 1">
         <label class="form-label small mb-1">Disciplina</label>
-        <select class="form-select form-select-sm" [(ngModel)]="selectedDisciplineId" (change)="reloadWeek()">
+  <select class="form-select form-select-sm select-caret" [(ngModel)]="selectedDisciplineId" (change)="reloadWeek()">
           <option *ngFor="let d of disciplines()" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
         </select>
       </div>

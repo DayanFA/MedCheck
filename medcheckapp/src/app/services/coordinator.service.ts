@@ -32,6 +32,23 @@ export class CoordinatorService {
     return this.http.delete(`${this.api}/disciplinas/${id}/preceptores/${preceptorId}`, { headers: this.authHeaders() });
   }
 
+  // Coordinators management (ADMIN only usage on UI)
+  listCoordinators(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.api}/coordenadores`, { headers: this.authHeaders() });
+  }
+
+  listDisciplineCoordinators(id: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.api}/disciplinas/${id}/coordenadores`, { headers: this.authHeaders() });
+  }
+
+  linkCoordinator(id: number, coordinatorId: number): Observable<any> {
+    return this.http.post(`${this.api}/disciplinas/${id}/coordenadores`, { coordinatorId }, { headers: this.authHeaders() });
+  }
+
+  unlinkCoordinator(id: number, coordinatorId: number): Observable<any> {
+    return this.http.delete(`${this.api}/disciplinas/${id}/coordenadores/${coordinatorId}`, { headers: this.authHeaders() });
+  }
+
   studentsByDiscipline(disciplineId: number, year?: number | string, page: number = 0, size: number = 8, q?: string,
     filters?: { fName?: boolean; fPhone?: boolean; fEmail?: boolean; fCpf?: boolean; statusIn?: boolean; statusOut?: boolean; preceptorId?: number; sort?: string }): Observable<any> {
     let params = new HttpParams().set('page', page).set('size', size);

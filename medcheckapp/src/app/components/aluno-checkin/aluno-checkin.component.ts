@@ -5,6 +5,7 @@ import { LocationModalComponent } from '../location-modal/location-modal.compone
 import { CheckInService } from '../../services/checkin.service';
 import { todayAcreISODate } from '../../util/date-utils';
 import { HttpClient } from '@angular/common/http';
+import { DisciplineService } from '../../services/discipline.service';
 // Nota: Para leitura de QR sem lib pesada, usamos um placeholder que pode ser trocado depois por 'jsqr'
 // ou outra lib. Aqui fica apenas estrutura inicial (captura de vídeo) para integração posterior.
 
@@ -35,6 +36,7 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   periodTotalHours = '';
   startDate = todayAcreISODate();
   endDate = todayAcreISODate();
+  private preceptorNameMap = new Map<number,string>();
   private timerId?: any;
   scanning = false;
   videoStream: MediaStream | null = null;
@@ -109,7 +111,7 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // Futuro: integrar decodificação real de QR (ex: jsQR). Por enquanto, placeholder para mostrar câmera.
 
-  constructor(private check: CheckInService, private http: HttpClient) {}
+  constructor(private check: CheckInService, private http: HttpClient, private disc: DisciplineService) {}
 
   ngOnInit(): void {
     this.readDisciplineFromLocal();
@@ -117,6 +119,7 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadWorkedCache();
     this.refreshStatus();
     this.loadDisciplines();
+    this.loadDisciplinePreceptors();
     this.loadHistory('today');
     this.timerId = setInterval(()=> this.tick(), 1000);
   }
@@ -331,6 +334,7 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
     this.disciplineId = id;
     if (id != null) localStorage.setItem(this.LOCAL_DISC_KEY, String(id)); else localStorage.removeItem(this.LOCAL_DISC_KEY);
     window.dispatchEvent(new CustomEvent('mc:discipline-changed', { detail: { id } }));
+    this.loadDisciplinePreceptors();
     this.loadHistory('today');
   }
 
@@ -418,12 +422,36 @@ export class AlunoCheckinComponent implements OnInit, OnDestroy, AfterViewInit {
   get totalPages(): number { return Math.max(1, Math.ceil(this.history.length / this.pageSize)); }
   get pagedHistory(): any[] {
     const start = (this.currentPage - 1) * this.pageSize;
-    return this.history.slice(start, start + this.pageSize);
+    const page = this.history.slice(start, start + this.pageSize);
+    return page.map(s => {
+      let precName: string | undefined = s?.preceptor?.name || s?.preceptorName || s?.preceptor_name || s?.preceptor_full_name;
+      const precId = s?.preceptor?.id || s?.preceptorId || s?.preceptor_id;
+      if (!precName && precId != null) {
+        const mapped = this.preceptorNameMap.get(Number(precId));
+        if (mapped) precName = mapped;
+      }
+      return { ...s, _preceptorDisplay: precName };
+    });
   }
   get pages(): number[] { return Array.from({ length: this.totalPages }, (_, i) => i + 1); }
   setPage(p: number) { if (p < 1 || p > this.totalPages) return; this.currentPage = p; }
   nextPage() { if (this.currentPage < this.totalPages) this.currentPage++; }
   prevPage() { if (this.currentPage > 1) this.currentPage--; }
+
+  private loadDisciplinePreceptors() {
+    const did = this.disciplineId;
+    if (!did) { this.preceptorNameMap.clear(); return; }
+    try {
+      this.disc.get(did).subscribe({
+        next: (detail: any) => {
+          this.preceptorNameMap.clear();
+          const list = detail?.preceptors || [];
+          for (const p of list) if (p?.id && p?.name) this.preceptorNameMap.set(Number(p.id), String(p.name));
+        },
+        error: _ => { /* silencioso */ }
+      });
+    } catch {}
+  }
 
   async toggleScan() {
     if (this.scanning) {

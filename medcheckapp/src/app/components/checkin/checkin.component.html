@@ -32,22 +32,46 @@
 
   <h6>Histórico de Hoje</h6>
   <div *ngIf="loadingHistory" class="text-muted small">Carregando...</div>
-  <ul class="list-unstyled small" *ngIf="!loadingHistory && history.length; else emptyHistory">
-    <li *ngFor="let h of history">
-      Check-In: {{h.checkInTime}}
-      <span *ngIf="h.checkInLat != null && h.checkInLng != null">
-        <span class="text-info">[{{h.checkInLat}}, {{h.checkInLng}}]
-          <button class="btn btn-link p-0 ms-1" style="font-size:11px" (click)="openLocation(h.checkInLat, h.checkInLng)" title="Ver mapa">🗺️</button>
-        </span>
-      </span>
-      <span *ngIf="h.checkOutTime"> | Check-Out: {{h.checkOutTime}}
-        <span *ngIf="h.checkOutLat != null && h.checkOutLng != null" class="text-info">[{{h.checkOutLat}}, {{h.checkOutLng}}]
-          <button class="btn btn-link p-0 ms-1" style="font-size:11px" (click)="openLocation(h.checkOutLat, h.checkOutLng)" title="Ver mapa">🗺️</button>
-        </span>
-      </span>
-      <span *ngIf="h.worked"> ({{h.worked}})</span>
-    </li>
-  </ul>
+  <div class="table-responsive" *ngIf="!loadingHistory && history.length; else emptyHistory">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>Entrada</th>
+          <th class="text-center">Loc (In)</th>
+          <th>Saída</th>
+          <th class="text-center">Loc (Out)</th>
+          <th>Preceptor</th>
+          <th>Duração</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let h of historyProcessed">
+          <td>{{ h.checkInTime | date:'HH:mm' }}</td>
+          <td class="text-center">
+            <ng-container *ngIf="h.checkInLat!=null && h.checkInLng!=null; else noInLoc">
+              <small class="d-block text-muted">{{h.checkInLat | number:'1.4-4'}}, {{h.checkInLng | number:'1.4-4'}}</small>
+              <button class="btn btn-sm btn-outline-primary px-2 py-1 d-inline-flex align-items-center gap-1" (click)="openLocation(h.checkInLat, h.checkInLng)" title="Local de entrada">
+                <i class="bi bi-geo-alt"></i><span class="d-none d-xl-inline">In</span>
+              </button>
+            </ng-container>
+            <ng-template #noInLoc><span class="badge bg-secondary">sem loc</span></ng-template>
+          </td>
+          <td>{{ h.checkOutTime ? (h.checkOutTime | date:'HH:mm') : '-' }}</td>
+          <td class="text-center">
+            <ng-container *ngIf="h.checkOutLat!=null && h.checkOutLng!=null; else noOutLoc">
+              <small class="d-block text-muted">{{h.checkOutLat | number:'1.4-4'}}, {{h.checkOutLng | number:'1.4-4'}}</small>
+              <button class="btn btn-sm btn-outline-success px-2 py-1 d-inline-flex align-items-center gap-1" (click)="openLocation(h.checkOutLat, h.checkOutLng)" title="Local do Check-Out">
+                <i class="bi bi-geo"></i><span class="d-none d-xl-inline">Out</span>
+              </button>
+            </ng-container>
+            <ng-template #noOutLoc><span class="badge bg-secondary">sem loc</span></ng-template>
+          </td>
+          <td>{{ h._preceptorDisplay || '-' }}</td>
+          <td>{{ h._workedDisplay || '-' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
   <ng-template #emptyHistory><div class="small text-muted">Sem registros.</div></ng-template>
   <app-location-modal *ngIf="showLocModal && modalLat != null && modalLng != null"
     [lat]="modalLat" [lng]="modalLng" [onClose]="closeLocationModal.bind(this)"></app-location-modal>

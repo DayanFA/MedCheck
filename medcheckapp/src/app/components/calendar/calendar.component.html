@@ -223,6 +223,7 @@
               <th class="text-center">Loc (In)</th>
               <th>Saída</th>
               <th class="text-center">Loc (Out)</th>
+              <th>Preceptor</th>
               <th>Duração</th>
             </tr>
           </thead>
@@ -247,6 +248,10 @@
                   </button>
                 </ng-container>
                 <ng-template #noOutLoc><span class="badge bg-secondary">sem loc</span></ng-template>
+              </td>
+              <td>
+                <ng-container *ngIf="s._preceptorDisplay; else noPrecName">{{ s._preceptorDisplay }}</ng-container>
+                <ng-template #noPrecName>-</ng-template>
               </td>
               <td>{{ s._workedDisplay || '-' }}</td>
             </tr>

@@ -107,10 +107,10 @@
   .dimension-card { border:1px solid #d1dae6; background:#fff; border-radius:10px; padding:1rem .95rem .9rem; box-shadow:0 2px 4px rgba(0,0,0,.04); }
   .dimension-card-header { font-weight:600; margin-bottom:.75rem; font-size:.95rem; color:#0d3c61; display:flex; align-items:center; gap:.5rem; position:relative; }
   .dimension-card-header:before { content:""; width:6px; height:18px; border-radius:3px; background:#ff9800; display:inline-block; }
-  .questions-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:.65rem; }
-  .question-tile { position:relative; border:1px solid #d7e0eb; background:#fdfefe; border-radius:8px; padding:.55rem .55rem .9rem; min-height:120px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 1px 2px rgba(0,0,0,.03); }
-  .question-tile .q-text { font-size:.63rem; line-height:1.2; font-weight:500; color:#142b3d; }
-  .question-tile .q-face { position:absolute; bottom:.4rem; right:.45rem; font-size:1.4rem; line-height:1; display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:8px; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,.08); border:1px solid #e0e6ef; font-weight:600; }
+  .questions-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:.7rem; }
+  .question-tile { position:relative; border:1px solid #d7e0eb; background:#fdfefe; border-radius:8px; padding:.55rem .55rem .9rem; padding-right:3.2rem; min-height:128px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+  .question-tile .q-text { font-size:.66rem; line-height:1.28; font-weight:500; color:#142b3d; overflow-wrap:anywhere; }
+  .question-tile .q-face { position:absolute; bottom:.45rem; right:.5rem; font-size:1.4rem; line-height:1; display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:8px; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,.08); border:1px solid #e0e6ef; font-weight:600; }
   .question-tile .q-face[data-score="1"] { background:#ffe5e5; }
   .question-tile .q-face[data-score="2"] { background:#ffeccf; }
   .question-tile .q-face[data-score="3"] { background:#fff7cc; }
@@ -120,14 +120,14 @@
 
   @media (max-width: 680px) {
     .questions-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
-    .question-tile { min-height:110px; }
-    .question-tile .q-text { font-size:.58rem; }
-    .question-tile .q-face { width:34px; height:34px; font-size:1.25rem; }
+    .question-tile { min-height:120px; padding-right:3rem; }
+    .question-tile .q-text { font-size:.6rem; line-height:1.26; }
+    .question-tile .q-face { width:34px; height:34px; font-size:1.25rem; bottom:.4rem; right:.4rem; }
   }
 
   @media (max-width: 480px) {
-    .questions-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap:.5rem; }
-    .question-tile { padding:.5rem .5rem .8rem; min-height:105px; }
+    .questions-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap:.55rem; }
+    .question-tile { padding:.5rem .5rem .85rem; padding-right:2.6rem; min-height:112px; }
     .dimension-card { padding:.85rem .75rem .8rem; }
     .dimension-card-header { font-size:.85rem; }
   }
@@ -162,8 +162,8 @@
   .evaluation-form-print { page-break-after: always; }
 }
 .full-report-print .questions-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:.5rem; }
-.full-report-print .question-tile { border:1px solid #d7e0eb; background:#fff; padding:.4rem .45rem .9rem; border-radius:6px; position:relative; min-height:105px; }
-.full-report-print .question-tile .q-text { font-size:.55rem; line-height:1.15; font-weight:500; }
+.full-report-print .question-tile { border:1px solid #d7e0eb; background:#fff; padding:.4rem .45rem .9rem; padding-right:2rem; border-radius:6px; position:relative; min-height:110px; }
+.full-report-print .question-tile .q-text { font-size:.55rem; line-height:1.18; font-weight:500; }
 .full-report-print .question-tile .q-face { position:absolute; bottom:.35rem; right:.35rem; font-size:1.1rem; }
 .full-report-print .dimension-card { background:#fdfefe; }
 .full-report-print h6 { font-size:.8rem; }

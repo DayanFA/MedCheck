@@ -51,6 +51,23 @@
             </div>
           </div>
         </div>
+        <!-- Texto introdutório MFC (folha de presença) -->
+        <div class="mfc-intro bordered-box p-2 small mb-2">
+          <p>
+            A Medicina de Família e Comunidade (MFC) é definida como a “especialidade
+            médica que presta assistência à saúde de forma continuada, integral e
+            abrangente para as pessoas, suas famílias e a comunidade” (Gusso & Lopes,
+            Tratado de MFC).
+          </p>
+          <p>
+            Atua no nível de atenção primária à saúde (APS), entendida como “oferta de
+            cuidados essenciais de saúde baseados em métodos e tecnologias práticas,
+            cientificamente bem fundamentadas e socialmente aceitáveis, colocadas ao
+            alcance universal de indivíduos e famílias da comunidade, mediante sua plena
+            participação e a um custo que a comunidade e o país podem manter em cada
+            fase do seu desenvolvimento” (Gusso & Lopes, Tratado de MFC).
+          </p>
+        </div>
         <div class="ident-table-wrapper mb-2">
           <table class="table table-bordered table-sm mb-0 ident-table">
             <tbody>
@@ -58,7 +75,12 @@
                 <td class="label">Nome do(a) Interno(a):</td>
                 <td>{{ student.name }}</td>
                 <td class="label">Nome do(a) Preceptor(a):</td>
-                <td>{{ student.preceptorName || '—' }}</td>
+                <td>
+                  <ng-container *ngIf="preceptorsForWeek(w).length > 0; else noPrecHdrPrint">
+                    {{ preceptorsForWeek(w).join(', ') }}
+                  </ng-container>
+                  <ng-template #noPrecHdrPrint>—</ng-template>
+                </td>
               </tr>
               <tr>
                 <td class="label">Período do Rodízio:</td>
@@ -78,6 +100,7 @@
               <th style="min-width:100px">Data</th>
               <th style="min-width:110px">Período</th>
               <th style="min-width:140px">Local</th>
+              <th style="min-width:140px">Preceptor</th>
               <!-- Coluna de assinatura removida -->
             </tr>
           </thead>
@@ -97,6 +120,10 @@
                 <td>
                   <span *ngIf="period.locations?.length; else vazioPB">{{ period.locations.join(', ') }}</span>
                   <ng-template #vazioPB><span class="text-muted">—</span></ng-template>
+                </td>
+                <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length">
+                  <span *ngIf="day.preceptors?.length; else noPrecPB">{{ day.preceptors.join(', ') }}</span>
+                  <ng-template #noPrecPB><span class="text-muted">—</span></ng-template>
                 </td>
                 <!-- célula de assinatura removida -->
               </tr>
@@ -129,7 +156,7 @@
               <td class="label">Nome do(a) Interno(a):</td>
               <td>{{ student.name }}</td>
               <td class="label">Nome do(a) Preceptor(a):</td>
-              <td>{{ student.preceptorName || '—' }}</td>
+              <td>{{ ev.preceptorName || '—' }}</td>
             </tr>
             <tr>
               <td class="label">Período do Rodízio:</td>
@@ -201,6 +228,24 @@
       </div>
     </div>
 
+    <!-- Texto introdutório MFC (folha de presença) -->
+    <div class="mfc-intro bordered-box p-2 small mb-3">
+      <p>
+        A Medicina de Família e Comunidade (MFC) é definida como a “especialidade
+        médica que presta assistência à saúde de forma continuada, integral e
+        abrangente para as pessoas, suas famílias e a comunidade” (Gusso & Lopes,
+        Tratado de MFC).
+      </p>
+      <p>
+        Atua no nível de atenção primária à saúde (APS), entendida como “oferta de
+        cuidados essenciais de saúde baseados em métodos e tecnologias práticas,
+        cientificamente bem fundamentadas e socialmente aceitáveis, colocadas ao
+        alcance universal de indivíduos e famílias da comunidade, mediante sua plena
+        participação e a um custo que a comunidade e o país podem manter em cada
+        fase do seu desenvolvimento” (Gusso & Lopes, Tratado de MFC).
+      </p>
+    </div>
+
     <!-- Tabela de identificação -->
     <div class="ident-table-wrapper mb-3">
       <table class="table table-bordered table-sm mb-0 ident-table">
@@ -209,7 +254,12 @@
             <td class="label">Nome do(a) Interno(a):</td>
             <td>{{ student.name }}</td>
             <td class="label">Nome do(a) Preceptor(a):</td>
-            <td>{{ student.preceptorName || '—' }}</td>
+            <td>
+              <ng-container *ngIf="preceptorsForWeek(selectedWeek).length > 0; else noPrecHdrInline">
+                {{ preceptorsForWeek(selectedWeek).join(', ') }}
+              </ng-container>
+              <ng-template #noPrecHdrInline>—</ng-template>
+            </td>
           </tr>
           <tr>
             <td class="label">Período do Rodízio:</td>
@@ -231,6 +281,7 @@
             <th style="min-width:100px">Data</th>
             <th style="min-width:110px">Período</th>
             <th style="min-width:140px">Local</th>
+            <th style="min-width:140px">Preceptor</th>
             <!-- Coluna de assinatura removida -->
           </tr>
         </thead>
@@ -251,6 +302,10 @@
                   <span *ngIf="period.locations?.length; else vazio">{{ period.locations.join(', ') }}</span>
                   <ng-template #vazio><span class="text-muted">—</span></ng-template>
                 </td>
+              <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length">
+                <span *ngIf="day.preceptors?.length; else noPrec">{{ day.preceptors.join(', ') }}</span>
+                <ng-template #noPrec><span class="text-muted">—</span></ng-template>
+              </td>
               <!-- célula de assinatura removida -->
             </tr>
           </ng-container>

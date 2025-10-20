@@ -171,6 +171,7 @@
                 <th class="text-center">Loc (In)</th>
                 <th>Saída</th>
                 <th class="text-center">Loc (Out)</th>
+                <th>Preceptor</th>
                 <th>Duração</th>
               </tr>
             </thead>
@@ -198,6 +199,7 @@
                   </ng-container>
                   <ng-template #noOutLoc><span class="badge bg-secondary">sem loc</span></ng-template>
                 </td>
+                <td>{{ h._preceptorDisplay || '-' }}</td>
                 <td>{{h.worked || '-'}} </td>
               </tr>
             </tbody>

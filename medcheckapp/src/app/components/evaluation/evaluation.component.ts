@@ -33,42 +33,33 @@ export class EvaluationComponent {
   dimensions: DimensionDef[] = [
     { id: 'dim1', title: 'Dimensão 1: Clínica da APS', questions: [
       { id: 'q1', text: 'Atua com empatia e busca criar vínculo com as pessoas?' },
-      { id: 'q2', text: 'Utiliza o tempo de forma adequada no atendimento às necessidades apresentadas?' },
+      { id: 'q2', text: 'Utiliza o tempo de forma adequada ao atendimento das necessidades apresentadas?' },
       { id: 'q3', text: 'Sabe conduzir a entrevista clínica abordando os diversos problemas relatados?' },
       { id: 'q4', text: 'Sabe conduzir o exame clínico com base nas informações da entrevista?' },
-      { id: 'q5', text: 'Busca a compreensão do processo de adoecimento de forma ampla?' },
-      { id: 'q6', text: 'Oportuniza contato para explorar condições de vida e saúde de membros da família?' },
+      { id: 'q5', text: 'Busca a compreensão do processo de adoecimento de forma mais ampla, abordando temas afeitos às condições de vida, trabalho, relações interpessoais, violência, risco nutricional, p. ex.?' },
+      { id: 'q6', text: 'Oportuniza o contato para explorar as condições de vida e saúde dos demais membros da família?' },
       { id: 'q7', text: 'Estabelece diálogo acessível à compreensão dos pacientes?' },
-      { id: 'q8', text: 'Dedica-se à explicação detalhada da condição de saúde acolhendo dúvidas?' },
-      { id: 'q9', text: 'Confecciona lista de problemas com propostas de encaminhamentos?' },
-      { id: 'q10', text: 'Compreende os ciclos de vida das famílias e aplica no entendimento do adoecimento?' },
+      { id: 'q8', text: 'Dedica-se à explicação detalhada da condição de saúde acolhendo dúvidas e questionamentos por parte de pacientes e familiares?' },
+      { id: 'q9', text: 'Confecciona lista de problemas com propostas de encaminhamentos para cada situação?' },
+      { id: 'q10', text: 'Compreende os ciclos de vida das famílias e os aplica no entendimento dos processos de adoecimento e sofrimento?' },
       { id: 'q11', text: 'Domina a clínica da APS, principais temas e manejo clínico adequado?' }
     ] },
     { id: 'dim2', title: 'Dimensão 2: Atuação comunitária', questions: [
       { id: 'q1', text: 'Dispõe-se, havendo indicação, a realizar visita domiciliar de reconhecimento, seguimento ou busca ativa?' },
-      { id: 'q2', text: 'É permeável ao contato e vínculo com outros equipamentos e representações sociais no território (escolas, igrejas, associações comunitárias etc.)?' },
-      { id: 'q3', text: 'Propõe e realiza atividades nos ambientes comunitários citados (escolas, associações, espaços coletivos)?' }
+      { id: 'q2', text: 'É permeável ao contato e vínculo com outros equipamentos e representações sociais no território como escolas, igrejas, associações comunitárias, p. ex.?' },
+      { id: 'q3', text: 'Propõe e realiza atividades nos ambientes citados acima?' }
     ] },
     { id: 'dim3', title: 'Dimensão 3: Vínculo com a equipe e processo de trabalho', questions: [
       { id: 'q1', text: 'Tem bom vínculo com a equipe de saúde?' },
       { id: 'q2', text: 'Atua de forma integrada e solidária junto à equipe buscando melhorar o processo de trabalho?' },
       { id: 'q3', text: 'Compreende a necessidade de fortalecimento e legitimação da equipe junto à comunidade?' },
-      { id: 'q4', text: 'Compreende as limitações do local onde atua e procura adequar suas condutas aos recursos disponíveis sem prejuízo ao tratamento?' },
-      { id: 'q5', text: 'É proativo na coordenação do cuidado (acompanhamento, resgate de faltosos por telefone, mensagem ou visita domiciliar)?' },
-      { id: 'q6', text: 'Frequenta todas as atividades programadas com assiduidade?' },
-      { id: 'q7', text: 'Chega e sai nos horários adequados, cumprindo sua carga horária?' },
-      { id: 'q8', text: 'Mostra pró-atividade na resolução dos problemas do serviço?' },
-      { id: 'q9', text: 'Desenvolve as tarefas determinadas pela preceptoria diariamente, demonstrando comprometimento com a rotina da equipe?' },
-      { id: 'q10', text: 'Traz aspectos novos e contribuições criativas para as soluções de problemas da equipe ou dos pacientes?' }
+      { id: 'q4', text: 'Compreende as limitações do local onde atua e procura adequar suas condutas aos equipamentos, medicamentos e insumos disponíveis sem prejuízo ao tratamento dos pacientes?' },
+      { id: 'q5', text: 'É proativo na coordenação do cuidado, manifestando interesse pelo acompanhamento dos pacientes inclusive com resgate dos faltosos (contato telefônico, envio de mensagem, visita domiciliar p. ex.)?' }
     ] },
     { id: 'dim4', title: 'Dimensão 4: Conhecimento sobre o sistema de saúde e políticas públicas', questions: [
-      { id: 'q1', text: 'Conhece o sistema de saúde loco-regional, reconhece os diversos pontos de atenção e direciona os pacientes adequadamente (integralidade)?' },
-      { id: 'q2', text: 'Compreende processos de gestão e gerenciamento como fundamentais para garantir melhor cuidado às pessoas e trabalhadores (organização, condições de trabalho, remuneração)?' },
-      { id: 'q3', text: 'É capaz de elaborar e ter visão crítica e propositiva sobre as políticas de saúde?' },
-      { id: 'q4', text: 'Busca continuamente conhecimentos teóricos para aprimorar o cuidado?' },
-      { id: 'q5', text: 'Estuda diariamente as patologias dos casos sob sua responsabilidade?' },
-      { id: 'q6', text: 'Estuda os artigos e materiais indicados pela preceptoria?' },
-      { id: 'q7', text: 'Estuda e realiza com afinco os procedimentos médicos necessários ao tratamento de seus pacientes?' }
+      { id: 'q1', text: 'Conhece o sistema de saúde loco-regional, reconhece os diversos pontos de atenção e consegue direcionar os pacientes aos serviços adequados à continuidade do cuidado (integralidade da atenção)?' },
+      { id: 'q2', text: 'Compreende os processos de gestão e gerenciamento como fundamentais para a garantia do melhor cuidado às pessoas incluindo os trabalhadores em saúde (condições e organização do processo de trabalho, remuneração, p. ex.)?' },
+  { id: 'q3', text: 'É capaz de elaborar e ter visão crítica e propositiva sobre as políticas de saúde?' }
     ] }
   ];
 

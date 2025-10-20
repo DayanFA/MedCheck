@@ -122,6 +122,28 @@ export class CheckInComponent implements OnInit {
     try { window.removeEventListener('mc:discipline-changed', this.onDisciplineChanged as any); } catch {}
   }
 
+  // Lista de histórico já formatada para exibição (nome do preceptor e duração)
+  get historyProcessed() {
+    return (this.history || []).map(h => {
+      // Nome do preceptor (somente nome; sem fallback para ID)
+      const preceptorName = h?.preceptor?.name || h?.preceptorName || h?.preceptor_name || h?.preceptor_full_name;
+      let worked: string | undefined;
+      if (h?.checkInTime && h?.checkOutTime) {
+        try {
+          const start = new Date(h.checkInTime).getTime();
+          const end = new Date(h.checkOutTime).getTime();
+          if (end > start) {
+            const diff = Math.floor((end - start) / 1000);
+            const hh = Math.floor(diff / 3600);
+            const mm = Math.floor((diff % 3600) / 60);
+            worked = hh ? `${hh}h ${mm.toString().padStart(2,'0')}m` : `${mm}m`;
+          }
+        } catch {}
+      }
+      return { ...h, _preceptorDisplay: preceptorName, _workedDisplay: worked };
+    });
+  }
+
   submit() {
     if (!this.disciplineId) { this.message = 'Selecione uma disciplina na Home antes.'; return; }
     if (!this.preceptorId || !this.code) { this.message = 'Informe ID do preceptor e código.'; return; }

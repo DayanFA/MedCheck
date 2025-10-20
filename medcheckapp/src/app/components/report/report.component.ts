@@ -17,7 +17,7 @@ import { ToastService } from '../../services/toast.service';
 
 interface PeriodInterval { start: string; end: string; }
 interface DayPeriod { shift: string; locations: string[]; intervals: PeriodInterval[]; }
-interface WeekDayRow { weekday: string; date: Date; periods: DayPeriod[]; }
+interface WeekDayRow { weekday: string; date: Date; periods: DayPeriod[]; preceptors: string[]; }
 interface WeekData { number: number; days: WeekDayRow[]; evaluation: number | null; loaded: boolean; rotationPeriod: string; }
 
 @Component({
@@ -64,42 +64,33 @@ export class ReportComponent implements OnChanges {
   private questionTexts: Record<string, Record<string,string>> = {
     dim1: {
       q1: 'Atua com empatia e busca criar vínculo com as pessoas?',
-      q2: 'Utiliza o tempo de forma adequada no atendimento às necessidades apresentadas?',
+      q2: 'Utiliza o tempo de forma adequada ao atendimento das necessidades apresentadas?',
       q3: 'Sabe conduzir a entrevista clínica abordando os diversos problemas relatados?',
       q4: 'Sabe conduzir o exame clínico com base nas informações da entrevista?',
-      q5: 'Busca a compreensão do processo de adoecimento de forma ampla?',
-      q6: 'Oportuniza contato para explorar condições de vida e saúde de membros da família?',
+      q5: 'Busca a compreensão do processo de adoecimento de forma mais ampla, abordando temas afeitos às condições de vida, trabalho, relações interpessoais, violência, risco nutricional, p. ex.?',
+      q6: 'Oportuniza o contato para explorar as condições de vida e saúde dos demais membros da família?',
       q7: 'Estabelece diálogo acessível à compreensão dos pacientes?',
-      q8: 'Dedica-se à explicação detalhada da condição de saúde acolhendo dúvidas?',
-      q9: 'Confecciona lista de problemas com propostas de encaminhamentos?',
-      q10: 'Compreende os ciclos de vida das famílias e aplica no entendimento do adoecimento?',
+      q8: 'Dedica-se à explicação detalhada da condição de saúde acolhendo dúvidas e questionamentos por parte de pacientes e familiares?',
+      q9: 'Confecciona lista de problemas com propostas de encaminhamentos para cada situação?',
+      q10: 'Compreende os ciclos de vida das famílias e os aplica no entendimento dos processos de adoecimento e sofrimento?',
       q11: 'Domina a clínica da APS, principais temas e manejo clínico adequado?'
     },
     dim2: {
       q1: 'Dispõe-se, havendo indicação, a realizar visita domiciliar de reconhecimento, seguimento ou busca ativa?',
-      q2: 'É permeável ao contato e vínculo com outros equipamentos e representações sociais no território (escolas, igrejas, associações comunitárias etc.)?',
-      q3: 'Propõe e realiza atividades nos ambientes comunitários citados (escolas, associações, espaços coletivos)?'
+      q2: 'É permeável ao contato e vínculo com outros equipamentos e representações sociais no território como escolas, igrejas, associações comunitárias, p. ex.?',
+      q3: 'Propõe e realiza atividades nos ambientes citados acima?'
     },
     dim3: {
       q1: 'Tem bom vínculo com a equipe de saúde?',
       q2: 'Atua de forma integrada e solidária junto à equipe buscando melhorar o processo de trabalho?',
       q3: 'Compreende a necessidade de fortalecimento e legitimação da equipe junto à comunidade?',
-      q4: 'Compreende as limitações do local onde atua e procura adequar suas condutas aos recursos disponíveis sem prejuízo ao tratamento?',
-      q5: 'É proativo na coordenação do cuidado (acompanhamento, resgate de faltosos por telefone, mensagem ou visita domiciliar)?',
-      q6: 'Frequenta todas as atividades programadas com assiduidade?',
-      q7: 'Chega e sai nos horários adequados, cumprindo sua carga horária?',
-      q8: 'Mostra pró-atividade na resolução dos problemas do serviço?',
-      q9: 'Desenvolve as tarefas determinadas pela preceptoria diariamente, demonstrando comprometimento com a rotina da equipe?',
-      q10: 'Traz aspectos novos e contribuições criativas para as soluções de problemas da equipe ou dos pacientes?'
+      q4: 'Compreende as limitações do local onde atua e procura adequar suas condutas aos equipamentos, medicamentos e insumos disponíveis sem prejuízo ao tratamento dos pacientes?',
+      q5: 'É proativo na coordenação do cuidado, manifestando interesse pelo acompanhamento dos pacientes inclusive com resgate dos faltosos (contato telefônico, envio de mensagem, visita domiciliar p. ex.)?'
     },
     dim4: {
-      q1: 'Conhece o sistema de saúde loco-regional, reconhece os diversos pontos de atenção e direciona os pacientes adequadamente (integralidade)?',
-      q2: 'Compreende processos de gestão e gerenciamento como fundamentais para garantir melhor cuidado às pessoas e trabalhadores (organização, condições de trabalho, remuneração)?',
-      q3: 'É capaz de elaborar e ter visão crítica e propositiva sobre as políticas de saúde?',
-      q4: 'Busca continuamente conhecimentos teóricos para aprimorar o cuidado?',
-      q5: 'Estuda diariamente as patologias dos casos sob sua responsabilidade?',
-      q6: 'Estuda os artigos e materiais indicados pela preceptoria?',
-      q7: 'Estuda e realiza com afinco os procedimentos médicos necessários ao tratamento de seus pacientes?'
+      q1: 'Conhece o sistema de saúde loco-regional, reconhece os diversos pontos de atenção e consegue direcionar os pacientes aos serviços adequados à continuidade do cuidado (integralidade da atenção)?',
+      q2: 'Compreende os processos de gestão e gerenciamento como fundamentais para a garantia do melhor cuidado às pessoas incluindo os trabalhadores em saúde (condições e organização do processo de trabalho, remuneração, p. ex.)?',
+  q3: 'É capaz de elaborar e ter visão crítica e propositiva sobre as políticas de saúde?'
     }
   };
 
@@ -112,6 +103,7 @@ export class ReportComponent implements OnChanges {
   globalRotationPeriod: string = '—';
 
   private disciplineCache: any[] = [];
+  private lastDisciplineDetail: any = null;
 
   private alunoCtx = new PreceptorAlunoContextService(); // manual inject fallback (standalone new)
   private alunoChangedHandler = (e: any) => {
@@ -455,6 +447,7 @@ export class ReportComponent implements OnChanges {
           const names = detail.preceptors.map(p => p.name).filter(Boolean);
           if (names.length) this.student.preceptorName = names.join(', ');
         }
+        this.lastDisciplineDetail = detail;
       },
       error: _ => { /* silencioso */ }
     });
@@ -550,7 +543,7 @@ export class ReportComponent implements OnChanges {
             intervals: ordered
           } as DayPeriod;
         }).filter(p => p.locations.length > 0 || p.intervals.length > 0);
-        return { weekday, date, periods };
+        return { weekday, date, periods, preceptors: [] };
       });
       // Se nenhum dia carregado, garantir estrutura vazia com placeholders (Seg-Sex) para não aparecer tabela em branco.
       if (dayRows.length === 0) {
@@ -565,7 +558,7 @@ export class ReportComponent implements OnChanges {
           const d = new Date(base.getTime());
           d.setDate(base.getDate() + i);
           const weekday = weekdayFull[d.getDay()];
-          dayRows.push({ weekday, date: d, periods: [] });
+          dayRows.push({ weekday, date: d, periods: [], preceptors: [] });
         }
       }
       // --- FILTRO DE ATIVIDADES (Incompleto/Cumprido ou Justificativa APROVADA) ---
@@ -597,7 +590,53 @@ export class ReportComponent implements OnChanges {
           if (st.status === 'ORANGE' && st.justificationStatus === 'APPROVED') return true; // Justificativa aprovada
           return false;
         });
-        this.applyWeekData(wk, filtered);
+        if (filtered.length === 0) { this.applyWeekData(wk, filtered); return; }
+        // Buscar sessões (check-ins) no intervalo da semana para mapear preceptores por dia
+        const datesIso = filtered.map(r => r.date.toISOString().substring(0,10));
+        const startIso = datesIso[0];
+        const endIso = datesIso[datesIso.length - 1];
+        this.calApi.getSessions(startIso, endIso, this.alunoId, this.disciplineId).subscribe({
+          next: (sessions: any[]) => {
+            const byDatePreceptors: Record<string, Set<string>> = {};
+            // Cache de nomes por id a partir do detalhe da disciplina (se disponível)
+            const precIdToName: Record<string,string> = {};
+            try {
+              const preceptors: any[] = this.lastDisciplineDetail?.preceptors || [];
+              for (const p of preceptors) {
+                if (p?.id && p?.name) precIdToName[String(p.id)] = p.name;
+              }
+            } catch {}
+            const getDateIso = (s: any): string | undefined => {
+              const t = s?.check_in_time || s?.checkInTime || s?.check_in || s?.checkIn || s?.createdAt || s?.date || s?.checkInDate || s?.check_in_date;
+              if (typeof t === 'string' && t.length >= 10) return t.substring(0,10);
+              return undefined;
+            };
+            const getPrecName = (s: any): string | undefined => {
+              const byName = s?.preceptor?.name || s?.preceptorName || s?.preceptor_name || s?.preceptor_full_name;
+              if (byName) return byName;
+              const pid = s?.preceptor?.id || s?.preceptorId || s?.preceptor_id;
+              if (pid != null && precIdToName[String(pid)]) return precIdToName[String(pid)];
+              return undefined;
+            };
+            for (const s of Array.isArray(sessions) ? sessions : []) {
+              const iso = getDateIso(s);
+              const name = getPrecName(s);
+              if (!iso || !name) continue;
+              if (!byDatePreceptors[iso]) byDatePreceptors[iso] = new Set<string>();
+              byDatePreceptors[iso].add(name);
+            }
+            for (const row of filtered) {
+              const iso = row.date.toISOString().substring(0,10);
+              const set = byDatePreceptors[iso];
+              row.preceptors = set ? Array.from(set).sort((a,b)=>a.localeCompare(b)) : [];
+            }
+            this.applyWeekData(wk, filtered);
+          },
+          error: _ => {
+            // Em caso de erro, prosseguir sem preencher preceptores
+            this.applyWeekData(wk, filtered);
+          }
+        });
       });
     });
   }
@@ -628,7 +667,11 @@ export class ReportComponent implements OnChanges {
       if (parsed?.dimensions) {
         enriched.details = { dimensions: parsed.dimensions.map((d: any) => {
           const answers = d.answers || {};
-          const questions = Object.keys(answers).map(qId => ({ id: qId, text: qId, answer: answers[qId] }));
+          // Filtrar perguntas desconhecidas com base no mapa questionTexts
+          const known = this.questionTexts[d.id] ? Object.keys(this.questionTexts[d.id]) : Object.keys(answers);
+          const questions = known
+            .filter(qId => answers[qId] != null)
+            .map(qId => ({ id: qId, text: this.fullQuestionText(d.id, qId), answer: answers[qId] }));
           return { id: d.id, name: d.id, questions };
         }) };
       }
@@ -699,6 +742,18 @@ export class ReportComponent implements OnChanges {
   }
 
   get selectedWeek(): WeekData { return this.weeks[this.selectedWeekIndex]; }
+
+  // Retorna nomes únicos de preceptores vinculados em uma semana (com base nas presenças da própria semana)
+  preceptorsForWeek(week: WeekData | undefined | null): string[] {
+    if (!week || !Array.isArray(week.days)) return [];
+    const set = new Set<string>();
+    for (const d of week.days) {
+      if (d?.preceptors?.length) {
+        for (const n of d.preceptors) if (n) set.add(n);
+      }
+    }
+    return Array.from(set).sort((a,b)=>a.localeCompare(b));
+  }
 
   // Semanas exibidas (modo paginado ou completo)
   get displayedWeeks(): WeekData[] {

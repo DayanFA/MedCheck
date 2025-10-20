@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { LocationModalComponent } from '../location-modal/location-modal.component';
 import { FormsModule } from '@angular/forms';
 import { CalendarServiceApi, CalendarDay, InternshipPlanDto } from '../../services/calendar.service';
+import { DisciplineService } from '../../services/discipline.service';
 import { EvaluationService } from '../../services/evaluation.service';
 import { ToastService } from '../../services/toast.service';
 import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-context.service';
@@ -18,6 +19,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 })
 export class UserCalendarComponent {
   private api = inject(CalendarServiceApi);
+  private discApi = inject(DisciplineService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   today = new Date();
@@ -33,6 +35,7 @@ export class UserCalendarComponent {
   // day history
   selectedDate = signal<string>('');
   sessionsForDay = signal<any[]|null>(null);
+  private preceptorNameMap = new Map<number,string>();
   // Estado modal de localização (reutilizando o mesmo componente já usado em outros fluxos)
   showLocModal = signal(false);
   locLat = signal<number|undefined>(undefined);
@@ -228,6 +231,8 @@ export class UserCalendarComponent {
       this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
       this.loading.set(false);
       this.updatePlanLock();
+      // Atualiza cache de preceptores por disciplina para mapear nomes por ID nas sessões
+      this.loadDisciplinePreceptors();
     }, _ => { this.loading.set(false); this.updatePlanLock(); });
     // se for aluno (sem alunoId) carregar disciplinas para seleção local
     if (!this.alunoId()) {
@@ -260,6 +265,7 @@ export class UserCalendarComponent {
                   this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
                   this.loading.set(false);
                   this.updatePlanLock();
+                  this.loadDisciplinePreceptors();
                 }, _ => { this.loading.set(false); this.updatePlanLock(); });
               }
               return; // já tratou como preceptor
@@ -282,6 +288,7 @@ export class UserCalendarComponent {
                     this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
                     this.loading.set(false);
                     this.updatePlanLock();
+                    this.loadDisciplinePreceptors();
                   }, _ => { this.loading.set(false); this.updatePlanLock(); });
                 }
               })
@@ -294,6 +301,21 @@ export class UserCalendarComponent {
         })
         .catch(()=>{ this.disciplines.set([]); this.disciplineId.set(undefined); });
     }
+  }
+
+  private loadDisciplinePreceptors() {
+    const did = this.disciplineId();
+    if (!did) { this.preceptorNameMap.clear(); return; }
+    try {
+      this.discApi.get(did).subscribe({
+        next: (detail: any) => {
+          this.preceptorNameMap.clear();
+          const list = detail?.preceptors || [];
+          for (const p of list) if (p?.id && p?.name) this.preceptorNameMap.set(Number(p.id), String(p.name));
+        },
+        error: _ => { /* silencioso */ }
+      });
+    } catch {}
   }
 
   setDisciplineForView(id: string) {
@@ -698,6 +720,14 @@ export class UserCalendarComponent {
     const list = this.sessionsForDay() || [];
     return list.map(s => {
       let worked: string | undefined;
+      // Derivar nome do preceptor (quando disponível)
+      let precName: string | undefined = s?.preceptor?.name || s?.preceptorName || s?.preceptor_name || s?.preceptor_full_name;
+      const precId = s?.preceptor?.id || s?.preceptorId || s?.preceptor_id;
+      if (!precName && precId != null) {
+        const mapped = this.preceptorNameMap.get(Number(precId));
+        if (mapped) precName = mapped;
+      }
+      let _preceptorDisplay: string | undefined = precName; // sem fallback para ID
       if (s.checkInTime && s.checkOutTime) {
         try {
           const start = new Date(s.checkInTime).getTime();
@@ -710,7 +740,7 @@ export class UserCalendarComponent {
           }
         } catch {}
       }
-      return { ...s, _workedDisplay: worked };
+      return { ...s, _workedDisplay: worked, _preceptorDisplay };
     });
   }
   get dayTotalHoursLabel(): string {

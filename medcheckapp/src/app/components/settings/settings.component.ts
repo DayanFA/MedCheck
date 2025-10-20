@@ -94,7 +94,7 @@ export class SettingsComponent implements OnDestroy {
     const input = ev.target as HTMLInputElement;
     const file = input?.files?.[0];
     if (!file) return;
-    if (file.size > 2_000_000) { this.msg = 'Arquivo muito grande (máx 2MB)'; return; }
+  if (file.size > 5_000_000) { this.msg = 'Arquivo muito grande (máx 5MB)'; return; }
     const form = new FormData();
     form.append('file', file);
     this.saving = true; this.msg='';
@@ -104,13 +104,7 @@ export class SettingsComponent implements OnDestroy {
     });
   }
 
-  removePhoto() {
-    this.saving = true; this.msg='';
-    this.http.delete('/api/users/me/photo', { headers: this.headers() }).subscribe({
-      next: _ => { this.saving=false; this.msg='Foto removida'; this.hasAvatar = false; this.clearPhotoUrl(); this.refreshCachedUser(true); },
-      error: _ => { this.saving=false; this.msg='Falha ao remover foto'; }
-    });
-  }
+  // Remoção de foto desabilitada por regra; usuário pode apenas trocar a foto
 
   private refreshCachedUser(force?: boolean) {
     // Atualiza imediatamente o cache do usuário com dados completos (inclui hasAvatar)

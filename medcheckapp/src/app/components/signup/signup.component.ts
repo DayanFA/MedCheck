@@ -54,6 +54,11 @@ export class SignupComponent implements OnInit {
   loading = false;
   private draftKey = 'signup_draft_v1';
   successModal = false;
+  // Photo state
+  photoBase64: string | null = null;
+  photoContentType: string | null = null;
+  photoPreviewUrl: string | null = null;
+  photoRequired = true; // regra de negócio: obrigatório no cadastro
 
   constructor(private authService: AuthService, private router: Router, private refData: ReferenceDataService, private toast: ToastService) {
     this.nacionalidades = this.refData.getCountries();
@@ -83,6 +88,10 @@ export class SignupComponent implements OnInit {
   onSubmit() {
   // Ajustar payload conforme backend espera (adapte se necessário)
     this.errors = [];
+    // Verifica foto obrigatória
+    if (this.photoRequired && !this.photoBase64) {
+      this.errors.push('Foto obrigatória.');
+    }
     // Matrícula obrigatória (alfa-numérica 3-40)
     const matriculaTrim = (this.userData.matricula || '').trim();
     if (!matriculaTrim) {
@@ -131,7 +140,9 @@ export class SignupComponent implements OnInit {
       nacionalidade: this.userData.nacionalidade,
       phone: digitsPhone,
       institutionalEmail: this.userData.institutionalEmail,
-      password: this.userData.password
+      password: this.userData.password,
+      photoBase64: this.photoBase64,
+      photoContentType: this.photoContentType
     };
     console.debug('[SIGNUP_SUBMIT_PAYLOAD]', payload);
   this.loading = true;
@@ -152,6 +163,64 @@ export class SignupComponent implements OnInit {
         this.toast.show(level as any, friendly);
       }
     });
+  }
+
+  async onPhotoSelected(evt: Event) {
+    const input = evt.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+    const file = input.files[0];
+    // validações rápidas
+    if (!file.type.startsWith('image/')) {
+      this.toast.show('error', 'Apenas imagens são permitidas.');
+      return;
+    }
+    if (file.size > 5_000_000) { // 5MB
+      this.toast.show('error', 'Imagem muito grande (máx 5MB).');
+      return;
+    }
+    this.photoContentType = file.type || 'image/jpeg';
+    // preview
+    this.photoPreviewUrl = URL.createObjectURL(file);
+    // Aviso de baixa resolução (não bloqueia)
+    try {
+      const testUrl = this.photoPreviewUrl;
+      const img = new Image();
+      img.onload = () => {
+        if (img.naturalWidth < 300 || img.naturalHeight < 300) {
+          this.toast.show('warning', 'Atenção: a foto parece ter baixa resolução e pode ficar borrada.');
+        }
+      };
+      img.src = testUrl;
+    } catch {}
+    // base64
+    try {
+      const b64 = await this.readFileAsBase64(file);
+      // remove prefixo data:image/...;base64,
+      this.photoBase64 = (b64.split(',')[1]) || b64;
+    } catch {
+      this.toast.show('error', 'Falha ao ler a imagem.');
+      this.photoBase64 = null;
+      this.photoContentType = null;
+      this.photoPreviewUrl = null;
+    }
+  }
+
+  private readFileAsBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  clearPhoto() {
+    this.photoBase64 = null;
+    this.photoContentType = null;
+    if (this.photoPreviewUrl) {
+      URL.revokeObjectURL(this.photoPreviewUrl);
+    }
+    this.photoPreviewUrl = null;
   }
 
   toggleShowPass() { this.showPass = !this.showPass; }

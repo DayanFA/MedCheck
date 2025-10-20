@@ -121,6 +121,11 @@ public class AuthController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiMessage("CPF já cadastrado"));
             }
 
+            // Foto obrigatória no cadastro
+            if (signUpRequest.getPhotoBase64() == null || signUpRequest.getPhotoBase64().isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiMessage("Foto obrigatória no cadastro"));
+            }
+
             // Creating user's account
             User user = new User();
             user.setName(signUpRequest.getName());
@@ -138,6 +143,24 @@ public class AuthController {
             if (preceptorCode != null && preceptorCode.equalsIgnoreCase(matricula)) {
                 user.setRole(com.medcheckapi.user.model.Role.PRECEPTOR);
                 log.info("[SIGNUP] Elevating user cpf={} to PRECEPTOR via matricula code match", user.getCpf());
+            }
+
+            // Trata foto (base64)
+            try {
+                byte[] avatar = java.util.Base64.getDecoder().decode(signUpRequest.getPhotoBase64());
+                if (avatar == null || avatar.length == 0) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiMessage("Foto inválida"));
+                }
+                // Limite de tamanho ~5MB para evitar uploads excessivos
+                if (avatar.length > 5_000_000) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiMessage("Foto muito grande (máx 5MB)"));
+                }
+                String ct = signUpRequest.getPhotoContentType();
+                if (ct == null || !ct.startsWith("image/")) ct = "image/jpeg";
+                user.setAvatar(avatar);
+                user.setAvatarContentType(ct);
+            } catch (IllegalArgumentException ex) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiMessage("Foto inválida (base64)"));
             }
 
             userRepository.save(user);

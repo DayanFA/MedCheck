@@ -14,6 +14,9 @@ public class SignUpRequest {
     private String phone;
     private String institutionalEmail;
     private String password;
+    // Optional image fields for avatar during signup (required by business rule)
+    private String photoBase64; // base64 without data URL prefix
+    private String photoContentType; // e.g., image/png
 
     // Getters and Setters
 
@@ -92,5 +95,21 @@ public class SignUpRequest {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getPhotoBase64() {
+        return photoBase64;
+    }
+
+    public void setPhotoBase64(String photoBase64) {
+        this.photoBase64 = photoBase64;
+    }
+
+    public String getPhotoContentType() {
+        return photoContentType;
+    }
+
+    public void setPhotoContentType(String photoContentType) {
+        this.photoContentType = photoContentType;
     }
 }

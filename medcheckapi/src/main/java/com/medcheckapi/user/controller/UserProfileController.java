@@ -107,7 +107,7 @@ public class UserProfileController {
 	public ResponseEntity<?> uploadPhoto(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
 										 @RequestParam("file") MultipartFile file) throws Exception {
 		if (file.isEmpty()) return ResponseEntity.badRequest().body(Map.of("error", "Arquivo vazio"));
-		if (file.getSize() > 2_000_000) return ResponseEntity.badRequest().body(Map.of("error", "Arquivo muito grande (máx 2MB)"));
+	if (file.getSize() > 5_000_000) return ResponseEntity.badRequest().body(Map.of("error", "Arquivo muito grande (máx 5MB)"));
 		String ct = Optional.ofNullable(file.getContentType()).orElse("image/jpeg");
 		if (!ct.startsWith("image/")) return ResponseEntity.badRequest().body(Map.of("error", "Tipo não suportado"));
 		User u = currentUser(principal);

@@ -25,9 +25,10 @@ public class CalendarController {
     private final InternshipJustificationRepository justRepo;
     private final DisciplineRepository discRepo;
     private final PreceptorEvaluationRepository evaluationRepo;
+    private final com.medcheckapi.user.repository.CoordinatorEvaluationRepository coordEvalRepo;
 
-    public CalendarController(UserRepository userRepo, CalendarService calendarService, InternshipPlanRepository planRepo, InternshipJustificationRepository justRepo, DisciplineRepository discRepo, PreceptorEvaluationRepository evaluationRepo) {
-        this.userRepo = userRepo; this.calendarService = calendarService; this.planRepo = planRepo; this.justRepo = justRepo; this.discRepo = discRepo; this.evaluationRepo = evaluationRepo;
+    public CalendarController(UserRepository userRepo, CalendarService calendarService, InternshipPlanRepository planRepo, InternshipJustificationRepository justRepo, DisciplineRepository discRepo, PreceptorEvaluationRepository evaluationRepo, com.medcheckapi.user.repository.CoordinatorEvaluationRepository coordEvalRepo) {
+        this.userRepo = userRepo; this.calendarService = calendarService; this.planRepo = planRepo; this.justRepo = justRepo; this.discRepo = discRepo; this.evaluationRepo = evaluationRepo; this.coordEvalRepo = coordEvalRepo;
     }
 
     private Map<String,Object> planDto(InternshipPlan p) {
@@ -175,17 +176,11 @@ public class CalendarController {
         }
         if (disc == null) disc = me.getCurrentDiscipline();
 
-        // LOCK: impedir adicionar/alterar planos se já existe avaliação para a semana (global ou da disciplina)
-        if (weekNumber != null) {
-            boolean locked = false;
-            if (disc != null) {
-                locked = evaluationRepo.findFirstByAlunoAndDisciplineAndWeekNumber(me, disc, weekNumber).isPresent();
-            }
-            if (!locked) {
-                locked = evaluationRepo.findFirstByAlunoAndWeekNumberAndDisciplineIsNull(me, weekNumber).isPresent();
-            }
-            if (locked) {
-                return ResponseEntity.status(409).body(Map.of("error", "Semana já avaliada. Não é possível adicionar/alterar planos."));
+        // LOCK: somente avaliação FINAL do COORDENADOR fecha a disciplina (não mais a do preceptor)
+        if (disc != null) {
+            boolean closedByCoordinator = coordEvalRepo.findFirstByAlunoAndDiscipline(me, disc).isPresent();
+            if (closedByCoordinator) {
+                return ResponseEntity.status(409).body(Map.of("error", "Disciplina já finalizada pelo coordenador. Não é possível adicionar/alterar planos."));
             }
         }
         p.setDiscipline(disc);
@@ -203,18 +198,11 @@ public class CalendarController {
             if (!p.getAluno().getId().equals(me.getId())) {
                 return ResponseEntity.status(403).body(Map.of("error", "Sem permissão"));
             }
-            // LOCK: impedir remover plano se já existe avaliação correspondente
-            Integer wn = p.getWeekNumber();
-            if (wn != null) {
-                boolean locked = false;
-                if (p.getDiscipline() != null) {
-                    locked = evaluationRepo.findFirstByAlunoAndDisciplineAndWeekNumber(me, p.getDiscipline(), wn).isPresent();
-                }
-                if (!locked) {
-                    locked = evaluationRepo.findFirstByAlunoAndWeekNumberAndDisciplineIsNull(me, wn).isPresent();
-                }
-                if (locked) {
-                    return ResponseEntity.status(409).body(Map.of("error", "Semana já avaliada. Não é possível remover planos."));
+            // LOCK: impedir remover plano apenas se disciplina já foi finalizada pelo coordenador
+            if (p.getDiscipline() != null) {
+                boolean closedByCoordinator = coordEvalRepo.findFirstByAlunoAndDiscipline(me, p.getDiscipline()).isPresent();
+                if (closedByCoordinator) {
+                    return ResponseEntity.status(409).body(Map.of("error", "Disciplina já finalizada pelo coordenador. Não é possível remover planos."));
                 }
             }
             planRepo.deleteById(id);

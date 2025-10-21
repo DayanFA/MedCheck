@@ -9,6 +9,7 @@ import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { PreceptorService } from '../../services/preceptor.service';
+import { CoordinatorService } from '../../services/coordinator.service';
 import { EvaluationService } from '../../services/evaluation.service';
 import { DisciplineService } from '../../services/discipline.service';
 import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-context.service';
@@ -45,14 +46,24 @@ export class ReportComponent implements OnChanges {
   preceptorDisciplines: any[] | null = null; // null = carregando, [] = nenhuma
   isCoordinator = false;
   coordinatorDisciplines: any[] | null = null; // lista de disciplinas vinculadas ao coordenador quando visualizando aluno
+  // Avaliação final do coordenador (nota/comentário)
+  finalEval: { score: number | null; comment: string; loaded: boolean; saving: boolean } = { score: null, comment: '', loaded: false, saving: false };
+  // Estado de edição/remoção da avaliação final do coordenador
+  finalEditing = false;
+  showFinalDeleteConfirm = false;
+  deletingFinal = false;
 
   @Input() alunoId?: number;          // usado em contexto de preceptor
   @Input() disciplineId?: number;     // usado em contexto de preceptor
 
   evaluationDetails: any = null; // cache da avaliação carregada (aluno view)
   showEvalModal = false;
+  // Lista de avaliações dos preceptores (pode haver múltiplas)
+  preceptorEvaluations: any[] = [];
   @ViewChild('fullReportRoot') fullReportRoot?: ElementRef<HTMLDivElement>;
   generatingPdf = false; // controla estado de geração para evitar múltiplos cliques e flicker
+  // Modal de confirmação para salvar avaliação final do coordenador
+  showFinalSaveConfirm = false;
 
   // Mapas para exibir textos completos das dimensões e questões na modal de detalhes
   dimensionTitles: Record<string,string> = {
@@ -122,6 +133,7 @@ export class ReportComponent implements OnChanges {
               private weekSync: WeekSelectionService,
               private route: ActivatedRoute,
               private preceptorService: PreceptorService,
+              private coordService: CoordinatorService,
               private router: Router,
               private evalService: EvaluationService,
               private http: HttpClient,
@@ -142,8 +154,10 @@ export class ReportComponent implements OnChanges {
     this.updatePaginationMode();
     this.ensureGroupForSelected();
     const u = this.auth.getUser();
-  if (u?.role === 'COORDENADOR') this.isCoordinator = true;
-    if (u?.name) this.student.name = u.name;
+    if (u?.role === 'COORDENADOR') this.isCoordinator = true;
+    // Para evitar exibir o nome do coordenador/preceptor no cabeçalho do relatório,
+    // só preenche o nome do cabeçalho com o usuário logado quando o usuário for ALUNO (auto-relatório)
+    if (u?.role === 'ALUNO' && u?.name) this.student.name = u.name;
     // Disciplina passa a ser derivada de preference local do aluno (mc_current_discipline_id) ou parâmetro disciplineId quando preceptor.
     this.setupInitialDisciplineContext();
     this.calApi.getCurrentPreceptor().subscribe(p => {
@@ -199,6 +213,11 @@ export class ReportComponent implements OnChanges {
     if (this.alunoId) {
       this.fetchPreceptorDisciplines();
       if (this.isCoordinator) this.fetchCoordinatorDisciplines();
+      // Carregar avaliação final se coordenador e disciplina definida
+      if (this.isCoordinator && this.disciplineId) this.fetchCoordinatorFinalEval();
+    } else {
+      // Contexto aluno: buscar avaliação final própria quando já tivermos disciplina
+      if (this.isAlunoUser && this.disciplineId) this.fetchMyFinalEval();
     }
   }
 
@@ -292,18 +311,24 @@ export class ReportComponent implements OnChanges {
     if (this.disciplineId) this.fetchDisciplineDetail();
     // Recarrega semana selecionada (sem atraso) com novo filtro
     this.loadWeek(this.selectedWeek.number);
+    // Se aluno, carregar avaliação final própria para a nova disciplina
+    if (this.isAlunoUser && this.disciplineId) this.fetchMyFinalEval();
   };
 
   private fetchStudentInfo() {
     if (!this.alunoId) return;
-    this.preceptorService.studentInfo(this.alunoId, this.disciplineId).subscribe(info => {
+    const u = this.auth.getUser();
+    const source$ = (u?.role === 'COORDENADOR')
+      ? this.coordService.studentInfo(this.alunoId!, this.disciplineId)
+      : this.preceptorService.studentInfo(this.alunoId!, this.disciplineId);
+    source$.subscribe(info => {
       if (info?.name) this.student.name = info.name;
       // Em contexto de preceptor, queremos exibir os preceptores vinculados à disciplina (se houver)
       // Limpa qualquer nome antigo até disciplina detalhada chegar
       this.student.preceptorName = '—';
       // Sempre que a API retornar preceptor principal, aplicar (independente de haver disciplineId)
-      if (info?.preceptor?.name) {
-        this.student.preceptorName = info.preceptor.name;
+      if ((info as any)?.preceptor?.name) {
+        this.student.preceptorName = (info as any).preceptor.name;
       }
       if (info?.discipline) {
         this.disciplineLabel = `CURSO DE MEDICINA - ${info.discipline.code} - ${info.discipline.name}`;
@@ -410,6 +435,12 @@ export class ReportComponent implements OnChanges {
     const qp: any = { alunoId: this.alunoId };
     if (this.disciplineId) qp.disciplineId = this.disciplineId;
     this.router.navigate([], { relativeTo: this.route, queryParams: qp, queryParamsHandling: 'merge' });
+    // Atualizar avaliação final quando disciplina mudar
+    if (this.isCoordinator && this.alunoId && this.disciplineId) {
+      this.fetchCoordinatorFinalEval();
+    } else {
+      this.finalEval = { score: null, comment: '', loaded: false, saving: false };
+    }
   }
 
   setDisciplineForPreceptor(raw: any) {
@@ -431,6 +462,205 @@ export class ReportComponent implements OnChanges {
     this.evaluationDetails = null;
     this.fetchStudentInfo();
     this.loadWeek(this.selectedWeek.number);
+  }
+
+  private fetchCoordinatorFinalEval() {
+    if (!this.isCoordinator || !this.alunoId || !this.disciplineId) return;
+    this.finalEval.loaded = false;
+    this.coordService.getFinalEvaluation(this.alunoId, this.disciplineId).subscribe({
+      next: res => {
+        if (res && res.found) {
+          this.finalEval.score = res.score ?? null;
+          this.finalEval.comment = res.comment ?? '';
+        } else {
+          this.finalEval.score = null;
+          this.finalEval.comment = '';
+        }
+        this.finalEval.loaded = true;
+        // Ao recarregar do servidor, saímos do modo de edição
+        this.finalEditing = false;
+      },
+      error: _ => {
+        this.finalEval.score = null;
+        this.finalEval.comment = '';
+        this.finalEval.loaded = true;
+      }
+    });
+  }
+
+  openFinalSaveConfirm() {
+    if (!this.isCoordinator || !this.alunoId || !this.disciplineId) return;
+    // pré-validação simples de faixa
+    const s = this.finalEval.score;
+    if (s != null && (s < 0 || s > 10)) {
+      this.toast.show('warning','A nota deve estar entre 0 e 10.');
+      return;
+    }
+    this.showFinalSaveConfirm = true;
+  }
+
+  cancelFinalSave() {
+    if (this.finalEval.saving) return;
+    this.showFinalSaveConfirm = false;
+  }
+
+  confirmFinalSave() {
+    if (this.finalEval.saving) return;
+    this.saveCoordinatorFinalEval();
+  }
+
+  saveCoordinatorFinalEval() {
+    if (!this.isCoordinator || !this.alunoId || !this.disciplineId) return;
+    if (this.finalEval.saving) return;
+    // score opcional (pode ser null), mas se fornecido precisa estar entre 0 e 10
+    const s = this.finalEval.score;
+    if (s != null && (s < 0 || s > 10)) {
+      this.toast.show('warning','A nota deve estar entre 0 e 10.');
+      return;
+    }
+    this.finalEval.saving = true;
+    this.coordService.evaluateFinal(this.alunoId, this.disciplineId, s ?? null, this.finalEval.comment || null).subscribe({
+      next: _ => {
+        this.toast.show('success','Nota enviada com sucesso.');
+        this.finalEval.saving = false;
+        this.showFinalSaveConfirm = false;
+        this.finalEditing = false;
+        // Após salvar, recarrega para garantir consistência
+        this.fetchCoordinatorFinalEval();
+      },
+      error: _ => {
+        this.toast.show('error','Falha ao enviar a nota.');
+        this.finalEval.saving = false;
+      }
+    });
+  }
+
+  startEditFinal() {
+    if (!this.isCoordinator || !this.alunoId || !this.disciplineId) return;
+    this.finalEditing = true;
+  }
+
+  cancelEditFinal() {
+    // Recarrega do servidor para descartar alterações locais
+    this.fetchCoordinatorFinalEval();
+    this.finalEditing = false;
+  }
+
+  openFinalDeleteConfirm() {
+    if (!this.isCoordinator || !this.alunoId || !this.disciplineId) return;
+    this.showFinalDeleteConfirm = true;
+  }
+
+  cancelFinalDelete() {
+    if (this.deletingFinal) return;
+    this.showFinalDeleteConfirm = false;
+  }
+
+  confirmFinalDelete() {
+    if (this.deletingFinal || !this.isCoordinator || !this.alunoId || !this.disciplineId) return;
+    this.deletingFinal = true;
+    this.coordService.deleteFinalEvaluation(this.alunoId, this.disciplineId).subscribe({
+      next: _ => {
+        this.toast.show('success', 'Nota final excluída.');
+        this.deletingFinal = false;
+        this.showFinalDeleteConfirm = false;
+        this.finalEditing = false;
+        // Limpa estado local e recarrega
+        this.finalEval.score = null;
+        this.finalEval.comment = '';
+        this.fetchCoordinatorFinalEval();
+      },
+      error: _ => {
+        this.toast.show('error', 'Falha ao excluir a nota final.');
+        this.deletingFinal = false;
+      }
+    });
+  }
+
+  // Carrega avaliação final própria (contexto ALUNO)
+  private fetchMyFinalEval() {
+    this.finalEval.loaded = false;
+    this.coordService.getMyFinalEvaluation(this.disciplineId).subscribe({
+      next: res => {
+        if (res && res.found) {
+          this.finalEval.score = res.score ?? null;
+          this.finalEval.comment = res.comment ?? '';
+        } else {
+          this.finalEval.score = null;
+          this.finalEval.comment = '';
+        }
+        this.finalEval.loaded = true;
+      },
+      error: _ => {
+        this.finalEval.score = null;
+        this.finalEval.comment = '';
+        this.finalEval.loaded = true;
+      }
+    });
+  }
+
+  // Impedir caracteres inválidos no campo numérico (ex.: 'e', 'E', '+', '-')
+  preventInvalidNumberInput(event: KeyboardEvent) {
+    // Para inteiros: também bloquear '.' e ','
+    const invalid = ['e','E','+','-','. ', ',', '.'];
+    if (invalid.includes(event.key)) {
+      event.preventDefault();
+      return;
+    }
+  }
+
+  // Sanitiza digitação/colar: remove caracteres inválidos e atualiza o modelo
+  onFinalScoreInput(evt: any) {
+    const input = evt?.target as HTMLInputElement;
+    if (!input) return;
+    // Inteiro: remove expoente/sinais e quaisquer separadores decimais
+    const cleaned = input.value.replace(/[eE\+\-]/g, '').replace(/[\.,]/g, '');
+    if (cleaned !== input.value) input.value = cleaned;
+    let n = parseFloat(cleaned);
+    if (isNaN(n)) {
+      this.finalEval.score = null;
+      return;
+    }
+    // Clamp imediato 0..10 para evitar valores fora da faixa durante a digitação
+    if (n < 0) n = 0;
+    if (n > 10) n = 10;
+    // Inteiro apenas
+    n = Math.round(n);
+    this.finalEval.score = n;
+    // Reflete o valor clamped no campo (evita exibir >10 visualmente)
+    input.value = String(n);
+  }
+
+  // Garante faixa 0..10 e força inteiro
+  sanitizeFinalScore() {
+    let v: any = this.finalEval.score;
+    if (typeof v === 'string') v = v.replace(/[\.,]/g, '');
+    let n = parseFloat(v);
+    if (isNaN(n)) { this.finalEval.score = null; return; }
+    if (n < 0) n = 0;
+    if (n > 10) n = 10;
+    n = Math.round(n); // inteiro
+    this.finalEval.score = n;
+  }
+
+  // Trata colagem: aceita decimais com vírgula ou ponto, e impede valores fora de faixa
+  handleFinalScorePaste(e: ClipboardEvent) {
+    const input = e.target as HTMLInputElement;
+    const raw = (e.clipboardData?.getData('text') || '').trim();
+    if (!raw) return; // deixa esvaziar normalmente
+    // Inteiro: remove espaços, expoente, sinais e separadores decimais
+    const normalized = raw.replace(/[\s,eE\+\-\.,]/g, '');
+    let n = parseFloat(normalized);
+    if (isNaN(n)) { e.preventDefault(); return; }
+    // clamp 0..10
+    if (n < 0) n = 0;
+    if (n > 10) n = 10;
+    // Inteiro
+    n = Math.round(n);
+    // aplica no modelo e no input; evita caracteres rejeitados
+    this.finalEval.score = n;
+    if (input) input.value = String(n);
+    e.preventDefault();
   }
 
   private fetchDisciplineDetail() {
@@ -657,31 +887,52 @@ export class ReportComponent implements OnChanges {
     const alunoRef = this.alunoId || this.auth.getUser()?.id;
     if (!alunoRef) return;
     this.evalService.get(alunoRef, 1, this.disciplineId).subscribe(res => {
-      if (!(res && res.found)) return;
-      // Parse e enriquecer detalhes (JSON string -> objeto com textos das perguntas se disponíveis)
-      let parsed: any = null;
-      if (res.details) {
-        try { parsed = typeof res.details === 'string' ? JSON.parse(res.details) : res.details; } catch { parsed = null; }
+      // Novo formato: { items: [...] }
+      let items: any[] = [];
+      if (res && Array.isArray(res.items)) {
+        items = res.items;
+      } else if (res && res.found) {
+        // Compatibilidade com formato antigo (única avaliação)
+        items = [res];
       }
-      const enriched: any = { score: res.score, comment: res.comment, preceptorName: res.preceptorName };
-      if (parsed?.dimensions) {
-        enriched.details = { dimensions: parsed.dimensions.map((d: any) => {
-          const answers = d.answers || {};
-          // Filtrar perguntas desconhecidas com base no mapa questionTexts
-          const known = this.questionTexts[d.id] ? Object.keys(this.questionTexts[d.id]) : Object.keys(answers);
-          const questions = known
-            .filter(qId => answers[qId] != null)
-            .map(qId => ({ id: qId, text: this.fullQuestionText(d.id, qId), answer: answers[qId] }));
-          return { id: d.id, name: d.id, questions };
-        }) };
+      const mapped: any[] = [];
+      for (const it of items) {
+        let parsed: any = null;
+        if (it.details) {
+          try { parsed = typeof it.details === 'string' ? JSON.parse(it.details) : it.details; } catch { parsed = null; }
+        }
+        const enriched: any = {
+          id: it.id,
+          score: it.score,
+          comment: it.comment,
+          preceptorId: it.preceptorId,
+          preceptorName: it.preceptorName
+        };
+        if (parsed?.dimensions) {
+          enriched.details = { dimensions: parsed.dimensions.map((d: any) => {
+            const answers = d.answers || {};
+            const known = this.questionTexts[d.id] ? Object.keys(this.questionTexts[d.id]) : Object.keys(answers);
+            const questions = known
+              .filter(qId => answers[qId] != null)
+              .map(qId => ({ id: qId, text: this.fullQuestionText(d.id, qId), answer: answers[qId] }));
+            return { id: d.id, name: d.id, questions };
+          }) };
+        }
+        mapped.push(enriched);
       }
-      this.evaluationDetails = enriched;
-      // Propagar score para todas as semanas para exibição uniforme.
-      for (const w of this.weeks) { w.evaluation = res.score; }
+      this.preceptorEvaluations = mapped;
+      // Se ainda não há detalhe selecionado, usar o primeiro como padrão
+      if (!this.evaluationDetails && this.preceptorEvaluations.length > 0) {
+        this.evaluationDetails = this.preceptorEvaluations[0];
+      }
+      // Preenche campo legado de score em semanas (não mais exibido diretamente)
+      const fallbackScore = this.preceptorEvaluations.length ? this.preceptorEvaluations[0].score : null;
+      for (const w of this.weeks) { w.evaluation = fallbackScore; }
     });
   }
 
   openEvaluationDetails() { this.showEvalModal = true; }
+  openEvaluationDetailsFor(item: any) { this.evaluationDetails = item; this.showEvalModal = true; }
   closeEvaluationDetails() { this.showEvalModal = false; }
 
   private updateRotationPeriodSummary(week: WeekData) {
@@ -788,7 +1039,7 @@ export class ReportComponent implements OnChanges {
   }
   // (stub removido)
   // Verifica se avaliação global existe
-  get hasGlobalEvaluation(): boolean { return this.weeks.some(w => w.evaluation !== null && w.evaluation !== undefined); }
+  get hasGlobalEvaluation(): boolean { return Array.isArray(this.preceptorEvaluations) && this.preceptorEvaluations.length > 0; }
 
   showDeleteEvalConfirm = false;
   deletingEval = false;
@@ -829,11 +1080,8 @@ export class ReportComponent implements OnChanges {
     if (!isPlatformBrowser(this.platformId)) {
       return; // evita executar em ambiente SSR
     }
-    // Bloqueia se não houver avaliação
-    if (!this.hasGlobalEvaluation || !this.evaluationDetails) {
-      alert('Para gerar o PDF é necessário primeiro registrar a avaliação.');
-      return;
-    }
+    // Observação: podemos gerar o PDF mesmo sem avaliação registrada.
+    // Se não houver avaliação, apenas as folhas de presença semanais serão exportadas (o formulário final é omitido).
     // Evita múltiplos cliques rápidos
     if (this.generatingPdf) return;
     // Garantir que todas as semanas estejam carregadas antes de gerar
@@ -876,8 +1124,8 @@ export class ReportComponent implements OnChanges {
       const usableWidth = pageWidth - marginX*2;
 
       // Selecionar todos os blocos semanais e formulário final
-      const blocks: HTMLElement[] = Array.from(root.querySelectorAll('.weekly-sheet')) as HTMLElement[];
-      const evalForm = root.querySelector('.evaluation-form-print') as HTMLElement | null;
+  const blocks: HTMLElement[] = Array.from(root.querySelectorAll('.weekly-sheet')) as HTMLElement[];
+  const evalForm = root.querySelector('.evaluation-form-print') as HTMLElement | null;
       if (evalForm) blocks.push(evalForm);
 
       // Ajustar largura para render (off-screen, sem flicker)
@@ -936,9 +1184,10 @@ export class ReportComponent implements OnChanges {
     const u = this.auth.getUser();
     if (!u) return false;
     // Mostrar para:
-    // - Aluno vendo seu próprio relatório (alunoId indefinido)
+    // - Aluno (sempre pode ver detalhes)
     // - Coordenador visualizando aluno
     // - Admin visualizando aluno
+    if (u.role === 'ALUNO') return true;
     if (!this.alunoId) return true; // contexto próprio aluno
     if (u.role === 'COORDENADOR') return true;
     if (u.role === 'ADMIN') return true;

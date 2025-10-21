@@ -25,11 +25,13 @@ public class CoordinatorController {
     private final UserRepository userRepository;
     private final DisciplineRepository disciplineRepository;
     private final CheckSessionRepository checkSessionRepository;
+    private final com.medcheckapi.user.repository.CoordinatorEvaluationRepository coordEvalRepo;
 
-    public CoordinatorController(UserRepository userRepository, DisciplineRepository disciplineRepository, CheckSessionRepository checkSessionRepository) {
+    public CoordinatorController(UserRepository userRepository, DisciplineRepository disciplineRepository, CheckSessionRepository checkSessionRepository, com.medcheckapi.user.repository.CoordinatorEvaluationRepository coordEvalRepo) {
         this.userRepository = userRepository;
         this.disciplineRepository = disciplineRepository;
         this.checkSessionRepository = checkSessionRepository;
+        this.coordEvalRepo = coordEvalRepo;
     }
 
     private void ensureCoordinatorOrAdmin(org.springframework.security.core.userdetails.User principal) {
@@ -226,6 +228,38 @@ public class CoordinatorController {
         return ResponseEntity.ok(list);
     }
 
+    // Student info for coordinator (used to fill 'Nome do(a) Interno(a)' on report)
+    @GetMapping("/student-info")
+    public ResponseEntity<?> studentInfo(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                         @RequestParam("alunoId") Long alunoId,
+                                         @RequestParam(value = "disciplineId", required = false) Long disciplineId) {
+        ensureCoordinatorOrAdmin(principal);
+        User me = userRepository.findByCpf(principal.getUsername()).orElseThrow();
+        User aluno = userRepository.findById(alunoId).orElse(null);
+        if (aluno == null) return ResponseEntity.notFound().build();
+        Discipline discipline = null;
+        if (disciplineId != null) {
+            discipline = disciplineRepository.findById(disciplineId).orElse(null);
+            if (discipline != null && me.getRole() == Role.COORDENADOR) {
+                final Long dId = discipline.getId();
+                boolean linked = disciplineRepository.findByCoordinators_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(dId));
+                if (!linked) return ResponseEntity.status(403).body(Map.of("error","Coordenador não vinculado à disciplina"));
+            }
+        }
+        Map<String,Object> resp = new HashMap<>();
+        resp.put("alunoId", aluno.getId());
+        resp.put("name", aluno.getName());
+        resp.put("cpf", aluno.getCpf());
+        if (discipline != null) {
+            resp.put("discipline", Map.of(
+                    "id", discipline.getId(),
+                    "code", discipline.getCode(),
+                    "name", discipline.getName()
+            ));
+        }
+        return ResponseEntity.ok(resp);
+    }
+
     public static class LinkRequest { public Long preceptorId; }
 
     public static class LinkCoordinatorRequest { public Long coordinatorId; }
@@ -280,5 +314,102 @@ public class CoordinatorController {
         if (!removed) return ResponseEntity.notFound().build();
         disciplineRepository.save(d);
         return ResponseEntity.ok(Map.of("ok", true));
+    }
+
+    // Coordenador lança avaliação final da disciplina (nota e comentário)
+    public static class FinalEvaluationRequest { public Long alunoId; public Long disciplineId; public Integer score; public String comment; }
+
+    @PostMapping("/evaluate-final")
+    public ResponseEntity<?> evaluateFinal(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                           @RequestBody FinalEvaluationRequest req) {
+        ensureCoordinatorOrAdmin(principal);
+        try {
+            if (req == null || req.alunoId == null || req.disciplineId == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "alunoId e disciplineId obrigatórios"));
+            }
+            if (req.score != null && (req.score < 0 || req.score > 10)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "score fora de faixa"));
+            }
+            User me = userRepository.findByCpf(principal.getUsername()).orElseThrow();
+            User aluno = userRepository.findById(req.alunoId).orElseThrow();
+            Discipline disc = disciplineRepository.findById(req.disciplineId).orElseThrow();
+            // Coordenador deve estar vinculado à disciplina (a menos que seja ADMIN)
+            if (me.getRole() == Role.COORDENADOR) {
+                boolean linked = disciplineRepository.findByCoordinators_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(disc.getId()));
+                if (!linked) return ResponseEntity.status(403).body(Map.of("error", "Coordenador não vinculado à disciplina"));
+            }
+            var ev = coordEvalRepo.findFirstByAlunoAndDiscipline(aluno, disc).orElse(new com.medcheckapi.user.model.CoordinatorEvaluation());
+            ev.setAluno(aluno);
+            ev.setDiscipline(disc);
+            ev.setCoordinator(me);
+            ev.setScore(req.score);
+            ev.setComment(req.comment);
+            ev.setUpdatedAt(java.time.LocalDateTime.now());
+            coordEvalRepo.save(ev);
+            return ResponseEntity.ok(Map.of(
+                "id", ev.getId(),
+                "alunoId", aluno.getId(),
+                "disciplineId", disc.getId(),
+                "coordinatorId", me.getId(),
+                "score", ev.getScore(),
+                "comment", ev.getComment()
+            ));
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    // Recupera a avaliação final do coordenador (se existir) para um aluno+disciplina
+    @GetMapping("/evaluate-final")
+    public ResponseEntity<?> getFinalEvaluation(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                                @RequestParam("alunoId") Long alunoId,
+                                                @RequestParam("disciplineId") Long disciplineId) {
+        ensureCoordinatorOrAdmin(principal);
+        try {
+            User me = userRepository.findByCpf(principal.getUsername()).orElseThrow();
+            User aluno = userRepository.findById(alunoId).orElseThrow();
+            Discipline disc = disciplineRepository.findById(disciplineId).orElseThrow();
+            if (me.getRole() == Role.COORDENADOR) {
+                boolean linked = disciplineRepository.findByCoordinators_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(disc.getId()));
+                if (!linked) return ResponseEntity.status(403).body(Map.of("error", "Coordenador não vinculado à disciplina"));
+            }
+            var opt = coordEvalRepo.findFirstByAlunoAndDiscipline(aluno, disc);
+            if (opt.isEmpty()) return ResponseEntity.ok(Map.of("found", false));
+            var ev = opt.get();
+            return ResponseEntity.ok(Map.of(
+                "found", true,
+                "id", ev.getId(),
+                "alunoId", aluno.getId(),
+                "disciplineId", disc.getId(),
+                "coordinatorId", ev.getCoordinator() != null ? ev.getCoordinator().getId() : null,
+                "score", ev.getScore(),
+                "comment", ev.getComment()
+            ));
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    // Exclui a avaliação final do coordenador (reabre a edição do calendário por ausência de avaliação final)
+    @DeleteMapping("/evaluate-final")
+    public ResponseEntity<?> deleteFinalEvaluation(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                                   @RequestParam("alunoId") Long alunoId,
+                                                   @RequestParam("disciplineId") Long disciplineId) {
+        ensureCoordinatorOrAdmin(principal);
+        try {
+            User me = userRepository.findByCpf(principal.getUsername()).orElseThrow();
+            User aluno = userRepository.findById(alunoId).orElseThrow();
+            Discipline disc = disciplineRepository.findById(disciplineId).orElseThrow();
+            if (me.getRole() == Role.COORDENADOR) {
+                boolean linked = disciplineRepository.findByCoordinators_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(disc.getId()));
+                if (!linked) return ResponseEntity.status(403).body(Map.of("error", "Coordenador não vinculado à disciplina"));
+            }
+            var opt = coordEvalRepo.findFirstByAlunoAndDiscipline(aluno, disc);
+            if (opt.isEmpty()) return ResponseEntity.notFound().build();
+            coordEvalRepo.delete(opt.get());
+            return ResponseEntity.ok(Map.of("ok", true));
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
     }
 }

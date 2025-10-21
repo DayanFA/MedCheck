@@ -21,8 +21,9 @@ import java.util.Optional;
 public class UserProfileController {
 	private final UserRepository userRepository;
 	private final DisciplineRepository disciplineRepository;
+	private final com.medcheckapi.user.repository.CoordinatorEvaluationRepository coordEvalRepo;
 
-	public UserProfileController(UserRepository userRepository, DisciplineRepository disciplineRepository) { this.userRepository = userRepository; this.disciplineRepository = disciplineRepository; }
+	public UserProfileController(UserRepository userRepository, DisciplineRepository disciplineRepository, com.medcheckapi.user.repository.CoordinatorEvaluationRepository coordEvalRepo) { this.userRepository = userRepository; this.disciplineRepository = disciplineRepository; this.coordEvalRepo = coordEvalRepo; }
 
 	private User currentUser(org.springframework.security.core.userdetails.User principal) {
 		if (principal == null) return null;
@@ -50,6 +51,32 @@ public class UserProfileController {
 		resp.put("currentDisciplineCode", u.getCurrentDiscipline() == null ? null : u.getCurrentDiscipline().getCode());
 		resp.put("preceptorDisciplines", preceptorDiscs);
 		return ResponseEntity.ok(resp);
+	}
+
+	// Final evaluation visible to the logged-in user (student), for a given discipline or current one
+	@GetMapping("/final-evaluation")
+	public ResponseEntity<?> myFinalEvaluation(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+											   @RequestParam(value = "disciplineId", required = false) Long disciplineId) {
+		User me = currentUser(principal);
+		if (me == null) return ResponseEntity.status(401).body(Map.of("error","unauthenticated"));
+		Discipline disc = null;
+		if (disciplineId != null) {
+			disc = disciplineRepository.findById(disciplineId).orElse(null);
+		} else if (me.getCurrentDiscipline() != null) {
+			disc = me.getCurrentDiscipline();
+		}
+		if (disc == null) {
+			return ResponseEntity.ok(Map.of("found", false));
+		}
+		var opt = coordEvalRepo.findFirstByAlunoAndDiscipline(me, disc);
+		if (opt.isEmpty()) return ResponseEntity.ok(Map.of("found", false));
+		var ev = opt.get();
+		return ResponseEntity.ok(Map.of(
+			"found", true,
+			"disciplineId", disc.getId(),
+			"score", ev.getScore(),
+			"comment", ev.getComment()
+		));
 	}
 
 	@PutMapping

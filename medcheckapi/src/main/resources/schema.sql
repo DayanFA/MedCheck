@@ -23,6 +23,7 @@ USE medcheck;
 DROP TABLE IF EXISTS internship_justifications;
 DROP TABLE IF EXISTS internship_plans;
 DROP TABLE IF EXISTS preceptor_evaluations;
+DROP TABLE IF EXISTS coordinator_evaluations;
 DROP TABLE IF EXISTS check_codes;
 DROP TABLE IF EXISTS check_sessions;
 DROP TABLE IF EXISTS password_reset_tokens;
@@ -201,6 +202,25 @@ CREATE TABLE preceptor_evaluations (
   CONSTRAINT fk_pe_preceptor FOREIGN KEY (preceptor_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_pe_discipline FOREIGN KEY (discipline_id) REFERENCES disciplines(id) ON DELETE SET NULL,
   INDEX idx_pe_lookup (aluno_id, discipline_id, week_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABELA: coordinator_evaluations (avaliação final do coordenador por disciplina)
+-- Única por (aluno, disciplina). Nota 0..10 e comentário opcional.
+-- ============================================================================
+CREATE TABLE coordinator_evaluations (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  aluno_id BIGINT NOT NULL,
+  discipline_id BIGINT NOT NULL,
+  coordinator_id BIGINT NOT NULL,
+  score INT NULL,
+  comment TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_ce_aluno FOREIGN KEY (aluno_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ce_discipline FOREIGN KEY (discipline_id) REFERENCES disciplines(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ce_coordinator FOREIGN KEY (coordinator_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT uq_coord_eval_aluno_disc UNIQUE (aluno_id, discipline_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================

@@ -66,4 +66,35 @@ export class CoordinatorService {
     }
     return this.http.get(`${this.api}/disciplinas/${disciplineId}/alunos`, { headers: this.authHeaders(), params });
   }
+
+  studentInfo(alunoId: number, disciplineId?: number): Observable<{ alunoId:number; name:string; cpf:string; discipline?: {id:number;code:string;name:string} }> {
+    let params = new HttpParams().set('alunoId', alunoId);
+    if (disciplineId) params = params.set('disciplineId', disciplineId);
+    return this.http.get<{ alunoId:number; name:string; cpf:string; discipline?: {id:number;code:string;name:string} }>(`${this.api}/student-info`, { headers: this.authHeaders(), params });
+  }
+
+  // Avaliação final do coordenador
+  getFinalEvaluation(alunoId: number, disciplineId: number): Observable<any> {
+    const params = new HttpParams().set('alunoId', alunoId).set('disciplineId', disciplineId);
+    return this.http.get<any>(`${this.api}/evaluate-final`, { headers: this.authHeaders(), params });
+  }
+
+  evaluateFinal(alunoId: number, disciplineId: number, score: number | null, comment: string | null): Observable<any> {
+    const body: any = { alunoId, disciplineId };
+    if (score !== null && score !== undefined) body.score = score;
+    if (comment !== null && comment !== undefined) body.comment = comment;
+    return this.http.post<any>(`${this.api}/evaluate-final`, body, { headers: this.authHeaders() });
+  }
+
+  deleteFinalEvaluation(alunoId: number, disciplineId: number): Observable<any> {
+    const params = new HttpParams().set('alunoId', alunoId).set('disciplineId', disciplineId);
+    return this.http.delete<any>(`${this.api}/evaluate-final`, { headers: this.authHeaders(), params });
+  }
+
+  // Final evaluation for the logged-in user (student)
+  getMyFinalEvaluation(disciplineId?: number): Observable<any> {
+    let params = new HttpParams();
+    if (disciplineId != null) params = params.set('disciplineId', String(disciplineId));
+    return this.http.get<any>(`/api/users/me/final-evaluation`, { headers: this.authHeaders(), params });
+  }
 }

@@ -133,7 +133,7 @@
       </div>
     </ng-container>
 
-    <!-- Formulário de Avaliação (completo, após as semanas) -->
+  <!-- Formulário de Avaliação (completo, após as semanas) -->
     <div *ngIf="evaluationDetails as ev" class="evaluation-form-print mt-4">
       <div class="institution-header mb-2">
         <div class="d-flex align-items-center">
@@ -193,6 +193,44 @@
           <span class="final-score-label">Nota Final:</span>
           <span class="final-score-value">{{ ev.score | number:'1.0-1' }}</span>
         </div>
+      </div>
+    </div>
+
+    <!-- Resumo da Avaliação Final do Coordenador (para PDF) -->
+  <div *ngIf="finalEval.loaded && (finalEval.score != null || finalEval.comment)" class="coordinator-final-print mt-4 bordered-box p-3">
+      <div class="institution-header mb-2">
+        <div class="d-flex align-items-center">
+          <div class="logo-box me-3 d-flex align-items-center justify-content-center">
+            <img src="assets/logo_ufac.png" alt="Logo UFAC" class="report-logo">
+          </div>
+          <div class="flex-grow-1 text-center">
+            <div class="inst-lines fw-semibold lh-sm inst-lines-text">
+              UNIVERSIDADE FEDERAL DO ACRE<br>
+              {{ disciplineLabel || 'CURSO DE MEDICINA' }}
+            </div>
+            <div class="sheet-title mt-2">AVALIAÇÃO FINAL DO COORDENADOR</div>
+          </div>
+        </div>
+      </div>
+      <div class="ident-table-wrapper mb-2">
+        <table class="table table-bordered table-sm mb-0 ident-table">
+          <tbody>
+            <tr>
+              <td class="label">Nome do(a) Interno(a):</td>
+              <td>{{ student.name }}</td>
+              <td class="label">Período do Rodízio:</td>
+              <td>{{ globalRotationPeriod }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="final-score-comment mt-3 text-center">
+        <span class="final-score-label">Nota Final:</span>
+        <span class="final-score-value">{{ finalEval.score | number:'1.0-0' }}</span>
+      </div>
+      <div class="mt-2" *ngIf="finalEval.comment">
+        <div class="fw-semibold">Comentário do Coordenador:</div>
+        <div class="small">{{ finalEval.comment }}</div>
       </div>
     </div>
   </div>
@@ -315,20 +353,66 @@
 
     <!-- Card de Avaliação (agora separado da área de identificação/presenças) -->
     <div class="evaluation-card mb-3">
-      <div class="d-flex align-items-center flex-wrap small">
-        <label class="form-label mb-0 me-2">Avaliação do(a) Preceptor(a) (0 a 10):</label>
-        <ng-container *ngIf="weeks && weeks[selectedWeekIndex]?.evaluation !== undefined && weeks[selectedWeekIndex]?.evaluation !== null; else semAvaliacao">
-          <span class="evaluation-inline-score">{{ weeks[selectedWeekIndex].evaluation | number:'1.0-1' }}</span>
-          <!-- Botão detalhes agora aparece para Coordenador e Admin/Preceptor (quando não é o próprio aluno) -->
-          <!-- Mostrar detalhes apenas para: aluno (sem alunoId em contexto de input) ou coordenador. Esconder para preceptor. -->
-          <button *ngIf="shouldShowEvalDetailsButton()" type="button" class="eval-inline-details-btn ms-2" (click)="openEvaluationDetails()" title="Ver detalhes da avaliação">!</button>
+      <div class="d-flex align-items-center flex-wrap small gap-2">
+        <label class="form-label mb-0 me-1">Avaliação do(a) Preceptor(a) (0 a 10):</label>
+        <ng-container *ngIf="preceptorEvaluations?.length; else semAvaliacao">
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <ng-container *ngFor="let ev of preceptorEvaluations">
+              <div class="d-inline-flex align-items-center gap-2">
+                <strong>{{ ev.preceptorName || 'Preceptor' }}:</strong>
+                <span class="evaluation-inline-score">{{ ev.score | number:'1.0-1' }}</span>
+                <button *ngIf="shouldShowEvalDetailsButton()" type="button" class="eval-inline-details-btn" (click)="openEvaluationDetailsFor(ev)" title="Ver detalhes desta avaliação">!</button>
+              </div>
+            </ng-container>
+          </div>
         </ng-container>
         <ng-template #semAvaliacao>
           <span class="text-muted fst-italic">(não enviada)</span>
         </ng-template>
       </div>
-      <div class="text-danger mt-2 small" *ngIf="selectedWeek.evaluation !== null && (selectedWeek.evaluation! < 0 || selectedWeek.evaluation! > 10)">
-        Valor deve estar entre 0 e 10.
+      <!-- Avaliação Final do Coordenador -->
+      <div *ngIf="isCoordinator && alunoId && disciplineId" class="mt-3 p-3 border rounded bg-light">
+        <div class="d-flex flex-wrap align-items-center gap-3">
+          <div class="d-flex align-items-center gap-2">
+            <label class="form-label mb-0">Avaliação Final (Coordenador):</label>
+       <input type="number"
+                   class="form-control form-control-sm"
+                   style="width:100px"
+         min="0" max="10" step="1"
+         inputmode="numeric"
+                   (keydown)="preventInvalidNumberInput($event)"
+         (paste)="handleFinalScorePaste($event)"
+                   (input)="onFinalScoreInput($event)"
+                   (blur)="sanitizeFinalScore()"
+                   [(ngModel)]="finalEval.score"
+                   [disabled]="finalEval.saving">
+          </div>
+          <div class="flex-grow-1">
+            <input type="text" class="form-control form-control-sm" placeholder="Comentário (opcional)" [(ngModel)]="finalEval.comment" [disabled]="finalEval.saving">
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-primary" (click)="openFinalSaveConfirm()" [disabled]="finalEval.saving || !finalEval.loaded">
+              <span *ngIf="!finalEval.saving">Enviar nota</span>
+              <span *ngIf="finalEval.saving" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Enviando...</span>
+            </button>
+            <!-- Ação de exclusão quando já existe nota -->
+            <button *ngIf="finalEval.loaded && (finalEval.score != null || finalEval.comment)" class="btn btn-sm btn-outline-danger" (click)="openFinalDeleteConfirm()">Excluir</button>
+          </div>
+        </div>
+        <div class="small text-muted mt-2">
+          Ao enviar a nota final, a disciplina será finalizada. Você poderá editar ou excluir esta nota posteriormente.
+        </div>
+      </div>
+      <!-- Exibição (somente leitura) para o ALUNO -->
+      <div *ngIf="isAlunoUser && finalEval.loaded && (finalEval.score != null || finalEval.comment)" class="mt-3 p-3 border rounded bg-light">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <strong>Nota Final:</strong>
+          <span class="evaluation-inline-score">{{ finalEval.score }}</span>
+        </div>
+        <div class="mt-2" *ngIf="finalEval.comment">
+          <strong>Comentário:</strong>
+          <div class="small">{{ finalEval.comment }}</div>
+        </div>
       </div>
     </div>
 
@@ -392,7 +476,7 @@
         </button>
       </div>
       <div class="d-flex align-items-center gap-2 ms-auto">
-        <button class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1" (click)="onGeneratePdf()" [disabled]="!hasGlobalEvaluation || generatingPdf">
+        <button class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1" (click)="onGeneratePdf()" [disabled]="generatingPdf">
           <span *ngIf="!generatingPdf"><i class="bi bi-filetype-pdf"></i> Gerar PDF</span>
           <span *ngIf="generatingPdf" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Gerando...</span>
         </button>
@@ -420,3 +504,47 @@
     </button>
   </div>
 </div>
+
+<!-- Modal custom de confirmação de envio da avaliação final do coordenador -->
+<div class="modal-eval-delete-backdrop" *ngIf="showFinalSaveConfirm" (click)="cancelFinalSave()"></div>
+<div class="modal-eval-delete" *ngIf="showFinalSaveConfirm">
+  <div class="modal-header d-flex justify-content-between align-items-center">
+    <h5 class="m-0">Confirmar Envio</h5>
+    <button type="button" class="btn-close" aria-label="Fechar" (click)="cancelFinalSave()" [disabled]="finalEval.saving"></button>
+  </div>
+  <div class="modal-body">
+    <p class="mb-2">Deseja realmente enviar a nota final deste(a) aluno(a)?</p>
+    <p class="small text-muted">Ao enviar a nota, a disciplina será finalizada. Você poderá editar ou excluir esta nota posteriormente.</p>
+    <div class="border rounded p-2 small">
+      <div><strong>Nota Final:</strong> {{ finalEval.score != null ? finalEval.score : '—' }}</div>
+      <div *ngIf="finalEval.comment"><strong>Comentário:</strong> {{ finalEval.comment }}</div>
+    </div>
+  </div>
+  <div class="modal-footer d-flex justify-content-end gap-2">
+    <button class="btn btn-sm btn-outline-secondary" (click)="cancelFinalSave()" [disabled]="finalEval.saving">Cancelar</button>
+    <button class="btn btn-sm btn-primary" (click)="confirmFinalSave()" [disabled]="finalEval.saving">
+      <span *ngIf="!finalEval.saving">Enviar nota</span>
+      <span *ngIf="finalEval.saving" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Enviando...</span>
+    </button>
+  </div>
+</div>
+
+<!-- Modal custom de confirmação de exclusão da nota final do coordenador -->
+<div class="modal-eval-delete-backdrop" *ngIf="showFinalDeleteConfirm" (click)="cancelFinalDelete()"></div>
+<div class="modal-eval-delete" *ngIf="showFinalDeleteConfirm">
+  <div class="modal-header d-flex justify-content-between align-items-center">
+    <h5 class="m-0">Confirmar Exclusão</h5>
+    <button type="button" class="btn-close" aria-label="Fechar" (click)="cancelFinalDelete()" [disabled]="deletingFinal"></button>
+  </div>
+  <div class="modal-body">
+    <p class="mb-2">Deseja realmente excluir a nota final enviada?</p>
+    <p class="small text-muted mb-0">Ao excluir, a disciplina deixará de estar finalizada até que uma nova nota seja enviada.</p>
+  </div>
+  <div class="modal-footer d-flex justify-content-end gap-2">
+    <button class="btn btn-sm btn-outline-secondary" (click)="cancelFinalDelete()" [disabled]="deletingFinal">Cancelar</button>
+    <button class="btn btn-sm btn-danger" (click)="confirmFinalDelete()" [disabled]="deletingFinal">
+      <span *ngIf="!deletingFinal">Excluir</span>
+      <span *ngIf="deletingFinal" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Excluindo...</span>
+    </button>
+  </div>
+  </div>

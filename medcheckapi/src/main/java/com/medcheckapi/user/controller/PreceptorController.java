@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -276,26 +277,35 @@ public class PreceptorController {
                 if (!coordLinked) return ResponseEntity.status(403).body(Map.of("error","Coordenador não vinculado à disciplina"));
             }
         }
-        PreceptorEvaluation eval;
+        List<PreceptorEvaluation> evals;
         if (discipline != null) {
-            eval = evaluationRepository.findFirstByAlunoAndDisciplineAndWeekNumber(aluno, discipline, weekNumber).orElse(null);
+            evals = evaluationRepository.findByAlunoAndDisciplineAndWeekNumber(aluno, discipline, weekNumber);
         } else {
-            eval = evaluationRepository.findFirstByAlunoAndWeekNumberAndDisciplineIsNull(aluno, weekNumber).orElse(null);
+            evals = evaluationRepository.findByAlunoAndWeekNumberAndDisciplineIsNull(aluno, weekNumber);
         }
-        if (eval == null) return ResponseEntity.ok(Map.of("found", false));
-        Map<String,Object> resp = new HashMap<>();
-        resp.put("found", true);
-        resp.put("id", eval.getId());
-        resp.put("alunoId", aluno.getId());
-        resp.put("preceptorId", eval.getPreceptor().getId());
-        resp.put("preceptorName", eval.getPreceptor().getName());
-        resp.put("disciplineId", eval.getDiscipline() == null ? null : eval.getDiscipline().getId());
-        resp.put("weekNumber", eval.getWeekNumber());
-        resp.put("score", eval.getScore());
-        resp.put("comment", eval.getComment());
-        resp.put("details", eval.getDetailsJson());
-        resp.put("updatedAt", eval.getUpdatedAt());
-        return ResponseEntity.ok(resp);
+        // Regra: Preceptor não pode ver avaliação de outro preceptor.
+        if (me.getRole() == Role.PRECEPTOR) {
+            final Long myId = me.getId();
+            evals = evals.stream()
+                    .filter(ev -> ev.getPreceptor() != null && myId.equals(ev.getPreceptor().getId()))
+                    .collect(Collectors.toList());
+        }
+        List<Map<String,Object>> list = new ArrayList<>();
+        for (PreceptorEvaluation ev : evals) {
+            Map<String,Object> m = new HashMap<>();
+            m.put("id", ev.getId());
+            m.put("alunoId", aluno.getId());
+            m.put("preceptorId", ev.getPreceptor().getId());
+            m.put("preceptorName", ev.getPreceptor().getName());
+            m.put("disciplineId", ev.getDiscipline() == null ? null : ev.getDiscipline().getId());
+            m.put("weekNumber", ev.getWeekNumber());
+            m.put("score", ev.getScore());
+            m.put("comment", ev.getComment());
+            m.put("details", ev.getDetailsJson());
+            m.put("updatedAt", ev.getUpdatedAt());
+            list.add(m);
+        }
+        return ResponseEntity.ok(Map.of("items", list));
     }
 
     // Delete evaluation (allow PRECEPTOR or ADMIN). Coordinator intentionally not allowed to delete.
@@ -321,10 +331,20 @@ public class PreceptorController {
             }
         }
         PreceptorEvaluation eval;
-        if (discipline != null) {
-            eval = evaluationRepository.findFirstByAlunoAndDisciplineAndWeekNumber(aluno, discipline, weekNumber).orElse(null);
+        if (me.getRole() == Role.PRECEPTOR) {
+            // Preceptor só pode excluir sua própria avaliação
+            if (discipline != null) {
+                eval = evaluationRepository.findFirstByAlunoAndPreceptorAndDisciplineAndWeekNumber(aluno, me, discipline, weekNumber).orElse(null);
+            } else {
+                eval = evaluationRepository.findFirstByAlunoAndPreceptorAndWeekNumberAndDisciplineIsNull(aluno, me, weekNumber).orElse(null);
+            }
         } else {
-            eval = evaluationRepository.findFirstByAlunoAndWeekNumberAndDisciplineIsNull(aluno, weekNumber).orElse(null);
+            // ADMIN mantém comportamento anterior (primeira encontrada)
+            if (discipline != null) {
+                eval = evaluationRepository.findFirstByAlunoAndDisciplineAndWeekNumber(aluno, discipline, weekNumber).orElse(null);
+            } else {
+                eval = evaluationRepository.findFirstByAlunoAndWeekNumberAndDisciplineIsNull(aluno, weekNumber).orElse(null);
+            }
         }
         if (eval == null) return ResponseEntity.ok(Map.of("deleted", false, "reason", "not-found"));
         // Only the original preceptor or an ADMIN can delete

@@ -346,14 +346,15 @@ public class CoordinatorController {
             ev.setComment(req.comment);
             ev.setUpdatedAt(java.time.LocalDateTime.now());
             coordEvalRepo.save(ev);
-            return ResponseEntity.ok(Map.of(
-                "id", ev.getId(),
-                "alunoId", aluno.getId(),
-                "disciplineId", disc.getId(),
-                "coordinatorId", me.getId(),
-                "score", ev.getScore(),
-                "comment", ev.getComment()
-            ));
+            // Map.of não aceita valores nulos; construir mapa mutável para permitir comment null
+            java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+            resp.put("id", ev.getId());
+            resp.put("alunoId", aluno.getId());
+            resp.put("disciplineId", disc.getId());
+            resp.put("coordinatorId", me.getId());
+            resp.put("score", ev.getScore());
+            resp.put("comment", ev.getComment()); // pode ser null
+            return ResponseEntity.ok(resp);
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         }
@@ -376,15 +377,16 @@ public class CoordinatorController {
             var opt = coordEvalRepo.findFirstByAlunoAndDiscipline(aluno, disc);
             if (opt.isEmpty()) return ResponseEntity.ok(Map.of("found", false));
             var ev = opt.get();
-            return ResponseEntity.ok(Map.of(
-                "found", true,
-                "id", ev.getId(),
-                "alunoId", aluno.getId(),
-                "disciplineId", disc.getId(),
-                "coordinatorId", ev.getCoordinator() != null ? ev.getCoordinator().getId() : null,
-                "score", ev.getScore(),
-                "comment", ev.getComment()
-            ));
+            // Map.of não aceita null; usar mapa mutável
+            java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+            resp.put("found", true);
+            resp.put("id", ev.getId());
+            resp.put("alunoId", aluno.getId());
+            resp.put("disciplineId", disc.getId());
+            resp.put("coordinatorId", ev.getCoordinator() != null ? ev.getCoordinator().getId() : null);
+            resp.put("score", ev.getScore());
+            resp.put("comment", ev.getComment()); // pode ser null
+            return ResponseEntity.ok(resp);
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         }

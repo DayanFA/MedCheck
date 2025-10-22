@@ -71,12 +71,13 @@ public class UserProfileController {
 		var opt = coordEvalRepo.findFirstByAlunoAndDiscipline(me, disc);
 		if (opt.isEmpty()) return ResponseEntity.ok(Map.of("found", false));
 		var ev = opt.get();
-		return ResponseEntity.ok(Map.of(
-			"found", true,
-			"disciplineId", disc.getId(),
-			"score", ev.getScore(),
-			"comment", ev.getComment()
-		));
+		// Map.of não aceita valores nulos; construir mapa mutável para permitir comment null
+		java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+		resp.put("found", true);
+		resp.put("disciplineId", disc.getId());
+		resp.put("score", ev.getScore());
+		resp.put("comment", ev.getComment()); // pode ser null
+		return ResponseEntity.ok(resp);
 	}
 
 	@PutMapping

@@ -133,8 +133,10 @@
       </div>
     </ng-container>
 
-  <!-- Formulário de Avaliação (completo, após as semanas) -->
-    <div *ngIf="evaluationDetails as ev" class="evaluation-form-print mt-4">
+  <!-- Formulários de Avaliação dos PRECEPTORES (um por preceptor, páginas distintas no PDF) -->
+    <ng-container *ngIf="preceptorEvaluations?.length">
+      <ng-container *ngFor="let ev of preceptorEvaluations">
+        <div class="evaluation-form-print mt-4">
       <div class="institution-header mb-2">
         <div class="d-flex align-items-center">
           <div class="logo-box me-3 d-flex align-items-center justify-content-center">
@@ -188,13 +190,15 @@
             </table>
           </div>
         </div>
-        <!-- Nota final ao término das dimensões -->
+        <!-- Nota do Preceptor ao término das dimensões -->
         <div class="final-score-comment mt-3 bordered-box p-3 text-center">
-          <span class="final-score-label">Nota Final:</span>
+          <span class="final-score-label">Nota Preceptor:</span>
           <span class="final-score-value">{{ ev.score | number:'1.0-1' }}</span>
         </div>
       </div>
-    </div>
+        </div>
+      </ng-container>
+    </ng-container>
 
     <!-- Resumo da Avaliação Final do Coordenador (para PDF) -->
   <div *ngIf="finalEval.loaded && (finalEval.score != null || finalEval.comment)" class="coordinator-final-print mt-4 bordered-box p-3">
@@ -231,6 +235,17 @@
       <div class="mt-2" *ngIf="finalEval.comment">
         <div class="fw-semibold">Comentário do Coordenador:</div>
         <div class="small">{{ finalEval.comment }}</div>
+      </div>
+    </div>
+    
+    <!-- Página final simples com a Nota Final do Internato (coordenador) -->
+    <div *ngIf="isDisciplineFinalized()" class="final-summary-print mt-4">
+      <div class="d-flex align-items-center justify-content-center" style="height: 900px; text-align: center;">
+        <div>
+          <div class="sheet-title">Nota final do internato {{ disciplineNameOnly }}</div>
+          <div class="display-4 fw-bold mt-3">{{ finalEval.score | number:'1.0-0' }}</div>
+          <div class="mt-2">Nota do aluno</div>
+        </div>
       </div>
     </div>
   </div>
@@ -391,29 +406,29 @@
             <input type="text" class="form-control form-control-sm" placeholder="Comentário (opcional)" [(ngModel)]="finalEval.comment" [disabled]="finalEval.saving">
           </div>
           <div class="d-flex align-items-center gap-2">
-            <button class="btn btn-sm btn-primary" (click)="openFinalSaveConfirm()" [disabled]="finalEval.saving || !finalEval.loaded">
-              <span *ngIf="!finalEval.saving">Enviar nota</span>
+            <button class="btn btn-sm btn-primary" (click)="openFinalSaveConfirm()" [disabled]="finalEval.saving || !isFinalScoreValid() || (finalExists && !isFinalDirty())">
+              <span *ngIf="!finalEval.saving && !(finalExists && !isFinalDirty())">Enviar nota</span>
+              <span *ngIf="!finalEval.saving && (finalExists && !isFinalDirty())">Nota enviada</span>
               <span *ngIf="finalEval.saving" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Enviando...</span>
             </button>
             <!-- Ação de exclusão quando já existe nota -->
-            <button *ngIf="finalEval.loaded && (finalEval.score != null || finalEval.comment)" class="btn btn-sm btn-outline-danger" (click)="openFinalDeleteConfirm()">Excluir</button>
+            <button *ngIf="finalExists" class="btn btn-sm btn-outline-danger" (click)="openFinalDeleteConfirm()">Excluir</button>
           </div>
+        </div>
+        <!-- Dicas de validação/estado para evitar confusão de que o comentário é obrigatório -->
+        <div class="small text-muted mt-1">
+          <ng-container *ngIf="!isFinalScoreValid(); else finalStateOk">
+            Digite uma nota inteira entre 0 e 10.
+          </ng-container>
+          <ng-template #finalStateOk>
+            <span *ngIf="finalExists && !isFinalDirty()">Sem alterações para enviar.</span>
+          </ng-template>
         </div>
         <div class="small text-muted mt-2">
           Ao enviar a nota final, a disciplina será finalizada. Você poderá editar ou excluir esta nota posteriormente.
         </div>
       </div>
-      <!-- Exibição (somente leitura) para o ALUNO -->
-      <div *ngIf="isAlunoUser && finalEval.loaded && (finalEval.score != null || finalEval.comment)" class="mt-3 p-3 border rounded bg-light">
-        <div class="d-flex flex-wrap align-items-center gap-2">
-          <strong>Nota Final:</strong>
-          <span class="evaluation-inline-score">{{ finalEval.score }}</span>
-        </div>
-        <div class="mt-2" *ngIf="finalEval.comment">
-          <strong>Comentário:</strong>
-          <div class="small">{{ finalEval.comment }}</div>
-        </div>
-      </div>
+      <!-- (removido bloco de leitura do aluno daqui para exibir no rodapé da página) -->
     </div>
 
     <!-- Modal Detalhes Avaliação -->
@@ -463,6 +478,26 @@
       </div>
     </div>
 
+    <!-- Exibição (somente leitura) para o ALUNO - resumo no rodapé -->
+    <div *ngIf="isAlunoUser && finalEval.loaded && (finalEval.score != null || finalEval.comment)" class="mt-4 p-3 border rounded bg-light">
+      <div class="small">
+        <strong class="final-score-label">Nota Final:</strong><span class="evaluation-inline-score">{{ finalEval.score }}</span>
+      </div>
+      <div class="small mt-1" *ngIf="finalEval.comment">
+        <strong>Comentário:</strong> {{ finalEval.comment }}
+      </div>
+    </div>
+
+    <!-- Exibição (somente leitura) para PRECEPTOR/ADMIN visualizando aluno -->
+    <div *ngIf="!isAlunoUser && !isCoordinator && finalEval.loaded && (finalEval.score != null || finalEval.comment)" class="mt-4 p-3 border rounded bg-light">
+      <div class="small">
+        <strong class="final-score-label">Nota Final (Coord.):</strong><span class="evaluation-inline-score">{{ finalEval.score }}</span>
+      </div>
+      <div class="small mt-1" *ngIf="finalEval.comment">
+        <strong>Comentário do Coordenador:</strong> {{ finalEval.comment }}
+      </div>
+    </div>
+
     <!-- Barra de ações inferior -->
     <div class="d-flex flex-wrap justify-content-between gap-2 pt-3 border-top mt-3 action-bar">
       <div class="d-flex align-items-center gap-2">
@@ -475,7 +510,7 @@
           Excluir Avaliação
         </button>
       </div>
-      <div class="d-flex align-items-center gap-2 ms-auto">
+      <div class="d-flex align-items-center gap-2 ms-auto" *ngIf="isDisciplineFinalized()">
         <button class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1" (click)="onGeneratePdf()" [disabled]="generatingPdf">
           <span *ngIf="!generatingPdf"><i class="bi bi-filetype-pdf"></i> Gerar PDF</span>
           <span *ngIf="generatingPdf" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Gerando...</span>

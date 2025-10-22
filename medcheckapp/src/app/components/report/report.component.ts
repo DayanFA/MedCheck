@@ -47,7 +47,12 @@ export class ReportComponent implements OnChanges {
   isCoordinator = false;
   coordinatorDisciplines: any[] | null = null; // lista de disciplinas vinculadas ao coordenador quando visualizando aluno
   // Avaliação final do coordenador (nota/comentário)
-  finalEval: { score: number | null; comment: string; loaded: boolean; saving: boolean } = { score: null, comment: '', loaded: false, saving: false };
+  // Começa como loaded=true para não bloquear o botão/enviar em cenários onde o fetch ainda não ocorreu
+  finalEval: { score: number | null; comment: string; loaded: boolean; saving: boolean } = { score: null, comment: '', loaded: true, saving: false };
+  // Indica se já existe avaliação final persistida no servidor
+  finalExists = false;
+  // Snapshot do valor persistido no servidor (para detectar alterações locais)
+  private finalOriginal: { score: number | null; comment: string } = { score: null, comment: '' };
   // Estado de edição/remoção da avaliação final do coordenador
   finalEditing = false;
   showFinalDeleteConfirm = false;
@@ -64,6 +69,9 @@ export class ReportComponent implements OnChanges {
   generatingPdf = false; // controla estado de geração para evitar múltiplos cliques e flicker
   // Modal de confirmação para salvar avaliação final do coordenador
   showFinalSaveConfirm = false;
+  // Indica, de forma unificada entre papéis, se a disciplina está FINALIZADA
+  // (i.e., existe avaliação final do coordenador persistida para o par aluno+disciplina)
+  finalFound = false;
 
   // Mapas para exibir textos completos das dimensões e questões na modal de detalhes
   dimensionTitles: Record<string,string> = {
@@ -213,8 +221,17 @@ export class ReportComponent implements OnChanges {
     if (this.alunoId) {
       this.fetchPreceptorDisciplines();
       if (this.isCoordinator) this.fetchCoordinatorDisciplines();
-      // Carregar avaliação final se coordenador e disciplina definida
-      if (this.isCoordinator && this.disciplineId) this.fetchCoordinatorFinalEval();
+      // Carregar avaliação final conforme papel
+      if (this.disciplineId) {
+        if (this.isCoordinator) {
+          this.fetchCoordinatorFinalEval();
+        } else {
+          const u2 = this.auth.getUser();
+          if (u2 && (u2.role === 'PRECEPTOR' || u2.role === 'ADMIN')) {
+            this.fetchStaffFinalEval();
+          }
+        }
+      }
     } else {
       // Contexto aluno: buscar avaliação final própria quando já tivermos disciplina
       if (this.isAlunoUser && this.disciplineId) this.fetchMyFinalEval();
@@ -407,9 +424,14 @@ export class ReportComponent implements OnChanges {
         if (!this.disciplineId && list.length > 0) {
           this.disciplineId = list[0].id;
           this.resetWeeksAndReload();
+          // Após definir disciplina automaticamente, buscar avaliação final do coordenador
+          if (this.alunoId && this.disciplineId) this.fetchCoordinatorFinalEval();
         } else {
-          // Mesmo sem mudança, garantir label correta se disciplinaId já setada
-          if (this.disciplineId) this.fetchDisciplineDetail();
+          // Mesmo sem mudança, garantir label e avaliação final corretas se disciplinaId já setada
+          if (this.disciplineId) {
+            this.fetchDisciplineDetail();
+            if (this.alunoId) this.fetchCoordinatorFinalEval();
+          }
         }
       })
       .catch(() => { this.coordinatorDisciplines = []; });
@@ -455,11 +477,17 @@ export class ReportComponent implements OnChanges {
     const qp: any = { alunoId: this.alunoId };
     if (this.disciplineId) qp.disciplineId = this.disciplineId;
     this.router.navigate([], { relativeTo: this.route, queryParams: qp, queryParamsHandling: 'merge' });
+    // Atualizar avaliação final (somente leitura) para preceptor/admin
+    const u = this.auth.getUser();
+    if (!this.isCoordinator && this.alunoId && this.disciplineId && u && (u.role === 'PRECEPTOR' || u.role === 'ADMIN')) {
+      this.fetchStaffFinalEval();
+    }
   }
 
   private resetWeeksAndReload() {
     this.weeks.forEach(w => { w.loaded = false; w.days = []; w.evaluation = null; });
     this.evaluationDetails = null;
+    this.finalFound = false; // resetar estado de finalização até novo fetch
     this.fetchStudentInfo();
     this.loadWeek(this.selectedWeek.number);
   }
@@ -472,9 +500,18 @@ export class ReportComponent implements OnChanges {
         if (res && res.found) {
           this.finalEval.score = res.score ?? null;
           this.finalEval.comment = res.comment ?? '';
+          this.finalExists = true;
+          this.finalFound = true;
+          this.finalOriginal = {
+            score: this.finalEval.score,
+            comment: this.finalEval.comment || ''
+          };
         } else {
           this.finalEval.score = null;
           this.finalEval.comment = '';
+          this.finalExists = false;
+          this.finalFound = false;
+          this.finalOriginal = { score: null, comment: '' };
         }
         this.finalEval.loaded = true;
         // Ao recarregar do servidor, saímos do modo de edição
@@ -484,6 +521,9 @@ export class ReportComponent implements OnChanges {
         this.finalEval.score = null;
         this.finalEval.comment = '';
         this.finalEval.loaded = true;
+        this.finalExists = false;
+        this.finalFound = false;
+        this.finalOriginal = { score: null, comment: '' };
       }
     });
   }
@@ -525,6 +565,13 @@ export class ReportComponent implements OnChanges {
         this.finalEval.saving = false;
         this.showFinalSaveConfirm = false;
         this.finalEditing = false;
+        this.finalExists = true;
+        this.finalFound = true;
+        // Atualiza snapshot local imediatamente
+        this.finalOriginal = {
+          score: this.finalEval.score,
+          comment: this.finalEval.comment || ''
+        };
         // Após salvar, recarrega para garantir consistência
         this.fetchCoordinatorFinalEval();
       },
@@ -533,6 +580,15 @@ export class ReportComponent implements OnChanges {
         this.finalEval.saving = false;
       }
     });
+  }
+
+  // Valida se a nota final está pronta para envio (inteiro 0..10)
+  isFinalScoreValid(): boolean {
+    const v = this.finalEval.score;
+    if (v === null || v === undefined) return false;
+    if (typeof v !== 'number' || Number.isNaN(v)) return false;
+    if (!Number.isInteger(v)) return false;
+    return v >= 0 && v <= 10;
   }
 
   startEditFinal() {
@@ -568,6 +624,9 @@ export class ReportComponent implements OnChanges {
         // Limpa estado local e recarrega
         this.finalEval.score = null;
         this.finalEval.comment = '';
+        this.finalExists = false;
+        this.finalFound = false;
+        this.finalOriginal = { score: null, comment: '' };
         this.fetchCoordinatorFinalEval();
       },
       error: _ => {
@@ -575,6 +634,17 @@ export class ReportComponent implements OnChanges {
         this.deletingFinal = false;
       }
     });
+  }
+
+  // Verifica se houve mudança local em relação ao valor persistido
+  isFinalDirty(): boolean {
+    const curScore = this.finalEval.score;
+    const curComment = (this.finalEval.comment || '').trim();
+    const origScore = this.finalOriginal.score;
+    const origComment = (this.finalOriginal.comment || '').trim();
+    const scoreChanged = curScore !== origScore;
+    const commentChanged = curComment !== origComment;
+    return scoreChanged || commentChanged;
   }
 
   // Carrega avaliação final própria (contexto ALUNO)
@@ -585,9 +655,11 @@ export class ReportComponent implements OnChanges {
         if (res && res.found) {
           this.finalEval.score = res.score ?? null;
           this.finalEval.comment = res.comment ?? '';
+          this.finalFound = true;
         } else {
           this.finalEval.score = null;
           this.finalEval.comment = '';
+          this.finalFound = false;
         }
         this.finalEval.loaded = true;
       },
@@ -595,8 +667,40 @@ export class ReportComponent implements OnChanges {
         this.finalEval.score = null;
         this.finalEval.comment = '';
         this.finalEval.loaded = true;
+        this.finalFound = false;
       }
     });
+  }
+
+  // Carrega avaliação final do coordenador para visualização por PRECEPTOR/ADMIN
+  private fetchStaffFinalEval() {
+    if (!this.alunoId || !this.disciplineId) return;
+    this.finalEval.loaded = false;
+    this.preceptorService.finalEvaluation(this.alunoId, this.disciplineId).subscribe({
+      next: res => {
+        if (res && res.found) {
+          this.finalEval.score = (res as any).score ?? null;
+          this.finalEval.comment = ((res as any).comment as any) ?? '';
+          this.finalFound = true;
+        } else {
+          this.finalEval.score = null;
+          this.finalEval.comment = '';
+          this.finalFound = false;
+        }
+        this.finalEval.loaded = true;
+      },
+      error: _ => {
+        this.finalEval.score = null;
+        this.finalEval.comment = '';
+        this.finalEval.loaded = true;
+        this.finalFound = false;
+      }
+    });
+  }
+
+  // Disciplina é considerada "fechada" quando há avaliação final do coordenador encontrada
+  isDisciplineFinalized(): boolean {
+    return !!this.finalFound;
   }
 
   // Impedir caracteres inválidos no campo numérico (ex.: 'e', 'E', '+', '-')
@@ -1123,10 +1227,14 @@ export class ReportComponent implements OnChanges {
       const marginX = 20;
       const usableWidth = pageWidth - marginX*2;
 
-      // Selecionar todos os blocos semanais e formulário final
-  const blocks: HTMLElement[] = Array.from(root.querySelectorAll('.weekly-sheet')) as HTMLElement[];
-  const evalForm = root.querySelector('.evaluation-form-print') as HTMLElement | null;
-      if (evalForm) blocks.push(evalForm);
+    // Selecionar todos os blocos semanais, formulário do preceptor e página final simples
+      const blocks: HTMLElement[] = Array.from(root.querySelectorAll('.weekly-sheet')) as HTMLElement[];
+      const evalForms = Array.from(root.querySelectorAll('.evaluation-form-print')) as HTMLElement[];
+      if (evalForms && evalForms.length) {
+        blocks.push(...evalForms);
+      }
+    const finalSummary = root.querySelector('.final-summary-print') as HTMLElement | null;
+    if (finalSummary) blocks.push(finalSummary);
 
       // Ajustar largura para render (off-screen, sem flicker)
       const originalWidth = root.style.width;
@@ -1172,6 +1280,19 @@ export class ReportComponent implements OnChanges {
       pdf.save(`Relatorio_${normCode}_${normAluno}.pdf`);
     } finally {
       this.generatingPdf = false;
+    }
+  }
+  
+  // Nome simples da disciplina para uso em títulos de impressão
+  get disciplineNameOnly(): string {
+    try {
+      if (this.lastDisciplineDetail?.name) return this.lastDisciplineDetail.name;
+      const label = this.disciplineLabel || '';
+      const parts = label.split(' - ');
+      const last = parts[parts.length - 1]?.trim();
+      return last || (label || 'CURSO DE MEDICINA');
+    } catch {
+      return this.disciplineLabel || 'CURSO DE MEDICINA';
     }
   }
   isPreceptorViewingStudent(): boolean {

@@ -51,4 +51,10 @@ export class PreceptorService {
     if (disciplineId) params.disciplineId = disciplineId;
     return this.http.get<{ alunoId:number; name:string; cpf:string; discipline?: {id:number;code:string;name:string}; preceptor:any }>(`${this.base}/student-info`, { headers: this.authHeaders(), params });
   }
+
+  // Avaliação final do coordenador (somente leitura) visível para PRECEPTOR/ADMIN
+  finalEvaluation(alunoId: number, disciplineId: number) {
+    const params = new HttpParams().set('alunoId', String(alunoId)).set('disciplineId', String(disciplineId));
+    return this.http.get<{ found: boolean; id?: number; alunoId?: number; disciplineId?: number; coordinatorId?: number | null; score?: number | null; comment?: string | null }>(`${this.base}/final-evaluation`, { headers: this.authHeaders(), params });
+  }
 }

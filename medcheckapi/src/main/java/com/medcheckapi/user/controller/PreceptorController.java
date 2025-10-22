@@ -35,12 +35,14 @@ public class PreceptorController {
     private final CheckSessionRepository checkSessionRepository;
     private final DisciplineRepository disciplineRepository;
     private final PreceptorEvaluationRepository evaluationRepository;
+    private final com.medcheckapi.user.repository.CoordinatorEvaluationRepository coordEvalRepo;
 
-    public PreceptorController(UserRepository userRepository, CheckSessionRepository checkSessionRepository, DisciplineRepository disciplineRepository, PreceptorEvaluationRepository evaluationRepository) {
+    public PreceptorController(UserRepository userRepository, CheckSessionRepository checkSessionRepository, DisciplineRepository disciplineRepository, PreceptorEvaluationRepository evaluationRepository, com.medcheckapi.user.repository.CoordinatorEvaluationRepository coordEvalRepo) {
         this.userRepository = userRepository;
         this.checkSessionRepository = checkSessionRepository;
         this.disciplineRepository = disciplineRepository;
         this.evaluationRepository = evaluationRepository;
+        this.coordEvalRepo = coordEvalRepo;
     }
 
     private User me(org.springframework.security.core.userdetails.User principal) {
@@ -353,5 +355,37 @@ public class PreceptorController {
         }
         evaluationRepository.delete(eval);
         return ResponseEntity.ok(Map.of("deleted", true));
+    }
+
+    // Final evaluation (coordinator) visibility for PRECEPTOR/ADMIN
+    @GetMapping("/final-evaluation")
+    public ResponseEntity<?> getCoordinatorFinalForStudent(@AuthenticationPrincipal org.springframework.security.core.userdetails.User principal,
+                                                           @RequestParam("alunoId") Long alunoId,
+                                                           @RequestParam("disciplineId") Long disciplineId) {
+        User me = me(principal);
+        if (me.getRole() != Role.PRECEPTOR && me.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+        User aluno = userRepository.findById(alunoId).orElse(null);
+        Discipline disc = disciplineRepository.findById(disciplineId).orElse(null);
+        if (aluno == null || disc == null) return ResponseEntity.notFound().build();
+        // Se PRECEPTOR, precisa estar vinculado à disciplina
+        if (me.getRole() == Role.PRECEPTOR) {
+            boolean linked = disciplineRepository.findByPreceptors_Id(me.getId()).stream().anyMatch(d -> d.getId().equals(disc.getId()));
+            if (!linked) return ResponseEntity.status(403).body(Map.of("error", "Preceptor não vinculado à disciplina"));
+        }
+        var opt = coordEvalRepo.findFirstByAlunoAndDiscipline(aluno, disc);
+        if (opt.isEmpty()) return ResponseEntity.ok(Map.of("found", false));
+        var ev = opt.get();
+        // Permitir valores nulos (comment)
+        java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("found", true);
+        resp.put("id", ev.getId());
+        resp.put("alunoId", aluno.getId());
+        resp.put("disciplineId", disc.getId());
+        resp.put("coordinatorId", ev.getCoordinator() != null ? ev.getCoordinator().getId() : null);
+        resp.put("score", ev.getScore());
+        resp.put("comment", ev.getComment());
+        return ResponseEntity.ok(resp);
     }
 }

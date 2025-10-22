@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { CalendarServiceApi, CalendarDay, InternshipPlanDto } from '../../services/calendar.service';
 import { DisciplineService } from '../../services/discipline.service';
 import { EvaluationService } from '../../services/evaluation.service';
+import { CoordinatorService } from '../../services/coordinator.service';
 import { ToastService } from '../../services/toast.service';
 import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-context.service';
 import { WeekSelectionService } from '../../services/week-selection.service';
@@ -31,6 +32,8 @@ export class UserCalendarComponent {
   data = signal<{ days: CalendarDay[]; plans:any[]; justifications:any[]; forcedDiscipline?: any }|null>(null);
   // Bloqueio de edição após avaliação
   planEditLocked = false;
+  // Fechamento da disciplina (avaliação final do coordenador existente)
+  disciplineFinalized = signal(false);
   loading = signal(false);
   // day history
   selectedDate = signal<string>('');
@@ -130,7 +133,7 @@ export class UserCalendarComponent {
     return !!user && user.role === 'ALUNO';
   }
 
-  constructor(private weekSync: WeekSelectionService, private toast: ToastService, private evalApi: EvaluationService) {
+  constructor(private weekSync: WeekSelectionService, private toast: ToastService, private evalApi: EvaluationService, private coordApi: CoordinatorService) {
     // Se usuário é preceptor e nenhum aluno selecionado (nem query param, nem contexto), redirecionar
     setTimeout(() => {
       const user: any = (this.api as any)?.auth?.getUser?.() || (window as any).mc_user_cache;
@@ -231,6 +234,7 @@ export class UserCalendarComponent {
       this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
       this.loading.set(false);
       this.updatePlanLock();
+      this.updateDisciplineFinalState();
       // Atualiza cache de preceptores por disciplina para mapear nomes por ID nas sessões
       this.loadDisciplinePreceptors();
     }, _ => { this.loading.set(false); this.updatePlanLock(); });
@@ -265,6 +269,7 @@ export class UserCalendarComponent {
                   this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
                   this.loading.set(false);
                   this.updatePlanLock();
+                  this.updateDisciplineFinalState();
                   this.loadDisciplinePreceptors();
                 }, _ => { this.loading.set(false); this.updatePlanLock(); });
               }
@@ -288,6 +293,7 @@ export class UserCalendarComponent {
                     this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
                     this.loading.set(false);
                     this.updatePlanLock();
+                    this.updateDisciplineFinalState();
                     this.loadDisciplinePreceptors();
                   }, _ => { this.loading.set(false); this.updatePlanLock(); });
                 }
@@ -335,6 +341,8 @@ export class UserCalendarComponent {
     if (this.alunoId()) qp.alunoId = this.alunoId();
     this.router.navigate([], { relativeTo: this.route, queryParams: qp, queryParamsHandling: 'merge' });
     this.load();
+    // Atualiza estado de fechamento de disciplina
+    this.updateDisciplineFinalState();
   }
 
   nextMonth(delta: number) {
@@ -612,6 +620,7 @@ export class UserCalendarComponent {
         this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
         if (force) this.scheduleNextCriticalEdge();
         this.updatePlanLock();
+        this.updateDisciplineFinalState();
       },
       error: () => {/* noop */}
     });
@@ -679,6 +688,24 @@ export class UserCalendarComponent {
     const dt = new Date(this.year(), this.month()-1, 1);
     return dt.toLocaleString('pt-BR', { month:'long', year:'numeric' });
   });
+
+  // Atualiza flag de disciplina finalizada (avaliação final do coordenador existente)
+  private updateDisciplineFinalState() {
+    // Somente no contexto do aluno (sem alunoId explícito) e com disciplina selecionada
+    const isAluno = !this.alunoId();
+    const did = this.disciplineId();
+    if (!isAluno || did == null) { this.disciplineFinalized.set(false); return; }
+    try {
+      this.coordApi.getMyFinalEvaluation(did).subscribe({
+        next: (res: any) => {
+          // Considera finalizada se qualquer payload válido retornar
+          const finalized = !!res && (res.id != null || res.score != null || (res.comment != null && String(res.comment).length >= 0));
+          this.disciplineFinalized.set(!!finalized);
+        },
+        error: () => this.disciplineFinalized.set(false)
+      });
+    } catch { this.disciplineFinalized.set(false); }
+  }
   todayIso = new Date().toISOString().slice(0,10);
   isToday(dateIso?: string) { return !!dateIso && dateIso === this.todayIso; }
   dayAriaLabel(cell: {date?:string;day?:number;d?:CalendarDay}) {

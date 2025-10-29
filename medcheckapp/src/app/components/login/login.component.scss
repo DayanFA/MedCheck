@@ -6,14 +6,26 @@
   overflow: hidden;
 }
 
-.login-shell { max-width: 1180px; }
+.login-shell { 
+  max-width: 1180px; 
+  display: flex; 
+  justify-content: center; 
+}
 
 // Decorative floating circles
 .decor-circle { position: absolute; border-radius: 50%; filter: blur(2px); opacity: .35; pointer-events: none; }
 .deco-1 { width: 460px; height: 460px; background: linear-gradient(135deg,#90caf9,#1976d2); top: -140px; left: -140px; }
 .deco-2 { width: 360px; height: 360px; background: linear-gradient(135deg,#bbdefb,#64b5f6); bottom: -120px; right: -120px; }
 
-.login-card { border-radius: 20px; backdrop-filter: blur(4px); }
+.login-card { 
+  border-radius: 20px; 
+  backdrop-filter: blur(4px);
+  /* Center the card and constrain its width for better balance */
+  margin-left: auto; 
+  margin-right: auto; 
+  width: 100%;
+  max-width: 980px;
+}
 
 .form-pane, .logo-pane { background: #fff; }
 .logo-pane { display: flex; flex-direction: column; justify-content: center; }
@@ -104,7 +116,15 @@
 @media (max-width: 575.98px) {
   .form-pane { padding: 2.25rem 1.35rem !important; }
   .logo-img { max-width: 220px; }
-  .links-stack { text-align: left; }
+  .links-stack {
+    text-align: right;
+    display: inline-flex;
+    flex-direction: row; /* manter lado a lado no mobile */
+    align-items: center;
+    gap: 0.75rem; /* espaçamento horizontal entre os links */
+  }
+  /* Remove qualquer margem-top vinda de utilitários para evitar quebra de linha visual */
+  .links-stack a { margin-top: 0 !important; }
   .decor-circle { display: none; }
 }
 

@@ -32,7 +32,8 @@
                 <div class="uploader-help small text-muted">
                   PNG ou JPG até 2MB. Em celulares, você pode abrir a câmera.
                 </div>
-                <input id="photoInput" type="file" accept="image/*" capture="environment" class="d-none" (change)="onPhotoSelected($event)" />
+                <!-- Importante: sem o atributo capture para que no celular o SO ofereça a escolha Camera ou Galeria -->
+                <input id="photoInput" type="file" accept="image/*" class="d-none" (change)="onPhotoSelected($event)" />
               </div>
               <div class="text-danger small mt-1" *ngIf="photoRequired && !photoBase64">A foto é obrigatória.</div>
             </div>

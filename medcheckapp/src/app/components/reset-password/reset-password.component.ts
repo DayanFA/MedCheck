@@ -21,6 +21,7 @@ export class ResetPasswordComponent implements OnInit {
   done = false;
   showPassword = false;
   showConfirm = false;
+  currentYear = new Date().getFullYear();
 
   constructor(private route: ActivatedRoute, private auth: AuthService, private toast: ToastService, private router: Router) {}
 

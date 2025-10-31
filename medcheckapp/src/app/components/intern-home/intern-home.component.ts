@@ -50,8 +50,15 @@ export class AlunoHomeComponent implements OnInit, OnDestroy {
 
   private userUpdatedListener = (e: any) => {
     try {
-      // Quando o usuário em cache mudar (por upload/remoção de foto), recarregar avatar
-      if (isPlatformBrowser(this.platformId)) this.loadAvatarIfAny();
+      // Quando o usuário em cache mudar (por upload/remoção de foto), recarregar avatar.
+      const detail = e?.detail;
+      if (isPlatformBrowser(this.platformId)) {
+        if (detail && typeof detail.hasAvatar === 'boolean') {
+          if (detail.hasAvatar === true) this.loadAvatar(); else this.clearAvatarUrl();
+        } else {
+          this.loadAvatarIfAny();
+        }
+      }
     } catch {}
   };
   private serviceStatusListener = (_e: any) => {

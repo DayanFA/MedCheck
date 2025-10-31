@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { of } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -52,7 +54,25 @@ export class AuthService {
   setUser(user: any, remember: boolean) {
     if (typeof window === 'undefined') return;
     try {
-      const str = JSON.stringify(user || {});
+      // Persist basic user immediately and notify listeners so UI can react fast
+      this.writeUserToStorage(user || {}, remember);
+      try { window.dispatchEvent(new CustomEvent('mc:user-updated', { detail: user })); } catch {}
+      // In background, try to fetch enriched profile (/api/users/me) which may include hasAvatar and other details.
+      // We do this without re-invoking setUser to avoid recursion.
+  this.http.get('/api/users/me').pipe(catchError(_ => of(null))).subscribe((profile: any) => {
+        try {
+          if (!profile) return;
+          const merged = { ...(user || {}), ...profile };
+          this.writeUserToStorage(merged, remember);
+          try { window.dispatchEvent(new CustomEvent('mc:user-updated', { detail: merged })); } catch {}
+        } catch {}
+      });
+    } catch {}
+  }
+
+  private writeUserToStorage(obj: any, remember: boolean) {
+    try {
+      const str = JSON.stringify(obj || {});
       if (remember) {
         window.localStorage?.setItem(this.userKey, str);
         window.sessionStorage?.removeItem(this.userKey);
@@ -60,8 +80,6 @@ export class AuthService {
         window.sessionStorage?.setItem(this.userKey, str);
         window.localStorage?.removeItem(this.userKey);
       }
-      // Notifica ouvintes (ex.: header) sobre mudança do usuário
-      window.dispatchEvent(new CustomEvent('mc:user-updated', { detail: user }));
     } catch {}
   }
 

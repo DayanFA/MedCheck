@@ -179,11 +179,15 @@ import { catchError } from 'rxjs/operators';
     .glass-card{background:#ffffff; border:1px solid #dfe7ef; border-radius:18px; padding:1rem .95rem .85rem; box-shadow:0 8px 26px -10px rgba(30,54,90,.18), 0 2px 10px -4px rgba(30,54,90,.15); display:flex; flex-direction:column;}
     .glass-card .section-title{font-size:.85rem; font-weight:600; letter-spacing:.5px;}
     .list.reset{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.55rem;}
-    .item{background:linear-gradient(90deg,#f3f8fc,#eef4f9); border:1px solid #d6e1ec; border-radius:14px; padding:.65rem .75rem; position:relative; transition:.25s cubic-bezier(.4,.14,.3,1);} 
+  .list.reset{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.55rem;}
+  .item{background:linear-gradient(90deg,#f3f8fc,#eef4f9); border:1px solid #d6e1ec; border-radius:14px; padding:.65rem .75rem; position:relative; transition:.25s cubic-bezier(.4,.14,.3,1); display:flex; align-items:flex-start; gap:.5rem;}
     .item:hover{background:#f2f8fd; transform:translateY(-2px); box-shadow:0 8px 20px -10px rgba(30,54,90,.18);} 
     .item .name{font-size:.83rem;}
     .item .meta{font-size:.62rem; letter-spacing:.3px;}
-    .actions .btn{font-size:.6rem; letter-spacing:.4px; font-weight:600; text-transform:uppercase;}
+  .actions .btn{font-size:.6rem; letter-spacing:.4px; font-weight:600; text-transform:uppercase; white-space:nowrap;}
+  /* Layout helpers to improve responsiveness */
+  .item .info{flex:1 1 auto; min-width:0;} /* allow truncation */
+  .item .actions{flex:0 0 auto; display:flex; align-items:center; justify-content:flex-end; margin-left: .5rem;}
     .empty{padding:.4rem .25rem;}
     .loading-overlay{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(3px); background:rgba(255,255,255,.55); border-radius:20px; z-index:10;}
     .dimmed{opacity:.45; pointer-events:none;}
@@ -192,6 +196,10 @@ import { catchError } from 'rxjs/operators';
       .glass-card{padding:.85rem .85rem .75rem;}
       .item{padding:.55rem .65rem;}
       .item .name{font-size:.8rem;}
+      /* On small screens stack actions under the info and keep button aligned to right */
+      .item{flex-wrap:wrap;}
+      .item .actions{flex:1 0 100%; margin-top:.45rem; justify-content:flex-end;}
+      .item .meta{display:block; overflow:hidden; text-overflow:ellipsis;}
     }
   `]
 })

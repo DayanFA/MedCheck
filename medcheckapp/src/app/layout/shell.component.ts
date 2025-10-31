@@ -41,6 +41,22 @@ export class ShellComponent implements OnInit, OnDestroy, AfterViewInit {
   private alunoChangedListener = (e: any) => {
     this.updateAlunoBadge();
   };
+  private userUpdatedListener = (e: any) => {
+    // Atualiza imediatamente o avatar/nome quando o AuthService chama setUser
+    try {
+      const detail = e?.detail;
+      if (detail && detail.name) this.userName = (detail.name || '').split(' ')[0];
+      if (detail && detail.role) this.userRole = detail.role || this.userRole;
+      // If the event carries hasAvatar info, act accordingly to avoid unnecessary preflight or 404s
+      if (detail && typeof detail.hasAvatar === 'boolean') {
+        if (detail.hasAvatar === true) this.loadAvatar();
+        else this.clearAvatarUrl();
+      } else {
+        // Fallback: try to load only if storage indicates avatar present
+        this.loadAvatarIfAny();
+      }
+    } catch {}
+  };
   private storageListener = (e: StorageEvent) => {
     // Atualização de usuário ainda mantém avatar / nome
     if (e.key === 'mc_user' && e.newValue) {
@@ -80,6 +96,8 @@ export class ShellComponent implements OnInit, OnDestroy, AfterViewInit {
       setTimeout(() => { this.loadAvatarIfAny(); this.loadUserDetails(); }, 0);
       // Ouve alterações no usuário em cache para refletir disciplina no header
       window.addEventListener('storage', this.storageListener);
+      // Ouve evento customizado emitido pelo AuthService quando setUser() é chamado
+      window.addEventListener('mc:user-updated', this.userUpdatedListener as any);
       window.addEventListener('mc:discipline-changed', this.disciplineChangedListener as any);
       window.addEventListener('mc:aluno-changed', this.alunoChangedListener as any);
       this.loadDisciplines();
@@ -131,6 +149,7 @@ export class ShellComponent implements OnInit, OnDestroy, AfterViewInit {
     this.clearAvatarUrl();
     if (isPlatformBrowser(this.platformId)) {
       window.removeEventListener('storage', this.storageListener);
+      window.removeEventListener('mc:user-updated', this.userUpdatedListener as any);
       window.removeEventListener('mc:discipline-changed', this.disciplineChangedListener as any);
       window.removeEventListener('mc:aluno-changed', this.alunoChangedListener as any);
       window.removeEventListener('resize', this.onResizeForced);

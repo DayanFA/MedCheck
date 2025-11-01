@@ -21,6 +21,9 @@ public interface CheckSessionRepository extends JpaRepository<CheckSession, Long
     List<CheckSession> findByAlunoAndCheckInTimeBetweenOrderByCheckInTimeDesc(User aluno, LocalDateTime start, LocalDateTime end);
     List<CheckSession> findByAlunoAndDisciplineAndCheckInTimeBetweenOrderByCheckInTimeDesc(User aluno, Discipline discipline, LocalDateTime start, LocalDateTime end);
 
+    // Sessions still open that started before a given threshold (used to auto-close long sessions)
+    List<CheckSession> findByCheckOutTimeIsNullAndCheckInTimeBefore(LocalDateTime threshold);
+
     // Distinct students (alunos) who had any check session with given preceptor within a time window
     @Query("SELECT cs.aluno FROM CheckSession cs WHERE cs.preceptor = :preceptor AND cs.checkInTime BETWEEN :start AND :end GROUP BY cs.aluno")
     Page<User> findDistinctAlunosByPreceptorAndPeriod(@Param("preceptor") User preceptor,

@@ -245,4 +245,24 @@ public class CheckInService {
             System.out.println("[CLEANUP] Removed " + removed + " unused check codes older than 20 minutes");
         }
     }
+
+    // Auto-fechamento: encerra automaticamente sessões abertas há mais de 9 horas (capando exatamente em 9h a partir do check-in)
+    @Scheduled(fixedDelay = 60_000) // a cada 1 minuto
+    @Transactional
+    public void autoCloseLongRunningSessions() {
+        LocalDateTime now = fixedNow();
+        LocalDateTime threshold = now.minusHours(9);
+        List<CheckSession> toClose = sessionRepo.findByCheckOutTimeIsNullAndCheckInTimeBefore(threshold);
+        int count = 0;
+        for (CheckSession cs : toClose) {
+            // Capa o período exatamente em 9 horas após o check-in
+            LocalDateTime cappedCheckout = cs.getCheckInTime().plusHours(9);
+            cs.setCheckOutTime(cappedCheckout);
+            sessionRepo.save(cs);
+            count++;
+        }
+        if (count > 0) {
+            System.out.println("[AUTO-CLOSE] Fechadas " + count + " sessões com mais de 9h ativas");
+        }
+    }
 }

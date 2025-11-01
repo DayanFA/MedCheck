@@ -470,6 +470,20 @@ INSERT INTO check_codes (preceptor_id, code, generated_at, expires_at, usage_cou
  ((SELECT id FROM users WHERE institutional_email='preceptor.cir@teste.com'), 'CIR789', NOW() - INTERVAL 1 HOUR, NOW() + INTERVAL 1 HOUR, 0),
  ((SELECT id FROM users WHERE institutional_email='preceptor.ped@teste.com'), 'PED456', NOW() - INTERVAL 10 MINUTE, NOW() + INTERVAL 50 MINUTE, 1);
 
+-- === Cenário de teste: sessão aberta quase 9h para auto-fechamento (1 min restante) ===
+-- Aluno: Aluno Teste (aluno@teste.com)
+-- Preceptor: Preceptor Teste (preceptor@teste.com)
+-- Disciplina: Internato em Medicina de Família e Comunidade (CCSD459)
+-- Objetivo: assim que o scheduler rodar e alcançar 9h, a sessão deve ser encerrada automaticamente
+INSERT INTO check_sessions (aluno_id, preceptor_id, discipline_id, check_in_time, validated)
+VALUES (
+  (SELECT id FROM users WHERE institutional_email='aluno@teste.com'),
+  (SELECT id FROM users WHERE institutional_email='preceptor@teste.com'),
+  (SELECT id FROM disciplines WHERE code='CCSD459'),
+  NOW() - INTERVAL 8 HOUR - INTERVAL 59 MINUTE,
+  TRUE
+);
+
 -- ============================================================================
 -- FIM DOS SEEDS ADICIONAIS
 -- ============================================================================

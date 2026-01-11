@@ -1,0 +1,323 @@
+<div class="calendar-page" *ngIf="data() as data">
+  <div class="calendar-wrapper content-box mx-auto animate-fade-slide">
+    <div class="calendar-head d-flex flex-wrap align-items-center gap-3 mb-3">
+      <div class="d-flex align-items-center gap-2 month-nav">
+        <button class="btn btn-outline-primary btn-sm rounded-circle icon-nav" (click)="nextMonth(-1)" aria-label="Mês anterior">
+          <i class="bi bi-chevron-left"></i>
+        </button>
+        <h4 class="m-0 month-title text-capitalize">{{ monthLabel() }}</h4>
+        <button class="btn btn-outline-primary btn-sm rounded-circle icon-nav" (click)="nextMonth(1)" aria-label="Próximo mês">
+          <i class="bi bi-chevron-right"></i>
+        </button>
+        <button class="btn btn-light btn-sm ms-1 btn-today" (click)="pickDate(todayIso)" *ngIf="selectedDate()!==todayIso" title="Ir para data de hoje">
+          <span>Hoje</span>
+        </button>
+      </div>
+      <div class="ms-auto d-flex align-items-center gap-2 flex-wrap legend-pills">
+        <span class="legend-pill fut">Futuro</span>
+        <span class="legend-pill faltou">Faltou</span>
+        <span class="legend-pill incompleto">Incompleto</span>
+        <span class="legend-pill cumprido">Cumprido</span>
+        <span class="legend-pill just">Justificado</span>
+      </div>
+  <div class="ms-auto d-flex align-items-center gap-2 flex-wrap discipline-select" *ngIf="alunoId() && !isAlunoUser()">
+        <ng-container *ngIf="disciplines(); else discLoading">
+          <select class="form-select form-select-sm select-caret" [ngModel]="disciplineId()" (ngModelChange)="setDisciplineForView($event)">
+            <option *ngFor="let d of disciplines()" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
+          </select>
+        </ng-container>
+        <ng-template #discLoading>
+          <div class="d-flex align-items-center gap-2 small text-muted">
+            <span class="spinner-border spinner-border-sm"></span> Carregando...
+          </div>
+        </ng-template>
+      </div>
+      <div class="ms-auto dropdown date-dropdown">
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-calendar-date"></i>
+        </button>
+        <div class="dropdown-menu p-2" style="min-width:260px;">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
+            <input class="form-control" type="date" [ngModel]="selectedDate() || todayIso" (ngModelChange)="pickDate($event)" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-12 col-lg-7 order-1 order-lg-0">
+        <div class="calendar-grid" role="grid" aria-label="Calendário mensal">
+          <div class="grid-header" *ngFor="let h of ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom']" role="columnheader">{{h}}</div>
+          <ng-container *ngFor="let week of weeks()">
+            <ng-container *ngFor="let cell of week">
+              <div class="day-cell" role="gridcell"
+                   [attr.aria-label]="dayAriaLabel(cell)"
+                   [attr.aria-selected]="cell.date===selectedDate()? 'true':'false'"
+                   [class.empty]="!cell.date"
+                   [class.today]="isToday(cell.date)"
+                   [class.selected]="cell.date===selectedDate()"
+                   (click)="cell.date && openPlan(cell.date)">
+                <div class="num">{{ cell.day }}</div>
+                <div class="status-dot" [ngClass]="statusClass(cell.d)"></div>
+                <div class="mini-hours" *ngIf="cell.d">
+                  {{ (cell.d.workedSeconds/3600) | number:'1.0-1' }}/{{ (cell.d.plannedSeconds/3600) | number:'1.0-1' }}h
+                </div>
+                <div class="bang"
+                     *ngIf="cell.d?.justificationStatus"
+                     [ngClass]="{
+                       'bang-approved': cell.d.justificationStatus==='APPROVED',
+                       'bang-rejected': cell.d.justificationStatus==='REJECTED',
+                       'bang-pending': cell.d.justificationStatus==='PENDING'
+                     }"
+                     title="Justificativa: {{ cell.d.justificationStatus==='PENDING' ? 'Pendente' : (cell.d.justificationStatus==='APPROVED' ? 'Aprovada' : (cell.d.justificationStatus==='REJECTED' ? 'Rejeitada' : cell.d.justificationStatus)) }}">!</div>
+              </div>
+            </ng-container>
+          </ng-container>
+          <div class="loading-overlay d-flex flex-column gap-2 align-items-center justify-content-center" *ngIf="loading()">
+            <div class="spinner-border text-primary"></div>
+            <div class="small text-muted">Atualizando...</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-5 order-0 order-lg-1 side-panels">
+        <!-- Mantém cards existentes (Planos, Justificativa, Histórico) -->
+        <!-- ...existing code preserved from previous template (cards) ... -->
+        <ng-container [ngTemplateOutlet]="cardsBlock"></ng-container>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Template com os cards originais para reaproveitar -->
+<ng-template #cardsBlock>
+  <!-- Copia original dos cards (Planos, Planos do dia, Justificativa, Histórico) -->
+  <!-- ...existing code... original card markup retained below -->
+  <div class="card mb-3" *ngIf="formDate() && !alunoId() && !disciplineFinalized()">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <strong><i class="bi bi-pencil-square me-1"></i> Plano para {{ formatDateShort(formDate()) }} <span class="text-muted ms-1">{{ formatDateHuman(formDate()).split(',')[0] }}</span></strong>
+      <span *ngIf="planEditLocked" class="badge text-bg-warning ms-2">Avaliado</span>
+    </div>
+    <div class="card-body">
+      <div class="alert alert-info py-2 px-3 mb-3" *ngIf="planEditLocked">Edição de planos bloqueada após avaliação do preceptor.</div>
+      <div class="row g-3">
+        <div class="col-6">
+          <label class="form-label">Início</label>
+          <input class="form-control" type="time" [readonly]="alunoId() || false" [ngModel]="formStart()" (ngModelChange)="formStart.set($event)" />
+        </div>
+        <div class="col-6">
+          <label class="form-label">Fim</label>
+          <input class="form-control" type="time" [readonly]="alunoId() || false" [ngModel]="formEnd()" (ngModelChange)="formEnd.set($event)" />
+        </div>
+        <div class="col-12">
+          <label class="form-label">Semana</label>
+          <select class="form-select w-auto" [ngModel]="selectedWeek()" (ngModelChange)="selectedWeek.set(+($event))">
+            <option *ngFor="let w of weeksOptions" [ngValue]="w">{{ w }}</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Local <span class="text-danger">*</span></label>
+          <input class="form-control" placeholder="Ex: Clínica X" [readonly]="alunoId()" required [ngModel]="formLocation()" (ngModelChange)="formLocation.set($event)" />
+        </div>
+        <div class="col-12">
+          <label class="form-label">Observação (opcional)</label>
+          <textarea class="form-control" rows="2" placeholder="Detalhes relevantes" [readonly]="alunoId()" [ngModel]="formNote()" (ngModelChange)="formNote.set($event)" (input)="autoGrow($event)"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer text-end" *ngIf="!alunoId()">
+      <button class="btn btn-primary" [disabled]="!formLocation() || !formLocation().trim() || false" (click)="savePlan()">Salvar Plano</button>
+    </div>
+  </div>
+
+  <div class="card mb-3" *ngIf="selectedDate()">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <strong><i class="bi bi-briefcase me-1"></i> Planos do dia {{ formatDateShort(selectedDate()) }}</strong>
+      <button class="btn btn-sm btn-outline-primary" (click)="refreshDay()" title="Recarregar"><i class="bi bi-arrow-clockwise"></i></button>
+    </div>
+    <div class="card-body">
+      <div *ngIf="!(plansForDay()?.length)">Sem planos.</div>
+      <ul class="list-group list-group-flush" *ngIf="plansForDay()?.length">
+        <li class="list-group-item px-0" *ngFor="let p of plansForDay()">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center gap-2 flex-wrap small fw-semibold">
+                <span><i class="bi bi-clock"></i> {{ p.startTime }} - {{ p.endTime }}</span>
+                <span *ngIf="p.discipline" class="badge rounded-pill text-bg-secondary small">{{ p.discipline.code }}</span>
+              </div>
+              <div class="text-muted small" *ngIf="p.location"><i class="bi bi-geo-alt"></i> {{ p.location }}</div>
+            </div>
+            <span class="badge text-bg-light small">{{ (p.plannedSeconds/3600) | number:'1.0-2' }}h</span>
+          </div>
+          <div class="text-muted small mt-1" *ngIf="p.note && !alunoId()">{{ p.note }}</div>
+          <div class="mt-2 d-flex gap-2" *ngIf="!alunoId()">
+            <button class="btn btn-sm btn-outline-primary" (click)="editPlan(p)">Editar</button>
+            <button class="btn btn-sm btn-outline-danger" (click)="deletePlan(p.id)">Excluir</button>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card mb-3" *ngIf="selectedDate() && ((!alunoId() && plansForDay()?.length) || (alunoId() && existingJust()))">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <strong><i class="bi bi-chat-dots me-1"></i> Justificativa {{ formatDateShort(selectedDate()) }}</strong>
+      <span *ngIf="existingJust() as ej" class="badge" [ngClass]="{ 'text-bg-warning': ej.status==='PENDING', 'text-bg-success': ej.status==='APPROVED', 'text-bg-danger': ej.status==='REJECTED' }">{{ ej.status==='PENDING' ? 'PENDENTE' : (ej.status==='APPROVED' ? 'APROVADO' : (ej.status==='REJECTED' ? 'REPROVADO' : ej.status)) }}</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-6">
+          <label class="form-label">Tipo</label>
+          <select class="form-select" [disabled]="alunoId() || (existingJust() && existingJust()?.status!=='PENDING')" [ngModel]="justType()" (ngModelChange)="justType.set($event)">
+            <option value="GENERAL">Geral</option>
+            <option value="ABSENCE">Falta</option>
+            <option value="OUT_OF_SCHEDULE">Fora do horário</option>
+            <option value="INSUFFICIENT_HOURS">Horas insuficientes</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Motivo</label>
+          <textarea class="form-control" [readonly]="alunoId() || (existingJust() && existingJust()?.status!=='PENDING')" rows="3" placeholder="Descreva o ocorrido" [ngModel]="justReason()" (ngModelChange)="justReason.set($event)" (input)="autoGrow($event)"></textarea>
+        </div>
+        <div class="col-12" *ngIf="!alunoId() && (existingJust()?.reviewNote)">
+          <div class="alert alert-info py-2 px-3 mb-0">
+            <strong>Resposta do preceptor:</strong>
+            <div class="mt-1">{{ existingJust()?.reviewNote }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer d-flex gap-2 justify-content-end">
+      <ng-container *ngIf="!alunoId(); else preceptorButtons">
+        <button class="btn btn-primary" [disabled]="existingJust() && existingJust()?.status!=='PENDING'" (click)="saveJustify()">Salvar Justificativa</button>
+        <button class="btn btn-outline-danger" *ngIf="existingJust() as ej" [disabled]="ej.status!=='PENDING'" (click)="deleteJustify(ej)">Excluir</button>
+      </ng-container>
+      <ng-template #preceptorButtons>
+        <button class="btn btn-outline-success" *ngIf="existingJust() as ej" [disabled]="ej.status!=='PENDING'" (click)="openReviewModal('APPROVED')">Aprovar</button>
+        <button class="btn btn-outline-danger" *ngIf="existingJust() as ej" [disabled]="ej.status!=='PENDING'" (click)="openReviewModal('REJECTED')">Reprovar</button>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="card" *ngIf="selectedDate()">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <strong><i class="bi bi-clock-history me-1"></i> Histórico {{ formatDateShort(selectedDate()) }}</strong>
+      <div class="history-summary-pill d-flex align-items-center gap-2" *ngIf="sessionsForDay()?.length">
+        <span class="badge bg-light text-dark border small fw-normal">{{ dayRecordsLabel }}</span>
+        <span class="small text-muted d-flex align-items-center gap-1" *ngIf="dayTotalHoursLabel">
+          <i class="bi bi-clock"></i>{{ dayTotalHoursLabel }}
+        </span>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div *ngIf="!(sessionsForDay()?.length)" class="empty-day-history text-center py-4 px-3">
+        <div class="emoji mb-2">🗂️</div>
+        <div class="fw-semibold mb-1">Nenhum registro</div>
+        <div class="text-muted small">Não há sessões neste dia.</div>
+      </div>
+      <div class="table-responsive day-history-table" *ngIf="sessionsForDay()?.length">
+        <table class="table table-sm mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Entrada</th>
+              <th class="text-center">Loc (In)</th>
+              <th>Saída</th>
+              <th class="text-center">Loc (Out)</th>
+              <th>Preceptor</th>
+              <th>Duração</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let s of daySessionsProcessed">
+              <td>{{ s.checkInTime | date:'HH:mm' }}</td>
+              <td class="text-center">
+                <ng-container *ngIf="s.checkInLat!=null && s.checkInLng!=null; else noInLoc">
+                  <small class="d-block text-muted">{{s.checkInLat | number:'1.4-4'}}, {{s.checkInLng | number:'1.4-4'}}</small>
+                  <button class="btn btn-sm btn-outline-primary px-2 py-1 d-inline-flex align-items-center gap-1" (click)="openLocationModal(s.checkInLat, s.checkInLng)" title="Local de entrada">
+                    <i class="bi bi-geo-alt"></i><span class="d-none d-xl-inline">In</span>
+                  </button>
+                </ng-container>
+                <ng-template #noInLoc><span class="badge bg-secondary">sem loc</span></ng-template>
+              </td>
+              <td>{{ s.checkOutTime ? (s.checkOutTime | date:'HH:mm') : '-' }}</td>
+              <td class="text-center">
+                <ng-container *ngIf="s.checkOutLat!=null && s.checkOutLng!=null; else noOutLoc">
+                  <small class="d-block text-muted">{{s.checkOutLat | number:'1.4-4'}}, {{s.checkOutLng | number:'1.4-4'}}</small>
+                  <button class="btn btn-sm btn-outline-success px-2 py-1 d-inline-flex align-items-center gap-1" (click)="openLocationModal(s.checkOutLat, s.checkOutLng)" title="Local do Check-Out">
+                    <i class="bi bi-geo"></i><span class="d-none d-xl-inline">Out</span>
+                  </button>
+                </ng-container>
+                <ng-template #noOutLoc><span class="badge bg-secondary">sem loc</span></ng-template>
+              </td>
+              <td>
+                <ng-container *ngIf="s._preceptorDisplay; else noPrecName">{{ s._preceptorDisplay }}</ng-container>
+                <ng-template #noPrecName>-</ng-template>
+              </td>
+              <td>{{ s._workedDisplay || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</ng-template>
+
+ <!-- Modal de Revisão (Bootstrap) -->
+<div class="modal fade glass-review-modal" id="reviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content review-glass-wrapper">
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-semibold d-flex align-items-center gap-2">
+          <span class="icon-circle" [ngClass]="{'approve': selectedAction()==='APPROVED', 'reject': selectedAction()==='REJECTED'}">
+            <i class="bi" [ngClass]="{'bi-hand-thumbs-up-fill': selectedAction()==='APPROVED', 'bi-hand-thumbs-down-fill': selectedAction()==='REJECTED'}"></i>
+          </span>
+          Avaliar justificativa
+        </h6>
+        <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body pt-0">
+        <div class="d-flex align-items-center justify-content-between mb-2 small text-muted">
+          <span>Data: <strong class="text-dark">{{ formatDateShort(selectedDate()) }}</strong></span>
+          <span *ngIf="existingJust() as ej" class="status-badge" [ngClass]="{
+            'pending': ej.status==='PENDING',
+            'approved': ej.status==='APPROVED',
+            'rejected': ej.status==='REJECTED'
+          }">{{ ej.status==='PENDING' ? 'PENDENTE' : (ej.status==='APPROVED' ? 'APROVADO' : 'REPROVADO') }}</span>
+        </div>
+        <label class="form-label small fw-semibold mb-1">Resposta ao aluno (opcional)</label>
+        <textarea class="form-control form-control-sm auto-grow" rows="3" placeholder="Mensagem ao aluno" [ngModel]="reviewNote()" (ngModelChange)="reviewNote.set($event)"></textarea>
+      </div>
+      <div class="modal-footer border-0 pt-1 d-flex gap-2 justify-content-end">
+        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success btn-sm" *ngIf="selectedAction()==='APPROVED'" (click)="confirmReview()">Confirmar</button>
+        <button type="button" class="btn btn-danger btn-sm" *ngIf="selectedAction()==='REJECTED'" (click)="confirmReview()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Modal de Localização isolado fora da estrutura do modal de revisão -->
+<ng-container *ngIf="showLocModal() && locLat()!=null && locLng()!=null">
+  <div class="loc-backdrop" (click)="closeLocationModal()"></div>
+  <app-location-modal [lat]="locLat()!" [lng]="locLng()!" [onClose]="closeLocationModal"></app-location-modal>
+</ng-container>
+
+<!-- Modal de confirmação genérico -->
+<ng-container *ngIf="confirmOpen()">
+  <div class="confirm-backdrop" (click)="cancelConfirm()"></div>
+  <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="confirm-body">
+      <div class="icon-wrap mb-2" [ngClass]="{'danger': confirmContext()==='plan' || (confirmContext()==='just' && !confirmPayload()?.actionReview)}">
+        <i class="bi" [ngClass]="{
+          'bi-exclamation-triangle-fill': confirmContext()==='plan' || (confirmContext()==='just' && confirmPayload()?.j),
+          'bi-question-circle-fill': confirmPayload()?.actionReview
+        }"></i>
+      </div>
+      <h6 id="confirmTitle" class="fw-semibold mb-2">Confirmação</h6>
+      <p class="small mb-3 text-muted">{{ confirmMessage() }}</p>
+      <div class="d-flex gap-2 justify-content-end">
+        <button class="btn btn-sm btn-light" (click)="cancelConfirm()">Não</button>
+        <button class="btn btn-sm" [ngClass]="{'btn-danger': confirmContext()==='plan' || (confirmContext()==='just' && confirmPayload()?.j), 'btn-primary': confirmPayload()?.actionReview}" (click)="confirmYes()">Sim</button>
+      </div>
+    </div>
+  </div>
+</ng-container>

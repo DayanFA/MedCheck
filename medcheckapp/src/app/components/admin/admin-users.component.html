@@ -1,0 +1,197 @@
+<div class="admin-users-wrapper p-3 p-md-4">
+  <div class="glass-toolbar d-flex flex-wrap align-items-center gap-2 mb-4">
+    <div class="input-group search-group flex-grow-1" style="max-width:420px">
+      <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
+      <input placeholder="Buscar..." class="form-control border-0 shadow-none" [(ngModel)]="q" (input)="onSearchChange()" (keydown)="onSearchEnter($event)">
+      <button *ngIf="q" class="btn btn-light border-0" type="button" (click)="clearSearch()"><i class="bi bi-x"></i></button>
+    </div>
+    <div class="ms-auto d-flex align-items-center gap-2 flex-wrap position-relative">
+      <div class="dropdown" [class.show]="showFilters">
+        <button type="button" class="btn btn-light border shadow-sm small dropdown-toggle" (click)="toggleFilters()">
+          Filtros
+        </button>
+        <div class="dropdown-menu p-3" [class.show]="showFilters" style="min-width:220px">
+          <div class="mb-2 fw-semibold small text-uppercase text-muted">Campos</div>
+          <div class="form-check small">
+            <input type="checkbox" id="fName" class="form-check-input" [(ngModel)]="fName" (change)="onFieldsChange()" name="fName">
+            <label for="fName" class="form-check-label">Nome</label>
+          </div>
+          <div class="form-check small">
+            <input type="checkbox" id="fPhone" class="form-check-input" [(ngModel)]="fPhone" (change)="onFieldsChange()" name="fPhone">
+            <label for="fPhone" class="form-check-label">Telefone</label>
+          </div>
+            <div class="form-check small">
+            <input type="checkbox" id="fEmail" class="form-check-input" [(ngModel)]="fEmail" (change)="onFieldsChange()" name="fEmail">
+            <label for="fEmail" class="form-check-label">Email</label>
+          </div>
+          <div class="form-check small mb-2">
+            <input type="checkbox" id="fCpf" class="form-check-input" [(ngModel)]="fCpf" (change)="onFieldsChange()" name="fCpf">
+            <label for="fCpf" class="form-check-label">CPF</label>
+          </div>
+          <div class="d-flex justify-content-end pt-2">
+            <button class="btn btn-outline-secondary btn-sm" type="button" (click)="resetAdvancedFilters()" [disabled]="!roleFilter && fName && fPhone && fEmail && fCpf">Limpar</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-outline-secondary btn-sm" (click)="load()" [disabled]="loading"><i class="bi bi-arrow-clockwise"></i></button>
+    </div>
+  </div>
+  <div class="alert alert-info py-2" *ngIf="msg">{{msg}}</div>
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" style="width:2rem;height:2rem"></div>
+  </div>
+  <div *ngIf="!loading" class="glass-table-container">
+    <div class="table-responsive rounded-4">
+      <table class="table table-sm align-middle modern-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>CPF</th>
+            <th>Email</th>
+            <th>Telefone</th>
+            <th class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let u of users">
+            <td>{{u.name}}</td>
+            <td>{{ u.cpf | cpf }}</td>
+            <td>{{u.email}}</td>
+            <td>{{u.phoneMasked || '—'}}</td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-primary" (click)="openEdit(u)"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-outline-danger" (click)="deleteUser(u)"><i class="bi bi-trash"></i></button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="d-flex flex-wrap align-items-center justify-content-between mt-3 gap-2">
+        <div class="small text-muted">Página {{ page + 1 }} de {{ totalPages || 1 }} • {{ totalItems }} registros</div>
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-secondary" (click)="firstPage()" [disabled]="page===0">«</button>
+          <button class="btn btn-outline-secondary" (click)="prevPage()" [disabled]="page===0">‹</button>
+          <button class="btn btn-outline-secondary" (click)="nextPage()" [disabled]="page+1>=totalPages">›</button>
+          <button class="btn btn-outline-secondary" (click)="lastPage()" [disabled]="page+1>=totalPages">»</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Edição Usuário -->
+<div class="modal-backdrop fancy" *ngIf="editingUser">
+  <div class="modal-dialog glass">
+    <div class="modal-content p-3 p-md-4">
+      <h5 class="mb-3 fw-semibold d-flex align-items-center gap-2"><i class="bi bi-person-gear text-primary"></i>Editar Usuário</h5>
+      <form (ngSubmit)="saveEdit()" #editForm="ngForm" class="d-flex flex-column gap-2">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label small mb-1">Nome</label>
+            <input class="form-control form-control-sm" [(ngModel)]="editingUser.name" name="name" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small mb-1">CPF</label>
+            <input class="form-control form-control-sm" [(ngModel)]="editingUser.cpf" name="cpf" appMask="cpf" (input)="formatCpfInput(editingUser.cpf)" required [ngClass]="{'is-invalid': cpfInvalid}">
+            <div *ngIf="cpfInvalid" class="invalid-feedback d-block small">CPF inválido</div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small mb-1">Matrícula</label>
+            <input class="form-control form-control-sm" [(ngModel)]="editingUser.matricula" name="matricula" (input)="onMatriculaInput()" [ngClass]="{'is-invalid': matriculaInvalid}" pattern="[A-Za-z0-9]{3,40}">
+            <div *ngIf="matriculaInvalid" class="invalid-feedback d-block small">3-40 letras/números.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-1">Email</label>
+            <input type="email" class="form-control form-control-sm" [(ngModel)]="editingUser.email" name="email" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-1">Telefone</label>
+            <input class="form-control form-control-sm" [(ngModel)]="editingUser.phone" name="phone" appMask="phone" (input)="onPhoneInput()" placeholder="(00) 00000-0000" [ngClass]="{'is-invalid': phoneInvalid}">
+            <div *ngIf="phoneInvalid" class="invalid-feedback d-block small">Telefone inválido.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-1">Data Nasc.</label>
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="editingUser.birthDate" name="birthDate" (change)="onBirthDateChange()" [ngClass]="{'is-invalid': birthDateInvalid}">
+            <div *ngIf="birthDateInvalid" class="invalid-feedback d-block small">Data inválida.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-1">Naturalidade</label>
+            <select class="form-select form-select-sm" [(ngModel)]="editingUser.naturalidade" name="naturalidade">
+              <option *ngFor="let e of estados" [value]="e">{{e}}</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-1">Nacionalidade</label>
+            <select class="form-select form-select-sm" [(ngModel)]="editingUser.nacionalidade" name="nacionalidade" required>
+              <option *ngFor="let n of nacionalidades" [value]="n">{{n}}</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-1">Role</label>
+            <select class="form-select form-select-sm" [(ngModel)]="editingUser.role" name="role">
+              <option *ngFor="let r of roles" [value]="r">{{r}}</option>
+            </select>
+          </div>
+          <!-- Campo disciplina removido conforme requisito -->
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-3 pt-2 border-top">
+          <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill" (click)="cancelEdit()" [disabled]="savingEdit">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3" [disabled]="editForm.invalid || savingEdit">
+            <span *ngIf="!savingEdit"><i class="bi bi-check2 me-1"></i>Salvar</span>
+            <span *ngIf="savingEdit" class="spinner-border spinner-border-sm"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Confirmação Salvar -->
+<div class="modal-backdrop fancy" *ngIf="confirmSave">
+  <div class="modal-dialog glass" style="max-width:480px;">
+    <div class="modal-content p-3 p-md-4">
+      <h5 class="mb-2">Confirmar alterações</h5>
+      <p class="small mb-3">Você está prestes a salvar as alterações do usuário <strong>{{editingUser?.name}}</strong>. Deseja continuar?</p>
+      <ul class="small mb-3 list-unstyled bg-light rounded p-2" *ngIf="editingUser">
+        <li><strong>Nome:</strong> {{editingUser.name}}</li>
+        <li><strong>CPF:</strong> {{editingUser.cpf}}</li>
+        <li><strong>Email:</strong> {{editingUser.email}}</li>
+        <li><strong>Telefone:</strong> {{editingUser.phone}}</li>
+        <li><strong>Nasc.:</strong> {{editingUser.birthDate || '—'}}</li>
+        <li><strong>Naturalidade:</strong> {{editingUser.naturalidade}}</li>
+        <li><strong>Nacionalidade:</strong> {{editingUser.nacionalidade}}</li>
+      </ul>
+      <div class="d-flex justify-content-end gap-2">
+        <button class="btn btn-outline-secondary btn-sm" (click)="confirmSaveCancel()" [disabled]="savingEdit">Cancelar</button>
+        <button class="btn btn-primary btn-sm rounded-pill" (click)="confirmSaveProceed()" [disabled]="savingEdit">
+          <span *ngIf="!savingEdit"><i class="bi bi-shield-check me-1"></i>Confirmar</span>
+          <span *ngIf="savingEdit" class="spinner-border spinner-border-sm"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Confirmação Exclusão -->
+<div class="modal-backdrop fancy" *ngIf="confirmDelete">
+  <div class="modal-dialog glass danger" style="max-width:460px;">
+    <div class="modal-content p-3 p-md-4">
+      <h5 class="mb-2 text-danger d-flex align-items-center gap-2"><i class="bi bi-exclamation-octagon"></i>Confirmar exclusão</h5>
+      <p class="small mb-3">Tem certeza que deseja excluir o usuário <strong>{{deletingUser?.name}}</strong>? Esta ação não pode ser desfeita.</p>
+      <ul class="small mb-3 list-unstyled bg-light rounded p-2" *ngIf="deletingUser">
+        <li><strong>Nome:</strong> {{deletingUser.name}}</li>
+        <li><strong>Email:</strong> {{deletingUser.email}}</li>
+        <li><strong>CPF:</strong> {{deletingUser.cpf | cpf}}</li>
+        <li><strong>Role:</strong> {{deletingUser.role}}</li>
+      </ul>
+      <div class="d-flex justify-content-end gap-2">
+        <button class="btn btn-outline-secondary btn-sm" (click)="confirmDeleteCancel()" [disabled]="deleting">Cancelar</button>
+        <button class="btn btn-danger btn-sm rounded-pill px-3" (click)="confirmDeleteProceed()" [disabled]="deleting">
+          <span *ngIf="!deleting"><i class="bi bi-trash3 me-1"></i>Excluir</span>
+          <span *ngIf="deleting" class="spinner-border spinner-border-sm"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

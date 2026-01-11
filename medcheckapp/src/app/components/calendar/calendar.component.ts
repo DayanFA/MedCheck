@@ -1,0 +1,791 @@
+import { Component, effect, inject, signal, computed } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { LocationModalComponent } from '../location-modal/location-modal.component';
+import { FormsModule } from '@angular/forms';
+import { CalendarServiceApi, CalendarDay, InternshipPlanDto } from '../../services/calendar.service';
+import { DisciplineService } from '../../services/discipline.service';
+import { EvaluationService } from '../../services/evaluation.service';
+import { CoordinatorService } from '../../services/coordinator.service';
+import { ToastService } from '../../services/toast.service';
+import { PreceptorAlunoContextService } from '../../services/preceptor-aluno-context.service';
+import { WeekSelectionService } from '../../services/week-selection.service';
+import { ActivatedRoute, Router } from '@angular/router';
+
+@Component({
+  selector: 'app-calendar',
+  standalone: true,
+  imports: [CommonModule, FormsModule, LocationModalComponent],
+  templateUrl: './calendar.component.html',
+  styleUrls: ['./calendar.component.scss']
+})
+export class UserCalendarComponent {
+  private api = inject(CalendarServiceApi);
+  private discApi = inject(DisciplineService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  today = new Date();
+  year = signal(this.today.getFullYear());
+  month = signal(this.today.getMonth() + 1); // 1-12
+  alunoId = signal<number|undefined>(undefined);
+  disciplineId = signal<number|undefined>(undefined); // disciplina forçada (preceptor) ou escolhida (aluno)
+  disciplines = signal<any[]|null>(null); // lista para aluno escolher na criação de plano/justificativa
+  data = signal<{ days: CalendarDay[]; plans:any[]; justifications:any[]; forcedDiscipline?: any }|null>(null);
+  // Bloqueio de edição após avaliação
+  planEditLocked = false;
+  // Fechamento da disciplina (avaliação final do coordenador existente)
+  disciplineFinalized = signal(false);
+  loading = signal(false);
+  // day history
+  selectedDate = signal<string>('');
+  sessionsForDay = signal<any[]|null>(null);
+  private preceptorNameMap = new Map<number,string>();
+  // Estado modal de localização (reutilizando o mesmo componente já usado em outros fluxos)
+  showLocModal = signal(false);
+  locLat = signal<number|undefined>(undefined);
+  locLng = signal<number|undefined>(undefined);
+  plansForDay = computed(() => {
+    const date = this.selectedDate();
+    const plans = this.data()?.plans || [];
+    return date ? plans.filter((p: any) => p.date === date) : [];
+  });
+
+  // plan form
+  formDate = signal<string>('');
+  formId = signal<number|undefined>(undefined);
+  formStart = signal<string>('08:00');
+  formEnd = signal<string>('12:00');
+  formLocation = signal<string>('');
+  formNote = signal<string>('');
+  // week selection (1..10) for the plan (UI only for now – not persisted in backend payload yet)
+  weeksOptions = Array.from({ length: 10 }, (_, i) => i + 1);
+  selectedWeek = signal<number>(1);
+
+  // justification form
+  justDate = signal<string>('');
+  justReason = signal<string>('');
+  justPlanId = signal<number|undefined>(undefined);
+  justType = signal<string>('GENERAL');
+  // preceptor review note (optional response to student)
+  reviewNote = signal<string>('');
+  selectedAction = signal<'APPROVED'|'REJECTED'|undefined>(undefined);
+  existingJust = computed(() => {
+    const d = this.selectedDate();
+    const js = this.data()?.justifications || [];
+    return d ? js.find((j: any) => j.date === d) : undefined;
+  });
+
+  // Confirmation modal state
+  confirmOpen = signal(false);
+  confirmContext = signal<'plan'|'just'|null>(null);
+  confirmPayload = signal<any>(null);
+  confirmMessage = signal<string>('Tem certeza que deseja excluir?');
+
+  weeks = computed(() => {
+    const ds = this.data()?.days ?? [];
+    const ymFirst = new Date(this.year(), this.month()-1, 1);
+    const startDay = ymFirst.getDay() || 7; // 1..7 (Mon..Sun)? We'll keep Sun=0 adjusted -> 7
+    const daysInMonth = new Date(this.year(), this.month(), 0).getDate();
+    const cells: { date?: string; day?: number; d?: CalendarDay }[] = [];
+    for (let i=1; i<startDay; i++) cells.push({});
+    for (let d=1; d<=daysInMonth; d++) {
+      const iso = `${this.year()}-${String(this.month()).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      cells.push({ date: iso, day: d, d: ds.find(x => x.date === iso) });
+    }
+    while (cells.length % 7 !== 0) cells.push({});
+    const weeks: any[] = [];
+    for (let i=0; i<cells.length; i+=7) weeks.push(cells.slice(i, i+7));
+    return weeks;
+  });
+
+  filteredDisciplineLabel = computed(() => {
+    const forced = this.data()?.forcedDiscipline;
+    if (forced && forced.code) return `${forced.code} — ${forced.name}`;
+    const did = this.disciplineId();
+    const list = this.disciplines();
+    if (did != null && Array.isArray(list)) {
+      const d = list.find(x => x.id === did);
+      if (d) return `${d.code} — ${d.name}`;
+    }
+    return 'Visão Geral';
+  });
+
+  private alunoCtx = inject(PreceptorAlunoContextService);
+  private initialized = false;
+  isCoordinator = false;
+  private refreshIntervalId: any = null;
+  private pendingTimeoutId: any = null;
+  private sessionEventHandler = () => {
+    this.refreshMonth(true);
+  };
+  private alunoChangedHandler = (e: any) => {
+    // Só reagir se nenhum alunoId explícito na URL (modo preceptor com contexto global)
+    if (this.alunoId()) return; // já há alunoId via query
+    const c = this.alunoCtx.getAluno();
+    if (c.id) {
+      this.alunoId.set(c.id);
+      this.load();
+    }
+  };
+
+  // Computed para indicar se usuário logado é ALUNO (acesso via auth no serviço api)
+  isAlunoUser(): boolean {
+    const user: any = (this.api as any)?.auth?.getUser?.() || (window as any).mc_user_cache;
+    return !!user && user.role === 'ALUNO';
+  }
+
+  constructor(private weekSync: WeekSelectionService, private toast: ToastService, private evalApi: EvaluationService, private coordApi: CoordinatorService) {
+    // Se usuário é preceptor e nenhum aluno selecionado (nem query param, nem contexto), redirecionar
+    setTimeout(() => {
+      const user: any = (this.api as any)?.auth?.getUser?.() || (window as any).mc_user_cache;
+      const role = user?.role;
+      this.isCoordinator = role === 'COORDENADOR';
+      if ((role === 'PRECEPTOR' || role === 'ADMIN' || role === 'COORDENADOR') && !this.alunoId()) {
+  const dest = '/home';
+        this.toast.show('warning', `Por favor selecione um aluno para visualizar o calendário.`);
+  this.router.navigate([dest]);
+        return;
+      }
+    }, 50);
+    this.route.queryParamMap.subscribe(mp => {
+      const idStr = mp.get('alunoId');
+      const idNum = idStr ? Number(idStr) : undefined;
+      this.alunoId.set(idNum && Number.isFinite(idNum) ? idNum : undefined);
+      const discStr = mp.get('disciplineId');
+      const discNum = discStr ? Number(discStr) : undefined;
+      this.disciplineId.set(discNum && Number.isFinite(discNum) ? discNum : undefined);
+      if (this.initialized) {
+        // Alterações posteriores de query params recarregam normalmente
+        this.load();
+      }
+    });
+    // sincroniza seleção inicial com service compartilhado
+    this.selectedWeek.set(this.weekSync.week());
+    // Adia o primeiro load para depois de aplicar possível contexto de aluno
+    setTimeout(() => {
+      if (!this.alunoId()) {
+        const c = this.alunoCtx.getAluno();
+        if (c.id) {
+          this.alunoId.set(c.id);
+        }
+      }
+      // Limpa quaisquer disciplinas herdadas (evita mostrar lista completa de um estado anterior)
+      this.disciplines.set(null);
+      this.load();
+      this.initialized = true;
+    }, 0);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mc:aluno-changed', this.alunoChangedHandler as any);
+      ['mc:session-updated','mc:session-created','mc:checkin-created','mc:checkin-updated'].forEach(evt => window.addEventListener(evt, this.sessionEventHandler as any));
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.refreshMonth(true); });
+      this.startAdaptiveRefresh();
+    }
+  }
+
+  pickDate(dateIso: string) {
+    if (!dateIso) return;
+    // Parse YYYY-MM-DD
+    const [y, m, d] = dateIso.split('-').map(Number);
+    if (!y || !m || !d) return;
+    const prevYear = this.year();
+    const prevMonth = this.month();
+    // If month/year differ, update and reload, then open day
+    if (y !== prevYear || m !== prevMonth) {
+      this.year.set(y);
+      this.month.set(m);
+      this.loading.set(true);
+      // IMPORTANTE: preservar disciplina selecionada ao recarregar mês
+      this.api.getMonth(y, m, this.alunoId(), this.disciplineId()).subscribe(res => {
+        // Preserva metadata de disciplina forçada
+        this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
+        this.loading.set(false);
+        this.updatePlanLock();
+        this.openPlan(dateIso);
+      }, _ => { this.loading.set(false); this.updatePlanLock(); });
+    } else {
+      // Same month: just open the day
+      this.openPlan(dateIso);
+    }
+  }
+
+  autoGrow(ev: Event) {
+    const el = ev.target as HTMLTextAreaElement;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = (el.scrollHeight + 2) + 'px';
+  }
+
+  load() {
+    // Evita flicker: se estamos em contexto preceptor (alunoId definido) e ainda não carregamos disciplinas desse contexto, zera imediatamente
+    if (this.alunoId() && !this.initialized) {
+      this.disciplines.set(null);
+    }
+    // Se for o próprio aluno (sem alunoId), aplicar disciplina salva localmente
+    if (!this.alunoId()) {
+      try {
+        const stored = localStorage.getItem('mc_current_discipline_id');
+        if (stored) {
+          const parsed = parseInt(stored, 10);
+          if (!Number.isNaN(parsed)) this.disciplineId.set(parsed);
+        }
+      } catch {}
+    }
+    this.loading.set(true);
+    this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe(res => {
+      this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
+      this.loading.set(false);
+      this.updatePlanLock();
+      this.updateDisciplineFinalState();
+      // Atualiza cache de preceptores por disciplina para mapear nomes por ID nas sessões
+      this.loadDisciplinePreceptors();
+    }, _ => { this.loading.set(false); this.updatePlanLock(); });
+    // se for aluno (sem alunoId) carregar disciplinas para seleção local
+    if (!this.alunoId()) {
+      const t = (this.api as any)['auth'].getToken?.();
+      const init: RequestInit = t ? { headers: { Authorization: `Bearer ${t}` } } : {};
+      fetch('/api/users/me/disciplines', init)
+        .then(r => r.ok ? r.json() : [])
+        .then(list => this.disciplines.set(list))
+        .catch(()=>{});
+    } else {
+      // Preceptor ou Coordenador visualizando aluno: carregar disciplinas específicas
+      const t = (this.api as any)['auth'].getToken?.();
+      const init: RequestInit = t ? { headers: { Authorization: `Bearer ${t}` } } : {};
+      fetch('/api/users/me', init)
+        .then(r => r.ok ? r.json() : null)
+        .then(profile => {
+          const role = profile?.role;
+          // Cenário PRECEPTOR (ou ADMIN atuando como preceptor) com lista preceptorDisciplines
+            if (profile && Array.isArray(profile.preceptorDisciplines) && profile.preceptorDisciplines.length) {
+              const list = profile.preceptorDisciplines;
+              this.disciplines.set(list);
+              const cur = this.disciplineId();
+              if (cur != null && !list.some((d: any) => d.id === cur)) {
+                this.disciplineId.set(undefined);
+              }
+              if ((this.disciplineId() == null) && list.length > 0) {
+                this.disciplineId.set(list[0].id);
+                this.loading.set(true);
+                this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe(res => {
+                  this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
+                  this.loading.set(false);
+                  this.updatePlanLock();
+                  this.updateDisciplineFinalState();
+                  this.loadDisciplinePreceptors();
+                }, _ => { this.loading.set(false); this.updatePlanLock(); });
+              }
+              return; // já tratou como preceptor
+            }
+          // Caso COORDENADOR (ou ADMIN sem preceptorDisciplines) buscar disciplinas via endpoint de coordenação
+          if (role === 'COORDENADOR' || role === 'ADMIN') {
+            fetch('/api/coord/disciplinas', init)
+              .then(r => r.ok ? r.json() : [])
+              .then((list: any[]) => {
+                if (!Array.isArray(list)) list = [] as any[];
+                this.disciplines.set(list);
+                const cur = this.disciplineId();
+                if (cur != null && !list.some((d: any) => d.id === cur)) {
+                  this.disciplineId.set(undefined);
+                }
+                if ((this.disciplineId() == null) && list.length > 0) {
+                  this.disciplineId.set(list[0].id);
+                  this.loading.set(true);
+                  this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe(res => {
+                    this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
+                    this.loading.set(false);
+                    this.updatePlanLock();
+                    this.updateDisciplineFinalState();
+                    this.loadDisciplinePreceptors();
+                  }, _ => { this.loading.set(false); this.updatePlanLock(); });
+                }
+              })
+              .catch(() => { this.disciplines.set([]); });
+            return;
+          }
+          // Fallback: nenhum conjunto específico
+          this.disciplines.set([]);
+          this.disciplineId.set(undefined);
+        })
+        .catch(()=>{ this.disciplines.set([]); this.disciplineId.set(undefined); });
+    }
+  }
+
+  private loadDisciplinePreceptors() {
+    const did = this.disciplineId();
+    if (!did) { this.preceptorNameMap.clear(); return; }
+    try {
+      this.discApi.get(did).subscribe({
+        next: (detail: any) => {
+          this.preceptorNameMap.clear();
+          const list = detail?.preceptors || [];
+          for (const p of list) if (p?.id && p?.name) this.preceptorNameMap.set(Number(p.id), String(p.name));
+        },
+        error: _ => { /* silencioso */ }
+      });
+    } catch {}
+  }
+
+  setDisciplineForView(id: string) {
+    const num = id ? Number(id) : undefined;
+    const candidate = num && Number.isFinite(num) ? num : undefined;
+    // Se contexto preceptor (alunoId definido) validar que disciplina está na lista vinculada
+    if (this.alunoId()) {
+      const list = this.disciplines();
+      if (candidate != null && list && !list.some(d => d.id === candidate)) {
+        // Ignora seleção inválida
+        return;
+      }
+    }
+    this.disciplineId.set(candidate);
+    // Atualiza query params para persistir em reload / compartilhamento de URL
+    const qp: any = { disciplineId: this.disciplineId() };
+    if (this.alunoId()) qp.alunoId = this.alunoId();
+    this.router.navigate([], { relativeTo: this.route, queryParams: qp, queryParamsHandling: 'merge' });
+    this.load();
+    // Atualiza estado de fechamento de disciplina
+    this.updateDisciplineFinalState();
+  }
+
+  nextMonth(delta: number) {
+    let y = this.year(); let m = this.month() + delta;
+    if (m < 1) { m = 12; y--; } else if (m > 12) { m = 1; y++; }
+    this.year.set(y); this.month.set(m); this.load();
+  }
+
+  statusClass(d?: CalendarDay) {
+    if (!d) return '';
+    switch (d.status) {
+      case 'BLUE': return 'status-blue';
+      case 'RED': return 'status-red';
+      case 'YELLOW': return 'status-yellow';
+      case 'GREEN': return 'status-green';
+      case 'ORANGE': return 'status-orange';
+      default: return '';
+    }
+  }
+
+  openPlan(dateIso: string) {
+    this.formDate.set(dateIso);
+    this.formId.set(undefined);
+    this.selectedDate.set(dateIso);
+    // reset panels state to avoid needing a second click
+    this.sessionsForDay.set(null);
+    this.justDate.set(dateIso);
+    this.reviewNote.set('');
+    this.formStart.set('08:00');
+    this.formEnd.set('12:00');
+    this.formLocation.set('');
+    this.formNote.set('');
+    // Keep previously selected week; do not auto-reset to preserve user's context.
+    // load day sessions
+  this.loadDaySessions(dateIso);
+    // preload justification state if exists
+    const ej = this.existingJust();
+    if (ej) {
+      this.justType.set(ej.type || 'GENERAL');
+      this.justReason.set(ej.reason || '');
+      this.justPlanId.set(ej.planId);
+    } else {
+      this.justType.set('GENERAL');
+      this.justReason.set('');
+      this.justPlanId.set(undefined);
+    }
+  }
+
+  savePlan() {
+    if (this.planEditLocked) {
+      this.toast.show('warning', 'Semana já avaliada. Planos bloqueados.');
+      return;
+    }
+    const payload: InternshipPlanDto = {
+      id: this.formId(),
+      date: this.formDate(),
+      startTime: this.formStart(),
+      endTime: this.formEnd(),
+      location: this.formLocation(),
+      note: this.formNote() || undefined,
+      weekNumber: this.selectedWeek(),
+      disciplineId: this.disciplineId() // para aluno, disciplineId será o selecionado via selector (ajustado no template)
+    };
+    // atualizar semana global selecionada
+    this.weekSync.setWeek(this.selectedWeek());
+    this.api.upsertPlan(payload).subscribe((resp: any) => {
+      const saved = resp?.plan || payload;
+      const cur = this.data();
+      if (cur) {
+        const plans = [...(cur.plans || [])];
+        const idx = plans.findIndex((p: any) => p.id === saved.id);
+        if (idx >= 0) plans[idx] = saved; else plans.push(saved);
+        this.data.set({ ...cur, plans });
+      }
+      this.formId.set(undefined);
+      // Optional: reload from server to stay consistent
+      this.load();
+    });
+  }
+
+  editPlan(p: any) {
+    this.formDate.set(p.date);
+    this.formId.set(p.id);
+    this.formStart.set(p.startTime);
+    this.formEnd.set(p.endTime);
+    this.formLocation.set(p.location || '');
+    this.formNote.set(p.note || '');
+    if (p.weekNumber) {
+      this.selectedWeek.set(p.weekNumber);
+      this.weekSync.setWeek(p.weekNumber);
+    }
+    // Select de disciplina removido para aluno; não alteramos disciplineId ao editar plano.
+  }
+
+  deletePlan(id: number) {
+    if (this.planEditLocked) {
+      this.toast.show('warning', 'Semana já avaliada. Planos bloqueados.');
+      return;
+    }
+    this.openConfirm('plan', { id }, 'Excluir este plano? Esta ação não pode ser desfeita.');
+  }
+
+  refreshDay() {
+    const d = this.selectedDate();
+    if (!d) return;
+    // Recarrega mês (plano/justificativa/status) e as sessões do dia
+    this.load();
+    this.loadDaySessions(d);
+  }
+
+  openJustify(dateIso: string, planId?: number) {
+    this.justDate.set(dateIso);
+    const ej = this.existingJust();
+    if (ej) {
+      // edit existing
+      this.justType.set(ej.type || 'GENERAL');
+      this.justReason.set(ej.reason || '');
+      this.justPlanId.set(ej.planId);
+    } else {
+      this.justType.set('GENERAL');
+      this.justReason.set('');
+      this.justPlanId.set(planId);
+    }
+  }
+
+  saveJustify() {
+    this.api.justify({ date: this.justDate(), planId: this.justPlanId(), type: this.justType(), reason: this.justReason(), disciplineId: this.disciplineId() })
+      .subscribe(() => { this.load(); this.refreshMonth(true); });
+  }
+
+  deleteJustify(j: any) {
+    if (j?.status !== 'PENDING') return; // guard
+    this.openConfirm('just', { j }, 'Excluir justificativa?');
+  }
+
+  review(action: 'APPROVED'|'REJECTED') {
+    const alunoId = this.alunoId();
+    const dateIso = this.selectedDate();
+    if (!alunoId || !dateIso) return;
+    const msg = action === 'APPROVED' ? 'Confirmar aprovação desta justificativa?' : 'Confirmar reprovação desta justificativa?';
+    this.openConfirm('just', { actionReview: action }, msg);
+  }
+
+  // Modal de revisão (Bootstrap)
+  openReviewModal(action: 'APPROVED'|'REJECTED') {
+    this.selectedAction.set(action);
+    // reset note (optional)
+    // this.reviewNote.set(''); // manter preenchido entre aberturas se desejar
+    try {
+      const anyWin = window as any;
+      const modalEl = document.getElementById('reviewModal');
+      if (modalEl && anyWin.bootstrap && anyWin.bootstrap.Modal) {
+        const instance = anyWin.bootstrap.Modal.getOrCreateInstance(modalEl);
+        instance.show();
+      }
+    } catch {}
+  }
+
+  confirmReview() {
+    const action = this.selectedAction();
+    const alunoId = this.alunoId();
+    const dateIso = this.selectedDate();
+    if (!action || !alunoId || !dateIso) return;
+    const note = (this.reviewNote() || '').trim() || undefined;
+    this.api.reviewJustification({ alunoId, date: dateIso, action, note }).subscribe({
+      next: () => { this.hideReviewModal(); this.load(); this.refreshMonth(true); },
+      error: () => { this.hideReviewModal(); this.load(); this.refreshMonth(true); },
+    });
+  }
+
+  private hideReviewModal() {
+    try {
+      const anyWin = window as any;
+      const modalEl = document.getElementById('reviewModal');
+      if (modalEl && anyWin.bootstrap && anyWin.bootstrap.Modal) {
+        const instance = anyWin.bootstrap.Modal.getOrCreateInstance(modalEl);
+        instance.hide();
+      }
+    } catch {}
+  }
+
+  // --- Confirmation modal helpers ---
+  openConfirm(ctx: 'plan'|'just', payload: any, message: string) {
+    this.confirmContext.set(ctx);
+    this.confirmPayload.set(payload);
+    this.confirmMessage.set(message || 'Tem certeza?');
+    this.confirmOpen.set(true);
+  }
+  cancelConfirm() {
+    this.confirmOpen.set(false);
+    this.confirmContext.set(null);
+    this.confirmPayload.set(null);
+  }
+  confirmYes() {
+    const ctx = this.confirmContext();
+    const payload = this.confirmPayload();
+    if (!ctx) { this.cancelConfirm(); return; }
+    if (ctx==='plan' && payload?.id) {
+      this.api.deletePlan(payload.id).subscribe(() => {
+        const cur = this.data();
+        if (cur) {
+          const plans = (cur.plans || []).filter((p: any) => p.id !== payload.id);
+          this.data.set({ ...cur, plans });
+        }
+        this.load();
+        this.refreshMonth(true);
+      });
+    } else if (ctx==='just') {
+      // Two contexts: deletion or review action
+      if (payload?.j) {
+        const j = payload.j;
+        const dateIso = this.selectedDate();
+        if (dateIso) {
+          this.api.deleteJustificationByDate(dateIso).subscribe(() => this.load());
+        } else if (j?.id) {
+          this.api.deleteJustification(j.id).subscribe(() => this.load());
+        }
+      } else if (payload?.actionReview) {
+        const alunoId = this.alunoId();
+        const dateIso = this.selectedDate();
+        const action = payload.actionReview as 'APPROVED'|'REJECTED';
+        if (alunoId && dateIso && action) {
+          const note = (this.reviewNote() || '').trim() || undefined;
+          this.api.reviewJustification({ alunoId, date: dateIso, action, note }).subscribe({
+            next: () => { this.load(); this.refreshMonth(true); },
+            error: () => { this.load(); this.refreshMonth(true); },
+          });
+        }
+      }
+    }
+    this.cancelConfirm();
+  }
+
+  private loadDaySessions(dateIso: string) {
+    // TODO: extender CalendarServiceApi.getSessions para aceitar preceptorId (atualmente ignorado)
+    this.api.getSessions(dateIso, dateIso, this.alunoId() || undefined, this.disciplineId() || undefined).subscribe(list => {
+      this.sessionsForDay.set(list);
+    });
+  }
+
+  // Abre modal de localização reaproveitando componente global já utilizado em outros fluxos.
+  openLocationModal(lat: number, lng: number) {
+    if (lat == null || lng == null) return;
+    this.locLat.set(lat);
+    this.locLng.set(lng);
+    this.showLocModal.set(true);
+    // Dispara evento global também para compatibilidade (caso haja outro handler genérico)
+    try { window.dispatchEvent(new CustomEvent('mc:open-location', { detail: { lat, lng } })); } catch {}
+    // Listener ESC para fechar
+    try {
+      const escHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') { this.closeLocationModal(); window.removeEventListener('keydown', escHandler); }
+      };
+      window.addEventListener('keydown', escHandler);
+    } catch {}
+  }
+
+  closeLocationModal = () => {
+    this.showLocModal.set(false);
+  };
+
+  ngOnDestroy() {
+    try { window.removeEventListener('mc:aluno-changed', this.alunoChangedHandler as any); } catch {}
+    try {
+      ['mc:session-updated','mc:session-created','mc:checkin-created','mc:checkin-updated'].forEach(evt => window.removeEventListener(evt, this.sessionEventHandler as any));
+      if (this.refreshIntervalId) clearInterval(this.refreshIntervalId);
+      if (this.pendingTimeoutId) clearTimeout(this.pendingTimeoutId);
+    } catch {}
+  }
+
+  private refreshMonth(force = false) {
+    if (!this.initialized || this.loading()) return;
+    this.api.getMonth(this.year(), this.month(), this.alunoId(), this.disciplineId()).subscribe({
+      next: res => {
+        this.data.set({ days: res.days, plans: res.plans, justifications: res.justifications, forcedDiscipline: (res as any).forcedDiscipline });
+        if (force) this.scheduleNextCriticalEdge();
+        this.updatePlanLock();
+        this.updateDisciplineFinalState();
+      },
+      error: () => {/* noop */}
+    });
+  }
+
+  private startAdaptiveRefresh() {
+    // Intervalo base mais curto para reação visual (~60s)
+    this.refreshIntervalId = setInterval(() => this.refreshMonth(false), 60 * 1000);
+    // E agendamentos precisos para bordas (início / fim de planos) do dia atual
+    this.scheduleNextCriticalEdge();
+  }
+
+  private scheduleNextCriticalEdge() {
+    if (this.pendingTimeoutId) { clearTimeout(this.pendingTimeoutId); this.pendingTimeoutId = null; }
+    const todayIso = new Date().toISOString().slice(0,10);
+    const cur = this.data();
+    if (!cur) return;
+  const todayRaw = cur.days.find(d => d.date === todayIso);
+  if (!todayRaw) return;
+  const today: any = todayRaw; // acesso a campos complementares calculados no backend (earliestStart/latestEnd)
+  // Edge candidates: earliestStart + 1min (grace) se status BLUE e há planos; latestEnd + 5s para virar RED se nada feito; ou próximo minuto se trabalhando
+    const now = new Date();
+    const parse = (t?: string) => { if (!t) return null; const dt = new Date(`${todayIso}T${t}:00`); return isNaN(dt.getTime()) ? null : dt; };
+  const earliest = parse(today.earliestStart);
+  const latest = parse(today.latestEnd);
+    let target: Date | null = null;
+    if (today.status === 'BLUE' && earliest) {
+      const grace = new Date(earliest.getTime() + 60*1000); // +1 min
+      if (grace > now) target = grace;
+    } else if (today.status === 'YELLOW' && latest) {
+      // ao fim do período pode virar GREEN ou manter YELLOW; ainda assim refresh imediato
+      const endPlus = new Date(latest.getTime() + 5*1000);
+      if (endPlus > now) target = endPlus;
+    } else if (today.status === 'BLUE' && latest) {
+      // caso especial: nenhum trabalho e já perto do fim; garantir refresh próximo do fim
+      const endPlus = new Date(latest.getTime() + 5*1000);
+      if (endPlus > now) target = endPlus;
+    }
+    if (target) {
+      const ms = target.getTime() - now.getTime();
+      if (ms > 0 && ms < 6*60*1000) { // só agenda se dentro de 6 min para evitar fila longa
+        this.pendingTimeoutId = setTimeout(() => this.refreshMonth(true), ms);
+      }
+    }
+  }
+
+  private updatePlanLock() {
+    const alunoId = this.alunoId();
+    const week = this.selectedWeek();
+    if (!alunoId || !week) { this.planEditLocked = false; return; }
+    // tenta avaliação específica da disciplina primeiro
+    this.evalApi.get(alunoId, week, this.disciplineId() || undefined).subscribe({
+      next: () => { this.planEditLocked = true; },
+      error: () => {
+        // fallback avaliação global
+        this.evalApi.get(alunoId, week).subscribe({
+          next: () => { this.planEditLocked = true; },
+          error: () => { this.planEditLocked = false; }
+        });
+      }
+    });
+  }
+
+  monthLabel = computed(() => {
+    const dt = new Date(this.year(), this.month()-1, 1);
+    return dt.toLocaleString('pt-BR', { month:'long', year:'numeric' });
+  });
+
+  // Atualiza flag de disciplina finalizada (avaliação final do coordenador existente)
+  private updateDisciplineFinalState() {
+    // Somente no contexto do aluno (sem alunoId explícito) e com disciplina selecionada
+    const isAluno = !this.alunoId();
+    const did = this.disciplineId();
+    if (!isAluno || did == null) { this.disciplineFinalized.set(false); return; }
+    try {
+      this.coordApi.getMyFinalEvaluation(did).subscribe({
+        next: (res: any) => {
+          // Considera finalizada se qualquer payload válido retornar
+          const finalized = !!res && (res.id != null || res.score != null || (res.comment != null && String(res.comment).length >= 0));
+          this.disciplineFinalized.set(!!finalized);
+        },
+        error: () => this.disciplineFinalized.set(false)
+      });
+    } catch { this.disciplineFinalized.set(false); }
+  }
+  todayIso = new Date().toISOString().slice(0,10);
+  isToday(dateIso?: string) { return !!dateIso && dateIso === this.todayIso; }
+  dayAriaLabel(cell: {date?:string;day?:number;d?:CalendarDay}) {
+    if(!cell.date || !cell.day) return 'Vazio';
+    const parts: string[] = [];
+    parts.push(`Dia ${cell.day}`);
+    if (this.isToday(cell.date)) parts.push('Hoje');
+    if (cell.date === this.selectedDate()) parts.push('Selecionado');
+    if (cell.d) {
+      const st = cell.d.status;
+      switch(st){
+        case 'BLUE': parts.push('Futuro'); break;
+        case 'RED': parts.push('Faltou'); break;
+        case 'YELLOW': parts.push('Incompleto'); break;
+        case 'GREEN': parts.push('Cumprido'); break;
+        case 'ORANGE': parts.push('Justificado'); break;
+      }
+      if (cell.d.workedSeconds) {
+        const horas = (cell.d.workedSeconds/3600).toFixed(1);
+        parts.push(`${horas} horas trabalhadas`);
+      }
+    }
+    return parts.join(', ');
+  }
+
+  formatDateHuman(iso?: string) {
+    if(!iso) return '';
+    try {
+      const d = new Date(iso + 'T00:00:00');
+      return d.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' }).replace(/\b(\w)/g, m => m.toUpperCase());
+    } catch { return iso; }
+  }
+  formatDateShort(iso?: string) {
+    if(!iso) return '';
+    try { const d = new Date(iso + 'T00:00:00'); return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit'}); } catch { return iso; }
+  }
+
+  get daySessionsProcessed() {
+    const list = this.sessionsForDay() || [];
+    return list.map(s => {
+      let worked: string | undefined;
+      // Derivar nome do preceptor (quando disponível)
+      let precName: string | undefined = s?.preceptor?.name || s?.preceptorName || s?.preceptor_name || s?.preceptor_full_name;
+      const precId = s?.preceptor?.id || s?.preceptorId || s?.preceptor_id;
+      if (!precName && precId != null) {
+        const mapped = this.preceptorNameMap.get(Number(precId));
+        if (mapped) precName = mapped;
+      }
+      let _preceptorDisplay: string | undefined = precName; // sem fallback para ID
+      if (s.checkInTime && s.checkOutTime) {
+        try {
+          const start = new Date(s.checkInTime).getTime();
+          const end = new Date(s.checkOutTime).getTime();
+          if (end > start) {
+            const diff = Math.floor((end - start)/1000);
+            const h = Math.floor(diff/3600);
+            const m = Math.floor((diff%3600)/60);
+            worked = h ? `${h}h ${m.toString().padStart(2,'0')}m` : `${m}m`;
+          }
+        } catch {}
+      }
+      return { ...s, _workedDisplay: worked, _preceptorDisplay };
+    });
+  }
+  get dayTotalHoursLabel(): string {
+    const list = this.daySessionsProcessed;
+    let totalSecs = 0;
+    for (const s of list) {
+      if (s.checkInTime && s.checkOutTime) {
+        const start = new Date(s.checkInTime).getTime();
+        const end = new Date(s.checkOutTime).getTime();
+        if (end > start) totalSecs += Math.floor((end-start)/1000);
+      }
+    }
+    if (!totalSecs) return '';
+    const h = Math.floor(totalSecs/3600); const m = Math.floor((totalSecs%3600)/60);
+    return h ? `${h}h ${m.toString().padStart(2,'0')}m` : `${m}m`;
+  }
+  get dayRecordsLabel(): string {
+    const n = (this.sessionsForDay()||[]).length;
+    if (n===0) return '0 registros'; if (n===1) return '1 registro'; return `${n} registros`;
+  }
+}

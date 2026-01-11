@@ -1,0 +1,98 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { AuthService } from './auth.service';
+
+export interface CalendarDay {
+  date: string; // YYYY-MM-DD
+  plannedSeconds: number;
+  workedSeconds: number;
+  status: 'NONE'|'BLUE'|'RED'|'YELLOW'|'GREEN'|'ORANGE';
+  justificationStatus?: 'PENDING'|'APPROVED'|'REJECTED';
+}
+
+export interface InternshipPlanDto {
+  id?: number;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string;   // HH:mm
+  location?: string;
+  note?: string;
+  weekNumber?: number;
+  disciplineId?: number;
+}
+
+@Injectable({ providedIn: 'root' })
+export class CalendarServiceApi {
+  private http = inject(HttpClient);
+  private auth = inject(AuthService);
+
+  getMonth(year: number, month: number, alunoId?: number, disciplineId?: number) {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    const params: any = { year, month };
+    if (alunoId) params.alunoId = alunoId;
+    if (disciplineId) params.disciplineId = disciplineId;
+    return this.http.get<{ year:number; month:number; days: CalendarDay[]; plans: any[]; justifications: any[] }>(`/api/calendar/month`, { params, headers });
+  }
+
+  upsertPlan(plan: InternshipPlanDto) {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.post<{ plan: InternshipPlanDto }>(`/api/calendar/plan`, plan, { headers });
+  }
+
+  deletePlan(id: number) {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.delete<{ deleted: boolean }>(`/api/calendar/plan/${id}`, { headers });
+  }
+
+  justify(payload: { date: string; planId?: number; type?: string; reason: string; disciplineId?: number; }) {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.post(`/api/calendar/justify`, payload, { headers });
+  }
+
+  deleteJustification(id: number) {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.delete<{ deleted: boolean }>(`/api/calendar/justify/${id}`, { headers });
+  }
+
+  deleteJustificationByDate(dateIso: string) {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.delete<{ deleted: boolean }>(`/api/calendar/justify`, { headers, params: { date: dateIso } as any });
+  }
+
+  getSessions(startIso: string, endIso: string, alunoId?: number, disciplineId?: number, preceptorId?: number) {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    const params: any = { start: startIso, end: endIso };
+    if (alunoId) params.alunoId = alunoId;
+    if (disciplineId) params.disciplineId = disciplineId;
+    if (preceptorId) params.preceptorId = preceptorId;
+    return this.http.get<any[]>(`/api/check/sessions`, { params, headers });
+  }
+
+  reviewJustification(payload: { alunoId: number; date: string; action: 'APPROVED'|'REJECTED'; note?: string; }) {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.post(`/api/calendar/justify/review`, payload, { headers });
+  }
+
+  getCurrentPreceptor() {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.get<{ id?: number; name?: string }>(`/api/calendar/current/preceptor`, { headers });
+  }
+
+  getWeekPlans(weekNumber: number, alunoId?: number, disciplineId?: number) {
+    const token = this.auth.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    const params: any = { weekNumber };
+    if (alunoId) params.alunoId = alunoId;
+    if (disciplineId) params.disciplineId = disciplineId;
+    return this.http.get<{ weekNumber: number; count: number; plans: InternshipPlanDto[] }>(`/api/calendar/week`, { headers, params });
+  }
+}

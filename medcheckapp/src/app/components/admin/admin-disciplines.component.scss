@@ -1,0 +1,92 @@
+// Styles aligned with Admin Users page for consistent look & feel
+
+.courses-wrapper {
+	// Match .admin-users-wrapper look
+	background: linear-gradient(145deg,#eef5ff,#e3eefc 50%,#dbe8f7);
+	border: 1px solid #dae4ef;
+	border-radius: 26px;
+	box-shadow: 0 14px 42px -14px rgba(32,56,92,.25), 0 6px 20px -8px rgba(32,56,92,.18);
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
+	position: relative;
+	min-height: 560px;
+}
+
+.glass-toolbar {
+	// Match admin-users toolbar
+	background: linear-gradient(135deg,#ffffff,#f2f7fb);
+	border:1px solid #d9e4ef;
+	border-radius: 18px;
+	padding:.65rem .9rem;
+	box-shadow:0 6px 18px -8px rgba(32,56,92,.18);
+}
+
+.glass-table-container {
+	// Match admin-users glass table
+	background:rgba(255,255,255,.6);
+	border:1px solid #d7e2ec;
+	border-radius:22px;
+	padding:1rem .75rem 1.5rem;
+	box-shadow:0 8px 26px -10px rgba(30,54,90,.18), 0 2px 10px -4px rgba(30,54,90,.15);
+}
+
+table.modern-table { margin:0; }
+table.modern-table thead th {
+	font-size:.65rem;
+	text-transform:uppercase;
+	letter-spacing:.55px;
+	font-weight:700;
+	color:#4d6275;
+	border-bottom:1px solid #d6e1ec;
+	background:linear-gradient(90deg,#f3f8fc,#eef4f9);
+}
+table.modern-table tbody tr { transition:.25s; }
+table.modern-table tbody tr:hover { background:#f2f8fd; }
+table.modern-table td, table.modern-table th { vertical-align:middle; }
+table.modern-table tbody td { font-size:.8rem; }
+
+.pill {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: .25rem .55rem;
+	font-size: .65rem;
+	letter-spacing: .05em;
+	font-weight: 600;
+	border-radius: 999px;
+	text-transform: uppercase;
+	backdrop-filter: blur(4px);
+	&.neutral { background: rgba(99,102,241,0.15); color:#3730a3; }
+	&.alt { background: rgba(16,185,129,0.15); color:#065f46; }
+}
+
+.code-badge {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+	font-size: .7rem;
+	background: rgba(31,41,55,0.75);
+	color: #f9fafb;
+	padding: .35rem .55rem;
+	border-radius: 8px;
+	letter-spacing: .05em;
+	box-shadow: 0 2px 4px -1px rgba(0,0,0,0.3);
+}
+
+.loading-state .tracking { letter-spacing: .18em; opacity:.7; }
+
+.fade-in { animation: fadeInUp .5s both cubic-bezier(.4,.0,.2,1); }
+@keyframes fadeInUp { from { opacity:0; transform: translateY(6px);} to { opacity:1; transform: translateY(0);} }
+
+.glass-alert {
+	background: rgba(255,255,255,0.55);
+	border: 1px solid rgba(255,255,255,0.6);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	border-radius: 16px;
+}
+
+@media (max-width: 640px) {
+	.courses-wrapper { border-radius:20px; }
+	.glass-toolbar { padding:.55rem .7rem; }
+	table.modern-table thead th { font-size:.58rem; }
+	table.modern-table tbody td { font-size:.72rem; }
+}

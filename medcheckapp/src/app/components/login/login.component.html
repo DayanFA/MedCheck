@@ -1,0 +1,72 @@
+<div class="login-wrapper d-flex align-items-center justify-content-center min-vh-100 py-4">
+  <div class="login-shell position-relative w-100 mx-3">
+    <div class="decor-circle deco-1"></div>
+    <div class="decor-circle deco-2"></div>
+    <div class="card login-card shadow-lg border-0 overflow-hidden" role="main" aria-labelledby="loginTitle">
+      <div class="row g-0 h-100 flex-md-row flex-column">
+        <!-- Logo / Hero Column (left) -->
+        <div class="col-md-6 d-flex align-items-center justify-content-center p-4 p-md-5 logo-pane position-relative order-1 order-md-0">
+          <div class="inner-wrapper w-100">
+            <div class="logo-content text-center uniform-center">
+            <img src="/assets/logo.png" alt="MedCheck Logo" class="img-fluid logo-img mb-4" loading="eager">
+            <h2 class="h5 fw-semibold mb-2 brand-heading">Plataforma de Internato</h2>
+            <p class="text-muted small mb-0 brand-sub">Gestão de presença, avaliações e integração preceptor-aluno.</p>
+            </div>
+          </div>
+        </div>
+        <!-- Form Column (right) -->
+        <div class="col-md-6 d-flex flex-column p-4 p-md-5 form-pane order-0 order-md-1">
+          <div class="inner-wrapper w-100">
+          <div class="mb-4 text-center text-md-start">
+            <h1 id="loginTitle" class="display-title h4 fw-bold mb-1">Acesso ao MedCheck</h1>
+            <p class="text-muted small mb-0">Entre para acompanhar presença, avaliações e rodízio.</p>
+          </div>
+          <hr class="section-sep d-md-none mb-4 mt-0" aria-hidden="true">
+          <form (ngSubmit)="onSubmit()" class="needs-validation" novalidate>
+            <!-- CPF -->
+            <div class="mb-3">
+              <label for="cpf" class="form-label small fw-semibold">CPF</label>
+              <div class="input-group input-group-sm enhanced-group">
+                <span class="input-group-text"><i class="bi bi-person-vcard"></i></span>
+                <input type="text" id="cpf" name="cpf" class="form-control" placeholder="000.000.000-00" autocomplete="username" [(ngModel)]="credentials.cpf" appMask="cpf" required>
+              </div>
+            </div>
+            <!-- Password -->
+            <div class="mb-3">
+              <label for="password" class="form-label small fw-semibold mb-1">Senha</label>
+              <div class="input-group input-group-sm enhanced-group password-group has-visibility">
+                <span class="input-group-text icon-lock"><i class="bi bi-lock"></i></span>
+                <input [type]="showPassword ? 'text' : 'password'" id="password" name="password" class="form-control" placeholder="••••••••" autocomplete="current-password" [(ngModel)]="credentials.password" required>
+                <button type="button" class="btn btn-plain toggle-visibility" (click)="togglePasswordVisibility()" [attr.aria-label]="showPassword ? 'Ocultar senha' : 'Mostrar senha'">
+                  <i class="bi" [ngClass]="showPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+                </button>
+              </div>
+            </div>
+            <!-- Options Row -->
+            <div class="row g-2 mb-3 align-items-center form-options">
+              <div class="col-auto d-flex align-items-center">
+                <div class="form-check small m-0">
+                  <input class="form-check-input" type="checkbox" id="remember" name="rememberMe" [(ngModel)]="rememberMe">
+                  <label class="form-check-label" for="remember">Lembrar de mim</label>
+                </div>
+              </div>
+              <div class="col-auto ms-auto text-end small links-stack d-inline-flex align-items-center">
+                <a routerLink="/forgot-password" class="link-secondary text-decoration-none d-inline-block me-3">Esqueci a senha</a>
+                <a routerLink="/signup" class="link-primary fw-semibold text-decoration-none d-inline-block">Cadastrar</a>
+              </div>
+            </div>
+            <!-- Submit -->
+            <div class="d-grid mb-2">
+              <button type="submit" class="btn btn-primary btn-login d-flex align-items-center justify-content-center gap-2" [disabled]="loading">
+                <span *ngIf="!loading">Entrar</span>
+                <span *ngIf="loading" class="d-inline-flex align-items-center gap-2"><span class="spinner-border spinner-border-sm"></span> Autenticando...</span>
+              </button>
+            </div>
+            <div class="text-center mt-2 small text-muted">Versão 1.0.0 • &copy; {{ currentYear }} MedCheck</div>
+          </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

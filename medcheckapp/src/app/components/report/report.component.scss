@@ -1,0 +1,205 @@
+.report-container { background: #f5f8ff; }
+.week-tabs { overflow-x: visible; flex-wrap: wrap; border-bottom:1px solid #dee2e6; }
+.week-tabs::-webkit-scrollbar { display:none; }
+.week-tabs .nav-link { white-space: nowrap; padding:.45rem .9rem; }
+.report-table input { min-width: 110px; }
+.report-table th, .report-table td { vertical-align: middle; }
+
+/* Cabeçalho institucional */
+.institution-header { border:1px solid #cfd6e2; padding:1rem 1.25rem; background:#fff; }
+.logo-box { width:110px; flex:0 0 110px; }
+.report-logo { max-height:90px; width:auto; display:block; }
+.inst-lines-text { font-size:.78rem; letter-spacing:.3px; }
+.sheet-title { font-size:.95rem; font-weight:700; }
+
+/* Tabela identificação */
+.ident-table-wrapper { border:1px solid #cfd6e2; }
+.ident-table { font-size:.72rem; }
+.ident-table td { padding:.25rem .5rem; }
+.ident-table td.label { width:160px; font-weight:600; }
+.ident-table tr:nth-child(2) td.label, .ident-table tr:nth-child(3) td.label { width:140px; }
+
+/* Tabela de presença */
+.report-table { font-size:.7rem; }
+.report-table th { font-weight:600; }
+
+/* Ajustes gerais */
+.tab-content { font-size:.75rem; }
+
+@media (max-width: 992px) {
+  .logo-box { width:90px; }
+  .report-logo { max-height:70px; }
+  .inst-lines-text { font-size:.7rem; }
+  .sheet-title { font-size:.9rem; }
+}
+@media (max-width: 768px) {
+  .report-table { font-size:.62rem; }
+  .ident-table { font-size:.62rem; }
+  .sheet-title { font-size:.85rem; }
+  .inst-lines-text { font-size:.64rem; }
+}
+@media (max-width: 576px) {
+  .report-container h2 { font-size: 1rem; }
+  .logo-box { width:70px; }
+  .report-logo { max-height:55px; }
+  .inst-lines-text { font-size:.6rem; }
+  .sheet-title { font-size:.8rem; }
+}
+
+.week-tabs.no-scroll { overflow: hidden; flex-wrap: nowrap; }
+.week-tabs.no-scroll .nav-link { padding:.45rem .85rem; }
+.week-tabs.no-scroll .nav-link.active { font-weight:600; }
+/* Removidos estilos de dropdown antigos */
+.week-overflow, .week-overflow .dropdown-menu { display:none; }
+
+/* Exibição inline da avaliação */
+.evaluation-inline-score { font-weight: 700; font-size: .9rem; color:#000; }
+.eval-inline-details-btn {
+  background:#ff9800; color:#fff; border:none; width:26px; height:26px; border-radius:50%;
+  font-weight:700; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  box-shadow:0 2px 4px rgba(0,0,0,.15); padding:0; font-size:.9rem;
+}
+.eval-inline-details-btn:hover { background:#fb8c00; }
+
+/* Card separado para avaliação */
+.evaluation-card {
+  border:1px solid #cfd6e2; background:#fff; padding:.75rem 1rem; border-radius:6px;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);
+}
+
+.eval-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1000;
+}
+.eval-modal {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: #fff; z-index: 1001; width: min(780px, 92%);
+  border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  display: flex; flex-direction: column; max-height: 85vh;
+  .modal-header { padding: 1rem 1.25rem; border-bottom: 1px solid #eee; display:flex; align-items:center; gap:1rem; h3 { margin:0; font-size:1.15rem;} .close-btn { margin-left:auto; background:none; border:none; font-size:1.4rem; cursor:pointer; } }
+  .modal-body { padding: 1rem 1.25rem; overflow-y: auto; }
+  .modal-footer { padding: .75rem 1.25rem; border-top: 1px solid #eee; text-align: right; }
+  .close-secondary { background:#ff9800; color:#fff; border:none; padding:.55rem 1.1rem; border-radius:4px; cursor:pointer; font-weight:600; }
+  .close-secondary:hover { background:#fb8c00; }
+  .dimension-block { margin-top:1rem; h4 { margin:0 0 .5rem; color:#e65100; } }
+  .dimension-table { width:100%; border-collapse: collapse; th, td { padding:.5rem .6rem; border:1px solid #ddd; font-size:.85rem; } thead { background:#fff3e0; } }
+  .answer-face { text-align:center; .face { display:inline-block; min-width:24px; font-weight:600; }
+    .face-1 { color:#d32f2f; }
+    .face-2 { color:#f57c00; }
+    .face-3 { color:#fbc02d; }
+    .face-4 { color:#388e3c; }
+    .face-5 { color:#2e7d32; }
+  }
+  .emoji-face { font-size:1.15rem; line-height:1; display:inline-block; }
+  .eval-modal-score { font-weight:700; color:#000; }
+  .eval-modal-comment { font-size:1.05rem; line-height:1.35; }
+  /* Legend scale */
+  .legend-scale { border:1px solid #e0e6ef; background:#f9fbfe; padding:.5rem .75rem; border-radius:6px; }
+  .legend-item { display:flex; align-items:center; gap:.35rem; background:#fff; padding:.25rem .55rem; border:1px solid #d9e2ef; border-radius:4px; font-weight:500; }
+  .legend-face { font-size:1.1rem; line-height:1; }
+  .legend-label { font-size:.65rem; color:#555; font-weight:600; }
+
+  /* Summary strip */
+  .summary-strip { border:1px solid #d9e2ef; background:#fff; border-radius:8px; }
+  .display-score { font-size:1.7rem; line-height:1; }
+
+  /* Dimension cards */
+  .dimensions-grid-wrapper { display:flex; flex-direction:column; }
+  .dimension-card { border:1px solid #d1dae6; background:#fff; border-radius:10px; padding:1rem .95rem .9rem; box-shadow:0 2px 4px rgba(0,0,0,.04); }
+  .dimension-card-header { font-weight:600; margin-bottom:.75rem; font-size:.95rem; color:#0d3c61; display:flex; align-items:center; gap:.5rem; position:relative; }
+  .dimension-card-header:before { content:""; width:6px; height:18px; border-radius:3px; background:#ff9800; display:inline-block; }
+  .questions-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:.7rem; }
+  .question-tile { position:relative; border:1px solid #d7e0eb; background:#fdfefe; border-radius:8px; padding:.55rem .55rem .9rem; padding-right:3.2rem; min-height:128px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+  .question-tile .q-text { font-size:.66rem; line-height:1.28; font-weight:500; color:#142b3d; overflow-wrap:anywhere; }
+  .question-tile .q-face { position:absolute; bottom:.45rem; right:.5rem; font-size:1.4rem; line-height:1; display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:8px; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,.08); border:1px solid #e0e6ef; font-weight:600; }
+  .question-tile .q-face[data-score="1"] { background:#ffe5e5; }
+  .question-tile .q-face[data-score="2"] { background:#ffeccf; }
+  .question-tile .q-face[data-score="3"] { background:#fff7cc; }
+  .question-tile .q-face[data-score="4"] { background:#e3f5e8; }
+  .question-tile .q-face[data-score="5"] { background:#d9f2e0; }
+  .question-tile:hover { border-color:#ffb74d; box-shadow:0 2px 6px rgba(0,0,0,.08); }
+
+  @media (max-width: 680px) {
+    .questions-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    .question-tile { min-height:120px; padding-right:3rem; }
+    .question-tile .q-text { font-size:.6rem; line-height:1.26; }
+    .question-tile .q-face { width:34px; height:34px; font-size:1.25rem; bottom:.4rem; right:.4rem; }
+  }
+
+  @media (max-width: 480px) {
+    .questions-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap:.55rem; }
+    .question-tile { padding:.5rem .5rem .85rem; padding-right:2.6rem; min-height:112px; }
+    .dimension-card { padding:.85rem .75rem .8rem; }
+    .dimension-card-header { font-size:.85rem; }
+  }
+}
+
+/* Estilos da barra de ações */
+.action-bar {
+  .btn-warning {
+    background:#ff9800;
+    border-color:#ff9800;
+  }
+  .btn-warning:hover { background:#fb8c00; border-color:#fb8c00; }
+  button[disabled] { opacity:.55; cursor:not-allowed; }
+}
+
+/* Full report print capture */
+.full-report-print { font-size:.72rem; }
+/* Manter off-screen para captura sem piscar na UI */
+.full-report-print {
+  position: fixed;
+  top: -20000px; /* suficientemente fora da viewport */
+  left: -20000px;
+  width: 1000px; /* base; pode ser ajustada temporariamente no TS */
+  pointer-events: none;
+  opacity: 0; /* invisível ao usuário */
+  z-index: -1; /* atrás de tudo */
+}
+.full-report-print .weekly-sheet { page-break-after: always; }
+.full-report-print .evaluation-form-print { page-break-after: always; }
+@media print {
+  .weekly-sheet { page-break-after: always; }
+  .evaluation-form-print { page-break-after: always; }
+}
+.full-report-print .questions-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:.5rem; }
+.full-report-print .question-tile { border:1px solid #d7e0eb; background:#fff; padding:.4rem .45rem .9rem; padding-right:2rem; border-radius:6px; position:relative; min-height:110px; }
+.full-report-print .question-tile .q-text { font-size:.55rem; line-height:1.18; font-weight:500; }
+.full-report-print .question-tile .q-face { position:absolute; bottom:.35rem; right:.35rem; font-size:1.1rem; }
+.full-report-print .dimension-card { background:#fdfefe; }
+.full-report-print h6 { font-size:.8rem; }
+
+.d-none { display:none !important; }
+
+/* Boxes reutilizados na impressão/formulário */
+.bordered-box { border:1px solid #cfd6e2; background:#fff; border-radius:6px; }
+.final-score-label { font-weight:600; font-size:.9rem; margin-right:.35rem; }
+.final-score-value { font-weight:700; font-size:1.55rem; color:#000; letter-spacing:.5px; }
+@media (max-width: 768px) {
+  .final-score-value { font-size:1.3rem; }
+}
+
+/* ===== Modal custom de confirmação de exclusão de avaliação ===== */
+.modal-eval-delete-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(2px);
+  z-index: 2000;
+}
+.modal-eval-delete {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, 92%);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px -4px rgba(0,0,0,.28), 0 0 0 1px rgba(0,0,0,.06);
+  z-index: 2010;
+  display: flex;
+  flex-direction: column;
+  animation: modalEvalDeletePop .2s ease;
+}
+.modal-eval-delete .modal-header { padding:.75rem 1rem; border-bottom:1px solid #e6e9ef; }
+.modal-eval-delete .modal-body { padding:1rem 1rem .5rem; font-size:.9rem; }
+.modal-eval-delete .modal-footer { padding:.75rem 1rem 1rem; border-top:1px solid #eef1f5; }
+@keyframes modalEvalDeletePop { from { opacity:0; transform: translate(-50%, calc(-50% + 10px)); } to { opacity:1; transform: translate(-50%, -50%);} }

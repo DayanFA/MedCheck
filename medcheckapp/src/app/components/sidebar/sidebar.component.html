@@ -1,0 +1,67 @@
+<aside class="sidebar d-flex flex-column">
+  <div class="d-flex align-items-center gap-2 mb-3 brand">
+    <img src="/assets/logo.png" alt="MedCheck Logo" class="brand-logo" />
+    <span class="fw-semibold fs-5 brand-text">MedCheck</span>
+  </div>
+  <hr class="divider" />
+  <nav class="flex-grow-1">
+    <ul class="nav nav-pills flex-column gap-1">
+      <li class="nav-item">
+        <a routerLink="/home" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/home'">
+          <i class="bi bi-house-door"></i><span>Home</span>
+        </a>
+      </li>
+      <li class="nav-item" *ngIf="role === 'ALUNO'">
+        <a routerLink="/checkin" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/checkin'">
+          <i class="bi bi-person-check"></i><span>Check-In</span>
+        </a>
+      </li>
+      <!-- Código (Preceptor gera). Para ADMIN mostrar link separado somente leitura -->
+      <li class="nav-item" *ngIf="role === 'PRECEPTOR'">
+        <a routerLink="/credentials" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/credentials'">
+          <i class="bi bi-qr-code"></i><span>Código</span>
+        </a>
+      </li>
+      <li class="nav-item" *ngIf="role === 'ADMIN'">
+          <a routerLink="/preceptors_credentials" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/preceptors_credentials'">
+          <i class="bi bi-qr-code"></i><span>Códigos Preceptores</span>
+        </a>
+      </li>
+      <li class="nav-item">
+  <a routerLink="/calendar" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/calendar'">
+          <i class="bi bi-calendar3"></i><span>Calendário</span>
+        </a>
+      </li>
+      <li class="nav-item" *ngIf="role === 'ADMIN'">
+  <a routerLink="/users" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/users'">
+          <i class="bi bi-people"></i><span>Administrar Usuários</span>
+        </a>
+      </li>
+      <li class="nav-item" *ngIf="role === 'ADMIN'">
+  <a routerLink="/courses" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/courses'">
+          <i class="bi bi-journal-text"></i><span>Disciplinas</span>
+        </a>
+      </li>
+      <li class="nav-item" *ngIf="role === 'COORDENADOR' || role === 'ADMIN'">
+  <a routerLink="/coordination" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/coordination'">
+          <i class="bi bi-people"></i><span>Coordenação</span>
+        </a>
+      </li>
+      <li class="nav-item">
+  <a routerLink="/report" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/report'">
+          <i class="bi bi-file-earmark-text"></i><span>Relatório</span>
+        </a>
+      </li>
+      <li class="nav-item">
+  <a routerLink="/settings" class="nav-link d-flex align-items-center gap-2" [class.active]="activePath === '/settings'">
+          <i class="bi bi-gear"></i><span>Configurações</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+  <div class="mt-auto pt-3">
+    <button class="btn btn-outline-secondary w-100 d-flex align-items-center gap-2" (click)="logout()">
+      <i class="bi bi-box-arrow-right"></i><span *ngIf="!collapsed">Sair</span>
+    </button>
+  </div>
+</aside>

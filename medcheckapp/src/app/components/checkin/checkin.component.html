@@ -1,0 +1,78 @@
+<div class="checkin-wrapper">
+  <h5 class="mb-3">Check-In do Aluno</h5>
+  <div class="card p-3 mb-4">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small">Disciplina</label>
+  <select class="form-select select-caret" [ngModel]="disciplineId" (ngModelChange)="onSelectDiscipline($event)">
+          <option *ngFor="let d of disciplines" [ngValue]="d.id">
+            {{ (d.code ? d.code + ' - ' : '') + (d.name || ('ID '+d.id)) }}
+          </option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">ID do Preceptor</label>
+        <input type="number" class="form-control" [(ngModel)]="preceptorId" placeholder="Ex: 2" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Código</label>
+        <input type="text" class="form-control" [(ngModel)]="code" placeholder="ABC123" />
+      </div>
+      <div class="col-md-3 d-grid">
+        <button class="btn btn-primary mb-2" [disabled]="submitting || checkingOut" (click)="submit()">{{ submitting ? 'Enviando...' : 'Validar & Check-In' }}</button>
+        <button class="btn btn-outline-danger" [disabled]="checkingOut || submitting" (click)="doCheckout()">{{ checkingOut ? 'Finalizando...' : 'Check-Out' }}</button>
+      </div>
+    </div>
+    <div class="small mt-2 text-muted">Informe o código exibido pelo preceptor (ou escaneie QR futuramente).</div>
+    <div class="mt-2 fw-semibold" [class.text-danger]="message.startsWith('Falha')" [class.text-success]="message.includes('realizado')">{{message}}</div>
+    <div *ngIf="lastLat != null && lastLng != null" class="mt-1 small text-info">
+      Última localização capturada: <span class="fw-bold">{{lastLat}}, {{lastLng}}</span>
+    </div>
+  </div>
+
+  <h6>Histórico de Hoje</h6>
+  <div *ngIf="loadingHistory" class="text-muted small">Carregando...</div>
+  <div class="table-responsive" *ngIf="!loadingHistory && history.length; else emptyHistory">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>Entrada</th>
+          <th class="text-center">Loc (In)</th>
+          <th>Saída</th>
+          <th class="text-center">Loc (Out)</th>
+          <th>Preceptor</th>
+          <th>Duração</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let h of historyProcessed">
+          <td>{{ h.checkInTime | date:'HH:mm' }}</td>
+          <td class="text-center">
+            <ng-container *ngIf="h.checkInLat!=null && h.checkInLng!=null; else noInLoc">
+              <small class="d-block text-muted">{{h.checkInLat | number:'1.4-4'}}, {{h.checkInLng | number:'1.4-4'}}</small>
+              <button class="btn btn-sm btn-outline-primary px-2 py-1 d-inline-flex align-items-center gap-1" (click)="openLocation(h.checkInLat, h.checkInLng)" title="Local de entrada">
+                <i class="bi bi-geo-alt"></i><span class="d-none d-xl-inline">In</span>
+              </button>
+            </ng-container>
+            <ng-template #noInLoc><span class="badge bg-secondary">sem loc</span></ng-template>
+          </td>
+          <td>{{ h.checkOutTime ? (h.checkOutTime | date:'HH:mm') : '-' }}</td>
+          <td class="text-center">
+            <ng-container *ngIf="h.checkOutLat!=null && h.checkOutLng!=null; else noOutLoc">
+              <small class="d-block text-muted">{{h.checkOutLat | number:'1.4-4'}}, {{h.checkOutLng | number:'1.4-4'}}</small>
+              <button class="btn btn-sm btn-outline-success px-2 py-1 d-inline-flex align-items-center gap-1" (click)="openLocation(h.checkOutLat, h.checkOutLng)" title="Local do Check-Out">
+                <i class="bi bi-geo"></i><span class="d-none d-xl-inline">Out</span>
+              </button>
+            </ng-container>
+            <ng-template #noOutLoc><span class="badge bg-secondary">sem loc</span></ng-template>
+          </td>
+          <td>{{ h._preceptorDisplay || '-' }}</td>
+          <td>{{ h._workedDisplay || '-' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <ng-template #emptyHistory><div class="small text-muted">Sem registros.</div></ng-template>
+  <app-location-modal *ngIf="showLocModal && modalLat != null && modalLng != null"
+    [lat]="modalLat" [lng]="modalLng" [onClose]="closeLocationModal.bind(this)"></app-location-modal>
+</div>

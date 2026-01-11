@@ -1,0 +1,123 @@
+@use 'sass:color';
+
+/* Base container (white card request retained) */
+.content-box {
+  max-width: 1060px;
+  background: #fff;
+  padding: 2.75rem 2.75rem 2.25rem;
+  border-radius: 18px;
+  box-shadow: 0 10px 28px -4px rgba(15,40,70,.12), 0 4px 12px rgba(15,40,70,.06);
+  position: relative;
+  backdrop-filter: blur(3px);
+}
+
+.home-wrapper { padding: 1.5rem 1rem 3rem; }
+
+/* Subtle ambient background (kept minimal so white card stands out) */
+.home-wrapper:before { content:""; position:fixed; inset:0; background:radial-gradient(circle at 25% 20%, #eef5ff, #dbe9ff 55%, #cddfff); z-index:-1; }
+
+/* Profile */
+.profile-pic { width:124px; height:124px; border-radius:22px; background:#2f3136; color:#d6d6d6; overflow:hidden; }
+.avatar-shell { position:relative; }
+.status-dot { position:absolute; bottom:6px; right:6px; width:16px; height:16px; border-radius:50%; border:2px solid #fff; background:#dc3545; box-shadow:0 0 0 2px rgba(255,255,255,.35); }
+.status-dot.on { background:#1db954; }
+.status-dot.off { background:#dc3545; }
+.profile-meta .label { font-size:.65rem; text-transform:uppercase; letter-spacing:.5px; font-weight:600; color:#5b6e82; display:block; }
+.profile-meta .val { font-size:.83rem; font-weight:500; color:#22303d; }
+.profile-block { border-bottom:1px solid #e6edf5; padding-bottom:1.25rem; }
+
+/* Metrics */
+.metrics-row { --metric-gap:1rem; }
+.metric-card { background:linear-gradient(145deg,#f6f9fe,#eef3fa); border:1px solid #e3edf6; padding:1.05rem 1.1rem 1.15rem; border-radius:14px; position:relative; overflow:hidden; }
+.metric-card:after { content:""; position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 85% 15%, rgba(255,255,255,.9), transparent 60%); opacity:.65; }
+.metric-label { font-size:.62rem; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:#60758a; margin-bottom:.35rem; }
+.metric-value, .metric-clock, .metric-hours { font-weight:600; line-height:1.1; }
+.metric-value { font-size:1.05rem; }
+.metric-clock { font-size:2.35rem; font-variant-numeric:tabular-nums; }
+.metric-hours { font-size:1.15rem; font-variant-numeric:tabular-nums; }
+.metric-sub { color:#5a6c7d; }
+
+/* Selector card */
+.selector-card { background:#fafcff; border:1px solid #e3edf6 !important; border-radius:16px; }
+.selector-card select { font-size:.78rem; }
+/* Compact select with icon */
+.selector-card .context-select .input-group-text { background:var(--bs-light,#f5f6f8); border:1px solid var(--bs-border-color,#dcdfe3); color:var(--bs-primary,#0d6efd); font-size:.85rem; }
+.selector-card .context-select .compact-select { padding-top:.25rem; padding-bottom:.25rem; line-height:1.1; font-size:.72rem; min-height:1.85rem; }
+.selector-card .context-select .form-select.compact-select { background-size:14px 14px; }
+
+/* Action Zone */
+.action-zone { text-align:center; }
+.action-btn { min-width:220px; border-radius:12px; box-shadow:0 6px 18px -4px rgba(0,123,255,.35); transition:.25s cubic-bezier(.4,.14,.3,1); }
+.action-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 10px 26px -6px rgba(0,123,255,.4); }
+.action-btn:active { transform:translateY(0); }
+
+/* Admin area */
+.admin-header { border-bottom:1px solid #e6edf5; padding-bottom:.75rem; }
+.admin-filters .filter-group { min-width:160px; }
+.admin-table-wrapper table { border-radius:12px; overflow:hidden; }
+.admin-table-wrapper thead th { font-size:.65rem; text-transform:uppercase; letter-spacing:.5px; font-weight:600; background:#f1f6fb; border-bottom:1px solid #e0e8f2; }
+.admin-table-wrapper tbody td { font-size:.77rem; vertical-align:middle; }
+.pagination-bar .btn-group .btn { min-width:34px; }
+
+/* Modal Checkout (backdrop + wrapper) */
+.checkout-confirm-backdrop {
+  position: fixed; inset: 0; z-index: 9998;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(6px) saturate(140%);
+}
+.checkout-confirm-wrapper {
+  position: fixed; inset:0; z-index: 9999; padding: 2rem 1rem; display:flex; align-items:center; justify-content:center;
+}
+.checkout-confirm-modal {
+  border:1px solid #e2e8f3;
+  box-shadow: 0 16px 38px -10px rgba(0,0,0,.32), 0 4px 14px -4px rgba(0,0,0,.18);
+  border-radius: 18px !important; position:relative; background:#fff;
+}
+.checkout-confirm-modal h5 { letter-spacing:.5px; }
+.checkout-confirm-modal p { line-height:1.35; }
+.checkout-confirm-modal .btn-warning { min-width:110px; }
+
+/* Variant estilo signup success */
+.signup-like-modal { position:relative; }
+.signup-like-modal .confirm-btn { 
+  background:linear-gradient(135deg,#ff9800,#ffb74d); border:1px solid #ff9800; position:relative; transition:.25s ease; font-weight:600; color:#422600;
+  box-shadow:0 4px 14px -4px rgba(255,152,0,.55), 0 2px 4px -1px rgba(255,152,0,.4);
+}
+.signup-like-modal .confirm-btn:hover:not(:disabled) { filter:brightness(1.05); transform:translateY(-2px); box-shadow:0 8px 20px -6px rgba(255,152,0,.6), 0 3px 6px -2px rgba(255,152,0,.45); }
+.signup-like-modal .confirm-btn:active:not(:disabled) { transform:translateY(0); box-shadow:0 3px 10px -4px rgba(255,152,0,.55); }
+.signup-like-modal .confirm-btn:disabled { opacity:.6; }
+.signup-like-modal .btn-outline-secondary { transition:.2s ease; }
+.signup-like-modal .btn-outline-secondary:hover:not(:disabled) { background:#f2f4f7; }
+
+/* Animations */
+.animate-fade-slide { animation:fadeSlide .55s ease; }
+.animate-pop { animation:popIn .35s ease; }
+@keyframes fadeSlide { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+@keyframes popIn { from { opacity:0; transform:scale(.92); } to { opacity:1; transform:scale(1); } }
+
+/* Utilities */
+.text-truncate { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.shadow-xs { box-shadow:0 2px 4px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04); }
+
+/* Responsive Tweaks */
+@media (max-width: 767.98px) {
+  .content-box { padding:1.75rem 1.4rem 1.6rem; }
+  .metric-clock { font-size:1.95rem; }
+  .metric-hours { font-size:1.05rem; }
+  .profile-pic { width:108px; height:108px; }
+  .home-wrapper { padding:1rem .75rem 2.5rem; }
+}
+
+@media (min-width: 1400px) {
+  .content-box { max-width:1180px; }
+  .metric-clock { font-size:2.6rem; }
+}
+
+/* Warning button re-theming */
+button.btn-warning { background:linear-gradient(135deg,#ffd400,#ffbd2f); border:none; color:#3a3300; }
+button.btn-warning:hover { background:linear-gradient(135deg, color.scale(#ffd400,$lightness:-6%), color.scale(#ffbd2f,$lightness:-8%)); }
+
+/* Legacy helpers retained for compatibility (if referenced elsewhere) */
+.time-display { font-size:2.8rem; font-weight:600; line-height:1.1; }
+.hours-display { font-size:1rem; font-weight:600; }
+

@@ -1,0 +1,42 @@
+<div class="courses-wrapper p-3 p-md-4">
+  <div class="glass-toolbar d-flex flex-wrap align-items-center gap-2 mb-4">
+    <h5 class="m-0 fw-semibold d-flex align-items-center gap-2">
+      <i class="bi bi-journal-bookmark text-primary"></i>
+      Disciplinas
+    </h5>
+    <div class="ms-auto d-flex align-items-center gap-2"></div>
+  </div>
+
+  <div class="alert alert-info py-2 small glass-alert" *ngIf="msg">{{msg}}</div>
+
+  <div *ngIf="loading" class="loading-state text-center py-5">
+    <div class="spinner-border text-primary" style="width:2.25rem;height:2.25rem"></div>
+    <div class="mt-3 small fw-semibold text-uppercase tracking">Carregando...</div>
+  </div>
+
+  <div *ngIf="!loading" class="glass-table-container">
+    <div class="table-responsive rounded-4">
+      <table class="table table-sm align-middle modern-table">
+        <thead>
+          <tr>
+            <th style="width:120px">Código</th>
+            <th>Nome</th>
+            <th style="width:80px" class="text-center">Horas</th>
+            <th style="width:80px" class="text-center">Ciclo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let d of data; let i = index" class="fade-in" [style.animationDelay]="(i*40)+'ms'">
+            <td><span class="code-badge">{{d.code}}</span></td>
+            <td>{{d.name}}</td>
+            <td class="text-center"><span class="pill neutral">{{d.hours}}</span></td>
+            <td class="text-center"><span class="pill alt">{{d.ciclo}}</span></td>
+          </tr>
+          <tr *ngIf="data.length===0">
+            <td colspan="4" class="text-center py-4 text-muted small">Nenhuma disciplina encontrada.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

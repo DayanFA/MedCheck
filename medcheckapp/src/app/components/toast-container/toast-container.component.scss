@@ -1,0 +1,8 @@
+.toast-wrapper { pointer-events:none; }
+.toast { pointer-events:auto; border-radius:10px; min-width:240px; }
+.toast-success { background:#e6f7ee; }
+.toast-error { background:#fdeaea; }
+.toast-info { background:#e8f3ff; }
+.toast-warning { background:#fff6e0; }
+.toast .btn-link { color:#6c757d; }
+.toast .btn-link:hover { color:#000; }

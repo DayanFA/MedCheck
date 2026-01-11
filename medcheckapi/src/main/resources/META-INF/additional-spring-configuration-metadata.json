@@ -1,0 +1,33 @@
+{
+  "properties": [
+    {
+      "name": "app.jwt-secret",
+      "type": "java.lang.String",
+      "description": "JWT secret key (raw or Base64)."
+    },
+    {
+      "name": "app.jwt-expiration-in-ms",
+      "type": "java.lang.Long",
+      "description": "JWT expiration in milliseconds." ,
+      "defaultValue": 604800000
+    },
+    {
+      "name": "app.reset.expiration-minutes",
+      "type": "java.lang.Integer",
+      "description": "Password reset token expiration in minutes.",
+      "defaultValue": 30
+    },
+    {
+      "name": "app.reset.base-url",
+      "type": "java.lang.String",
+      "description": "Frontend base URL used to compose password reset link." ,
+      "defaultValue": "http://localhost:4200/reset-password"
+    },
+    {
+      "name": "app.reset.log-link",
+      "type": "java.lang.Boolean",
+      "description": "If true, log the password reset link to the backend logs instead of (or in addition to) sending email.",
+      "defaultValue": true
+    }
+  ]
+}

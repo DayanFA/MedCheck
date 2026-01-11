@@ -1,0 +1,84 @@
+.app-shell { height: 100vh; }
+
+.main-area { background: #cfe2ff; transition: margin-left .25s ease; }
+.top-bar {
+	min-height: 56px;
+	background: #fff !important; /* unify with sidebar */
+	border-bottom: 1px solid #e5e7eb;
+	position: sticky; top: 0; z-index: 40;
+	display: flex; align-items: center;
+  gap: .75rem;
+  flex-wrap: nowrap; /* prevent items wrapping to next line */
+}
+.top-bar .btn { border-radius: 10px; font-weight:500; }
+.top-bar .btn.btn-outline-secondary { background: #ffffff; border-color: #dce3ee; }
+.top-bar .btn.btn-outline-secondary:hover { background:#f3f6fa; }
+.top-bar .btn.btn-outline-secondary:active { background:#e8edf3; }
+.top-bar .badge { border-radius: 1rem; font-weight:500; letter-spacing:.2px; }
+.user-avatar { width:40px; height:40px; box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 0 0 4px rgba(13,71,161,.15); }
+.user-avatar { width: 40px; height: 40px; }
+
+.content-wrapper { border-radius: .75rem; background: transparent; }
+
+/* Collapsed adjustments if needed later (reserved hook) */
+.app-shell.collapsed .top-bar { padding-left: .6rem; }
+
+/* Animated hamburger */
+.hamburger-btn {
+  --line-w: 26px;
+  --line-h: 3px;
+  --line-radius: 2px;
+  background: #ffffff;
+  border: 1px solid #dce3ee;
+  padding: .55rem .7rem;
+  border-radius: 12px;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: background .25s ease, border-color .25s ease, box-shadow .25s ease;
+}
+.hamburger-btn span {
+  display: block;
+  width: var(--line-w);
+  height: var(--line-h);
+  background: #0d47a1;
+  border-radius: var(--line-radius);
+  transition: transform .35s cubic-bezier(.68,-0.55,.27,1.55), opacity .25s ease, width .25s ease;
+}
+.hamburger-btn:hover { background:#f3f6fa; }
+.hamburger-btn:active { background:#e9eef4; }
+.hamburger-btn.active span:nth-child(1),
+.hamburger-btn.active span:nth-child(2),
+.hamburger-btn.active span:nth-child(3) { transform:none; opacity:1; }
+
+/* New subtle animation: bars compress slightly then return */
+.hamburger-btn:active span { transform:scaleX(.85); }
+
+/* Visual state when collapsed: shift middle bar to right and lighten outer bars */
+.hamburger-btn.active span:nth-child(1) { width:22px; }
+.hamburger-btn.active span:nth-child(2) { width:26px; }
+.hamburger-btn.active span:nth-child(3) { width:18px; }
+.hamburger-btn span { will-change:width; }
+
+/* Slight scale on focus */
+.hamburger-btn:focus-visible { outline:2px solid #1976d2; outline-offset:2px; }
+
+/* Adjust spacing when collapsed (optional subtle) */
+.top-bar.is-collapsed .hamburger-btn { border-color:#cfd8e3; }
+.top-bar .welcome { font-size:.95rem; color:#2f3a4a; }
+.top-bar .aluno-badge { background:#e7f1ff; color:#0d1f33; border:1px solid #d4e4f9; border-radius:14px; }
+.top-bar .disc-badge { background:#f5f7fa; color:#213445; border:1px solid #d9e2ec; border-radius:14px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; }
+.top-bar.narrow .disc-badge { max-width:100px; }
+.top-bar .top-info { flex-wrap:nowrap; }
+.top-bar.narrow .welcome { display:none; }
+.top-bar.narrow .view-label { display:none; }
+@media (max-width: 860px) {
+  .top-bar { gap:.5rem; padding-left:.55rem !important; padding-right:.6rem !important; }
+  .top-bar .disc-badge { font-size:.7rem; padding:.25rem .45rem; }
+  .top-bar .aluno-badge { font-size:.7rem; padding:.25rem .55rem; }
+  .user-avatar { width:34px; height:34px; }
+  .hamburger-btn { padding:.45rem .55rem; }
+  .hamburger-btn span { height:2px; }
+}

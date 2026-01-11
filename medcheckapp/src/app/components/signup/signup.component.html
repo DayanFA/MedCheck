@@ -1,0 +1,177 @@
+<div class="signup-wrapper d-flex align-items-center justify-content-center min-vh-100 py-4 position-relative">
+  <div class="decor-circle deco-1"></div>
+  <div class="decor-circle deco-2"></div>
+  <div class="signup-shell position-relative w-100 mx-3">
+    <div class="card signup-card shadow-lg border-0 overflow-hidden" role="main" aria-labelledby="signupTitle">
+      <div class="p-4 p-md-5 form-pane">
+        <div class="inner-wrapper w-100 mx-auto">
+          <div class="mb-4 text-center">
+            <h1 id="signupTitle" class="h4 fw-bold mb-1">Crie sua Conta</h1>
+            <p class="text-muted small mb-0">Preencha seus dados para acessar o MedCheck.</p>
+          </div>
+          <form #f="ngForm" (ngSubmit)="onSubmit()" class="row g-3" novalidate>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Foto (obrigatória) <span class="req">*</span></label>
+              <div class="avatar-uploader d-flex align-items-center gap-3 flex-wrap">
+                <div class="avatar-box position-relative">
+                  <div class="avatar-ring">
+                    <img *ngIf="photoPreviewUrl; else noPhoto" [src]="photoPreviewUrl" alt="Prévia da foto" class="avatar-img" />
+                    <ng-template #noPhoto>
+                      <div class="avatar-placeholder d-flex align-items-center justify-content-center">
+                        <i class="bi bi-person-circle"></i>
+                      </div>
+                    </ng-template>
+                  </div>
+                  <label for="photoInput" class="avatar-action" title="Enviar foto">
+                    <i class="bi bi-camera-fill"></i>
+                  </label>
+                  <button type="button" class="avatar-clear" *ngIf="photoBase64" (click)="clearPhoto()" aria-label="Remover foto">
+                    <i class="bi bi-x"></i>
+                  </button>
+                </div>
+                <div class="uploader-help small text-muted">
+                  PNG ou JPG até 2MB. Em celulares, você pode abrir a câmera.
+                </div>
+                <!-- Importante: sem o atributo capture para que no celular o SO ofereça a escolha Camera ou Galeria -->
+                <input id="photoInput" type="file" accept="image/*" class="d-none" (change)="onPhotoSelected($event)" />
+              </div>
+              <div class="text-danger small mt-1" *ngIf="photoRequired && !photoBase64">A foto é obrigatória.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Nome completo <span class="req">*</span></label>
+              <div class="input-group input-group-sm enhanced-group">
+                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                <input type="text" class="form-control" [(ngModel)]="userData.name" name="name" required>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Matrícula <span class="req">*</span></label>
+              <div class="input-group input-group-sm enhanced-group">
+                <span class="input-group-text"><i class="bi bi-hash"></i></span>
+                <input type="text" class="form-control" [(ngModel)]="userData.matricula" name="matricula" appMask="matricula" required pattern="[A-Za-z0-9]{3,40}">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Data de nascimento <span class="req">*</span></label>
+              <div class="input-group input-group-sm enhanced-group">
+                <span class="input-group-text"><i class="bi bi-calendar-event"></i></span>
+                <input type="date" class="form-control" [(ngModel)]="userData.dataNascimento" name="dataNascimento" (input)="onBirthDateInput()" [ngClass]="{'is-invalid': birthDateInvalid}" required>
+              </div>
+              <div *ngIf="birthDateInvalid" class="invalid-feedback d-block small">Data de nascimento inválida.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Naturalidade <span class="req">*</span></label>
+              <div class="input-group input-group-sm enhanced-group">
+                <span class="input-group-text"><i class="bi bi-geo"></i></span>
+                <select class="form-select" [(ngModel)]="userData.naturalidade" name="naturalidade" required>
+                  <option value="" disabled selected>Selecione</option>
+                  <option *ngFor="let e of estados" [value]="e">{{e}}</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">CPF <span class="req">*</span></label>
+              <div class="input-group input-group-sm enhanced-group">
+                <span class="input-group-text"><i class="bi bi-person-vcard"></i></span>
+                <input type="text" class="form-control" [(ngModel)]="userData.cpf" name="cpf" placeholder="000.000.000-00" appMask="cpf" (input)="onCpfInput()" [ngClass]="{'is-invalid': cpfInvalid || cpfIncomplete}" required autocomplete="off" inputmode="numeric">
+              </div>
+              <div *ngIf="cpfIncomplete && !cpfInvalid" class="invalid-feedback d-block small">CPF inválido (incompleto)</div>
+              <div *ngIf="cpfInvalid && !cpfIncomplete" class="invalid-feedback d-block small">CPF inválido</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">E-mail Institucional <span class="req">*</span></label>
+              <div class="input-group input-group-sm enhanced-group">
+                <span class="input-group-text"><i class="bi bi-at"></i></span>
+                <input type="email" class="form-control" [(ngModel)]="userData.institutionalEmail" name="institutionalEmail" placeholder="usuario@dominio" required>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Nacionalidade <span class="req">*</span></label>
+              <div class="input-group input-group-sm enhanced-group">
+                <span class="input-group-text"><i class="bi bi-flag"></i></span>
+                <select class="form-select" [(ngModel)]="userData.nacionalidade" name="nacionalidade" required>
+                  <option value="" disabled>Selecione</option>
+                  <option *ngFor="let n of nacionalidades" [value]="n">{{n}}</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Telefone <span class="req">*</span></label>
+              <div class="input-group input-group-sm enhanced-group">
+                <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                <input type="text" class="form-control" [(ngModel)]="userData.telefone" name="telefone" placeholder="(00) 00000-0000" appMask="phone" required>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold mb-1">Senha <span class="req">*</span></label>
+              <div class="input-group input-group-sm enhanced-group password-group has-visibility">
+                <span class="input-group-text icon-lock"><i class="bi bi-lock"></i></span>
+                <input [type]="showPass ? 'text':'password'" minlength="6" class="form-control" [(ngModel)]="userData.password" name="password" (input)="onPasswordInput()" required>
+                <button type="button" class="btn btn-plain toggle-visibility" (click)="toggleShowPass()" tabindex="-1" [attr.aria-label]="showPass ? 'Ocultar senha' : 'Mostrar senha'">
+                  <i class="bi" [ngClass]="showPass ? 'bi-eye-slash':'bi-eye'"></i>
+                </button>
+              </div>
+              <div class="strength mt-1">
+                <div class="strength-bar" [style.width]="passwordStrength + '%'" [ngClass]="{
+                  'weak': passwordStrength < 40,
+                  'fair': passwordStrength >=40 && passwordStrength <70,
+                  'strong': passwordStrength >=70
+                }"></div>
+              </div>
+              <ul class="pwd-criteria list-unstyled small mt-2 mb-0">
+                <li [class.met]="passwordCriteria.length6">Mínimo 6 caracteres</li>
+                <li [class.met]="passwordCriteria.length10">Ideal 10+ caracteres</li>
+                <li [class.met]="passwordCriteria.lower">Letra minúscula</li>
+                <li [class.met]="passwordCriteria.upper">Letra maiúscula</li>
+                <li [class.met]="passwordCriteria.digit">Número</li>
+                <li [class.met]="passwordCriteria.symbol">Símbolo (!&#64;#$%...)</li>
+              </ul>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold mb-1">Confirmar Senha <span class="req">*</span></label>
+              <div class="input-group input-group-sm enhanced-group password-group has-visibility">
+                <span class="input-group-text icon-lock"><i class="bi bi-lock-fill"></i></span>
+                <input [type]="showConfirm ? 'text':'password'" minlength="6" class="form-control" [(ngModel)]="userData.confirmPassword" name="confirmPassword" required>
+                <button type="button" class="btn btn-plain toggle-visibility" (click)="toggleShowConfirm()" tabindex="-1" [attr.aria-label]="showConfirm ? 'Ocultar confirmação' : 'Mostrar confirmação'">
+                  <i class="bi" [ngClass]="showConfirm ? 'bi-eye-slash':'bi-eye'"></i>
+                </button>
+              </div>
+            </div>
+            <div class="col-12" *ngIf="errors.length">
+              <div class="alert alert-danger py-2 px-3 mb-0 small">
+                <ul class="m-0 ps-3">
+                  <li *ngFor="let e of errors">{{e}}</li>
+                </ul>
+              </div>
+            </div>
+            <div class="col-12 pt-2 text-center">
+              <button class="btn btn-primary btn-signup d-inline-flex align-items-center justify-content-center gap-2" type="submit" [disabled]="f.invalid || passwordStrength < 70 || cpfInvalid || birthDateInvalid || loading || !photoBase64">
+                <span *ngIf="!loading">Cadastrar-se</span>
+                <span *ngIf="loading" class="d-flex align-items-center gap-2"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Salvando...</span>
+              </button>
+              <div class="small text-muted mt-2" *ngIf="!loading && (passwordStrength < 70 || cpfInvalid || birthDateInvalid)">
+                <span *ngIf="cpfInvalid">Corrija o CPF.</span>
+                <span *ngIf="birthDateInvalid"> Data de nascimento inválida.</span>
+              </div>
+            </div>
+            <div class="col-12 text-center small mt-1 links-stack">
+              <a routerLink="/login" class="text-decoration-none fw-semibold">Já tenho uma conta</a>
+            </div>
+            <div class="col-12 text-center small mt-3 text-muted">&copy; {{ currentYear }} MedCheck</div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de sucesso -->
+<div *ngIf="successModal" class="signup-success-backdrop position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center">
+  <div class="signup-success-modal bg-white rounded shadow p-4" role="dialog" aria-labelledby="signupSuccessTitle" aria-modal="true" style="max-width:360px; width:100%;">
+    <h5 id="signupSuccessTitle" class="fw-bold mb-2">Conta criada!</h5>
+    <p class="mb-4 small text-muted">Seu cadastro foi concluído com sucesso. Você já pode acessar o MedCheck usando suas credenciais.</p>
+    <div class="text-end">
+  <button class="btn btn-primary btn-sm" (click)="confirmSuccess()" autofocus>OK</button>
+    </div>
+  </div>
+</div>

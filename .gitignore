@@ -1,24 +1,131 @@
-# Python backend for club management
-__pycache__/
-*.py[cod]      # Python compiled files
-*$py.class
-*.so
-.Python
-env/
-.env           # Where database passwords are stored
-venv/          # Virtual environment for testing
-.venv
+########################################
+# Root / OS junk
+########################################
+.DS_Store
+Thumbs.db
 
-# Teacher IDE settings
-.vscode/       # Ms. Rodriguez uses VS Code
-.idea/         # Mr. Chen uses PyCharm
+########################################
+# Local helper scripts (do not commit)
+########################################
+run-backend.bat
+setup-mail-and-run.bat
+test-email-reset.ps1
+test-password-reset-flow.bat
+test-send-reset-email.bat
+test-send-reset-email-local.bat
 
-# Local development & testing
-instance/
-.pytest_cache/
-.coverage      # Test coverage reports
-htmlcov/
+########################################
+# IDE / Editor settings
+########################################
+.vscode/
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+.factorypath
+.sts4-cache
+*.swp
+*.swo
 
-# Staff computer files
-.DS_Store      # For teachers with Macs
-Thumbs.db      # For teachers with Windows
+########################################
+# Java / Spring Boot (medcheckapi)
+########################################
+**/target/
+**/generated-sources/
+**/generated-test-sources/
+**/maven-status/
+**/maven-archiver/
+**/surefire-reports/
+**/failsafe-reports/
+**/jacoco.exec
+**/jacoco/*.exec
+*.class
+hs_err_pid*.log
+replay_pid*.log
+*.log
+
+# Test-only local secrets (do not commit)
+medcheckapi/src/test/resources/test-secrets.properties
+
+# Keep resource files but allow profile-specific overrides to be ignored
+application-*.yml
+application-*.yaml
+application-*.properties
+bootstrap-*.yml
+bootstrap-*.yaml
+*.local.properties
+.env
+.env.*
+medcheckapi/.env.local
+
+# Always keep the base application properties/yml if present
+!**/application.properties
+!**/application.yml
+
+# Optional: ignore wrapper JAR (uncomment to ignore). Usually it's OK to commit.
+# .mvn/wrapper/maven-wrapper.jar
+
+########################################
+# Node / Angular / TypeScript (medcheckapp)
+########################################
+**/node_modules/
+**/dist/
+**/out/
+**/build/
+**/.angular/
+**/.angular/cache
+**/coverage/
+**/.eslintcache
+**/*.tsbuildinfo
+**/.tsbuildinfo
+*.tgz
+
+# Playwright / E2E
+**/playwright-report/
+**/test-results/
+**/playwright/.cache/
+
+# Logs & debug outputs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+########################################
+# General temp / cache
+########################################
+*.tmp
+*.temp
+*.pid
+*.seed
+*.orig
+*.cache/
+tmp/
+uploads/
+
+########################################
+# Security / certificates / keys
+########################################
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.keystore
+
+########################################
+# Recommendations
+########################################
+# (Recomendado COMMITAR lock files para builds reprodutíveis)
+# Descomente se REALMENTE quiser ignorar:
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+########################################
+# Keep essentials
+########################################
+!README.md
+!**/src/main/**
+!**/src/app/**

@@ -1,0 +1,45 @@
+<div class="container py-3">
+  <h2>Vínculo de Preceptores por Disciplina</h2>
+
+  <div class="row g-3 align-items-end my-2">
+    <div class="col-md-6">
+      <label class="form-label">Disciplina</label>
+  <select class="form-select select-caret" [(ngModel)]="selecionadaId" (ngModelChange)="onSelectDisciplina()">
+        <option *ngFor="let d of disciplinas" [value]="d.id">{{ d.code }} - {{ d.name }}</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row mt-4">
+    <div class="col-md-6">
+      <h5>Preceptores disponíveis</h5>
+      <ul class="list-group small">
+        <li *ngFor="let p of preceptores" class="list-group-item d-flex justify-content-between align-items-center">
+          <span>
+            {{ p.name }}
+            <small class="text-muted d-block">CPF: {{ p.cpf }} • {{ p.email }}</small>
+          </span>
+          <button class="btn btn-sm btn-primary" [disabled]="jaVinculado(p)" (click)="vincular(p)">
+            Vincular
+          </button>
+        </li>
+      </ul>
+    </div>
+
+    <div class="col-md-6">
+      <h5>Preceptores vinculados</h5>
+      <ul class="list-group small">
+        <li *ngFor="let p of vinculados" class="list-group-item d-flex justify-content-between align-items-center">
+          <span>
+            {{ p.name }}
+            <small class="text-muted d-block">CPF: {{ p.cpf }} • {{ p.email }}</small>
+          </span>
+          <button class="btn btn-sm btn-outline-danger" (click)="desvincular(p)">
+            Remover
+          </button>
+        </li>
+        <li *ngIf="!vinculados.length" class="list-group-item text-muted">Nenhum preceptor vinculado.</li>
+      </ul>
+    </div>
+  </div>
+</div>

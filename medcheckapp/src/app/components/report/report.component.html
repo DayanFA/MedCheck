@@ -1,0 +1,585 @@
+<div class="report-container container-fluid py-3">
+  <!-- Barra superior de controles (disciplina) -->
+  <div class="d-flex flex-wrap align-items-center gap-3 mb-3" *ngIf="alunoId && !isAlunoUser">
+    <!-- Selector para COORDENADOR -->
+    <div class="d-flex align-items-center gap-2" *ngIf="isCoordinator">
+      <ng-container *ngIf="coordinatorDisciplines !== null; else coordLoading">
+  <select class="form-select form-select-sm select-caret" style="min-width:220px" [ngModel]="disciplineId" (ngModelChange)="setDisciplineForCoordinator($event)">
+          <option *ngFor="let d of coordinatorDisciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
+        </select>
+      </ng-container>
+      <ng-template #coordLoading>
+        <div class="d-flex align-items-center gap-2 small text-muted">
+          <div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">Carregando...</span></div>
+          Carregando disciplinas...
+        </div>
+      </ng-template>
+    </div>
+  <!-- Selector para PRECEPTOR -->
+  <div class="d-flex align-items-center gap-2" *ngIf="preceptorDisciplines !== undefined && !isCoordinator">
+      <ng-container *ngIf="preceptorDisciplines === null; else discOk">
+        <div class="d-flex align-items-center gap-2 small text-muted">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Carregando...</span>
+          </div>
+          Carregando disciplinas...
+        </div>
+      </ng-container>
+      <ng-template #discOk>
+  <select class="form-select form-select-sm select-caret" style="min-width:220px" [ngModel]="disciplineId" (ngModelChange)="setDisciplineForPreceptor($event)">
+          <option *ngFor="let d of preceptorDisciplines" [ngValue]="d.id">{{ d.code }} - {{ d.name }}</option>
+        </select>
+      </ng-template>
+    </div>
+  </div>
+  <!-- Hidden full printable wrapper for PDF generation (mantido sempre fora da tela para evitar flicker) -->
+  <div class="full-report-print" #fullReportRoot aria-hidden="true">
+    <!-- 10 Folhas de Presença (uma por semana) -->
+    <ng-container *ngFor="let w of weeks; let wi = index">
+      <div class="weekly-sheet mb-5">
+        <div class="institution-header mb-2">
+          <div class="d-flex align-items-center">
+            <div class="logo-box me-3 d-flex align-items-center justify-content-center">
+              <img src="assets/logo_ufac.png" alt="Logo UFAC" class="report-logo">
+            </div>
+            <div class="flex-grow-1 text-center">
+              <div class="inst-lines fw-semibold lh-sm inst-lines-text">
+                UNIVERSIDADE FEDERAL DO ACRE<br>
+                {{ disciplineLabel || 'CURSO DE MEDICINA' }}
+              </div>
+              <div class="sheet-title mt-2">FOLHA DE PRESENÇA DIÁRIA</div>
+            </div>
+          </div>
+        </div>
+        <!-- Texto introdutório MFC (folha de presença) -->
+        <div class="mfc-intro bordered-box p-2 small mb-2">
+          <p>
+            A Medicina de Família e Comunidade (MFC) é definida como a “especialidade
+            médica que presta assistência à saúde de forma continuada, integral e
+            abrangente para as pessoas, suas famílias e a comunidade” (Gusso & Lopes,
+            Tratado de MFC).
+          </p>
+          <p>
+            Atua no nível de atenção primária à saúde (APS), entendida como “oferta de
+            cuidados essenciais de saúde baseados em métodos e tecnologias práticas,
+            cientificamente bem fundamentadas e socialmente aceitáveis, colocadas ao
+            alcance universal de indivíduos e famílias da comunidade, mediante sua plena
+            participação e a um custo que a comunidade e o país podem manter em cada
+            fase do seu desenvolvimento” (Gusso & Lopes, Tratado de MFC).
+          </p>
+        </div>
+        <div class="ident-table-wrapper mb-2">
+          <table class="table table-bordered table-sm mb-0 ident-table">
+            <tbody>
+              <tr>
+                <td class="label">Nome do(a) Interno(a):</td>
+                <td>{{ student.name }}</td>
+                <td class="label">Nome do(a) Preceptor(a):</td>
+                <td>
+                  <ng-container *ngIf="preceptorsForWeek(w).length > 0; else noPrecHdrPrint">
+                    {{ preceptorsForWeek(w).join(', ') }}
+                  </ng-container>
+                  <ng-template #noPrecHdrPrint>—</ng-template>
+                </td>
+              </tr>
+              <tr>
+                <td class="label">Período do Rodízio:</td>
+                <td colspan="3">{{ w.rotationPeriod }}</td>
+              </tr>
+              <tr>
+                <td class="label">Semana:</td>
+                <td colspan="3">Semana {{ w.number }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <table class="table table-sm table-bordered align-middle report-table mb-2">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width:90px">Dias da Semana</th>
+              <th style="min-width:100px">Data</th>
+              <th style="min-width:110px">Período</th>
+              <th style="min-width:140px">Local</th>
+              <th style="min-width:140px">Preceptor</th>
+              <!-- Coluna de assinatura removida -->
+            </tr>
+          </thead>
+          <tbody>
+            <ng-container *ngFor="let day of w.days">
+              <tr *ngFor="let period of day.periods; index as pi">
+                <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length" class="fw-semibold">{{ day.weekday }}</td>
+                <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length">{{ day.date | date:'dd/MM/yyyy' }}</td>
+                <td>
+                  <div class="fw-semibold">{{ period.shift }}</div>
+                  <div class="text-muted small" *ngIf="period.intervals?.length">
+                    <span *ngFor="let it of period.intervals; let last = last">
+                      {{ it.start }}-{{ it.end }}<span *ngIf="!last">; </span>
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <span *ngIf="period.locations?.length; else vazioPB">{{ period.locations.join(', ') }}</span>
+                  <ng-template #vazioPB><span class="text-muted">—</span></ng-template>
+                </td>
+                <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length">
+                  <span *ngIf="day.preceptors?.length; else noPrecPB">{{ day.preceptors.join(', ') }}</span>
+                  <ng-template #noPrecPB><span class="text-muted">—</span></ng-template>
+                </td>
+                <!-- célula de assinatura removida -->
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
+      </div>
+    </ng-container>
+
+  <!-- Formulários de Avaliação dos PRECEPTORES (um por preceptor, páginas distintas no PDF) -->
+    <ng-container *ngIf="preceptorEvaluations?.length">
+      <ng-container *ngFor="let ev of preceptorEvaluations">
+        <div class="evaluation-form-print mt-4">
+      <div class="institution-header mb-2">
+        <div class="d-flex align-items-center">
+          <div class="logo-box me-3 d-flex align-items-center justify-content-center">
+            <img src="assets/logo_ufac.png" alt="Logo UFAC" class="report-logo">
+          </div>
+          <div class="flex-grow-1 text-center">
+            <div class="inst-lines fw-semibold lh-sm inst-lines-text">
+              UNIVERSIDADE FEDERAL DO ACRE<br>
+              {{ disciplineLabel || 'CURSO DE MEDICINA' }}
+            </div>
+            <div class="sheet-title mt-2">FORMULÁRIO DE AVALIAÇÃO DO RODÍZIO DO INTERNATO</div>
+          </div>
+        </div>
+      </div>
+      <div class="ident-table-wrapper mb-2">
+        <table class="table table-bordered table-sm mb-0 ident-table">
+          <tbody>
+            <tr>
+              <td class="label">Nome do(a) Interno(a):</td>
+              <td>{{ student.name }}</td>
+              <td class="label">Nome do(a) Preceptor(a):</td>
+              <td>{{ ev.preceptorName || '—' }}</td>
+            </tr>
+            <tr>
+              <td class="label">Período do Rodízio:</td>
+              <td colspan="3">{{ globalRotationPeriod }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Caixa de informação introdutória MFC removida conforme solicitação -->
+      <!-- Dimensões -->
+      <div *ngIf="ev.details?.dimensions as dimsPrint">
+        <div class="dimension-print mb-4" *ngFor="let dim of dimsPrint; let di = index">
+          <div class="table-responsive mb-3">
+            <table class="table table-bordered align-middle table-sm eval-table mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:55%">{{ dimensionTitles[dim.id] || ('Dimensão ' + (di+1)) }}</th>
+                  <th *ngFor="let f of faces" class="text-center" style="width:9%">{{ f }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let q of dim.questions; let qi = index">
+                  <td class="question-text"><span class="q-number">{{ qi+1 }})</span> {{ fullQuestionText(dim.id, q.id) }}</td>
+                  <td *ngFor="let f of faces; let fi = index" class="text-center">
+                    <span *ngIf="q.answer === (fi+1)">{{ f }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Nota do Preceptor ao término das dimensões -->
+        <div class="final-score-comment mt-3 bordered-box p-3 text-center">
+          <span class="final-score-label">Nota Preceptor:</span>
+          <span class="final-score-value">{{ ev.score | number:'1.0-1' }}</span>
+        </div>
+      </div>
+        </div>
+      </ng-container>
+    </ng-container>
+
+    <!-- Resumo da Avaliação Final do Coordenador (para PDF) -->
+  <div *ngIf="finalEval.loaded && (finalEval.score != null || finalEval.comment)" class="coordinator-final-print mt-4 bordered-box p-3">
+      <div class="institution-header mb-2">
+        <div class="d-flex align-items-center">
+          <div class="logo-box me-3 d-flex align-items-center justify-content-center">
+            <img src="assets/logo_ufac.png" alt="Logo UFAC" class="report-logo">
+          </div>
+          <div class="flex-grow-1 text-center">
+            <div class="inst-lines fw-semibold lh-sm inst-lines-text">
+              UNIVERSIDADE FEDERAL DO ACRE<br>
+              {{ disciplineLabel || 'CURSO DE MEDICINA' }}
+            </div>
+            <div class="sheet-title mt-2">AVALIAÇÃO FINAL DO COORDENADOR</div>
+          </div>
+        </div>
+      </div>
+      <div class="ident-table-wrapper mb-2">
+        <table class="table table-bordered table-sm mb-0 ident-table">
+          <tbody>
+            <tr>
+              <td class="label">Nome do(a) Interno(a):</td>
+              <td>{{ student.name }}</td>
+              <td class="label">Período do Rodízio:</td>
+              <td>{{ globalRotationPeriod }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="final-score-comment mt-3 text-center">
+        <span class="final-score-label">Nota Final:</span>
+        <span class="final-score-value">{{ finalEval.score | number:'1.0-0' }}</span>
+      </div>
+      <div class="mt-2" *ngIf="finalEval.comment">
+        <div class="fw-semibold">Comentário do Coordenador:</div>
+        <div class="small">{{ finalEval.comment }}</div>
+      </div>
+    </div>
+    
+    <!-- Página final simples com a Nota Final do Internato (coordenador) -->
+    <div *ngIf="isDisciplineFinalized()" class="final-summary-print mt-4">
+      <div class="d-flex align-items-center justify-content-center" style="height: 900px; text-align: center;">
+        <div>
+          <div class="sheet-title">Nota final do internato {{ disciplineNameOnly }}</div>
+          <div class="display-4 fw-bold mt-3">{{ finalEval.score | number:'1.0-0' }}</div>
+          <div class="mt-2">Nota do aluno</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Tabs Semanas responsivas -->
+  <ul class="nav nav-tabs week-tabs no-scroll justify-content-start" role="tablist">
+    <li class="nav-item" *ngIf="hasPrevGroup" role="presentation">
+      <button class="nav-link" type="button" (click)="prevGroup()">...</button>
+    </li>
+    <li class="nav-item" *ngFor="let w of displayedWeeks; let idx = index" role="presentation">
+      <button class="nav-link" [class.active]="(groupStartIndex + idx) === selectedWeekIndex" (click)="selectWeek(groupStartIndex + idx)" type="button">
+        Semana {{ groupStartIndex + idx + 1 }}
+      </button>
+    </li>
+    <li class="nav-item" *ngIf="hasNextGroup" role="presentation">
+      <button class="nav-link" type="button" (click)="nextGroup()">...</button>
+    </li>
+  </ul>
+
+  <div class="tab-content border border-top-0 rounded-bottom bg-white p-4 shadow-sm">
+    <!-- Cabeçalho institucional -->
+    <div class="institution-header mb-3">
+      <div class="d-flex align-items-center">
+        <div class="logo-box me-3 d-flex align-items-center justify-content-center">
+          <img src="assets/logo_ufac.png" alt="Logo UFAC" class="report-logo">
+        </div>
+        <div class="flex-grow-1 text-center">
+          <div class="inst-lines fw-semibold lh-sm inst-lines-text">
+            UNIVERSIDADE FEDERAL DO ACRE<br>
+            {{ disciplineLabel || 'CURSO DE MEDICINA' }}
+          </div>
+          <div class="sheet-title mt-2">FOLHA DE PRESENÇA DIÁRIA</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Texto introdutório MFC (folha de presença) -->
+    <div class="mfc-intro bordered-box p-2 small mb-3">
+      <p>
+        A Medicina de Família e Comunidade (MFC) é definida como a “especialidade
+        médica que presta assistência à saúde de forma continuada, integral e
+        abrangente para as pessoas, suas famílias e a comunidade” (Gusso & Lopes,
+        Tratado de MFC).
+      </p>
+      <p>
+        Atua no nível de atenção primária à saúde (APS), entendida como “oferta de
+        cuidados essenciais de saúde baseados em métodos e tecnologias práticas,
+        cientificamente bem fundamentadas e socialmente aceitáveis, colocadas ao
+        alcance universal de indivíduos e famílias da comunidade, mediante sua plena
+        participação e a um custo que a comunidade e o país podem manter em cada
+        fase do seu desenvolvimento” (Gusso & Lopes, Tratado de MFC).
+      </p>
+    </div>
+
+    <!-- Tabela de identificação -->
+    <div class="ident-table-wrapper mb-3">
+      <table class="table table-bordered table-sm mb-0 ident-table">
+        <tbody>
+          <tr>
+            <td class="label">Nome do(a) Interno(a):</td>
+            <td>{{ student.name }}</td>
+            <td class="label">Nome do(a) Preceptor(a):</td>
+            <td>
+              <ng-container *ngIf="preceptorsForWeek(selectedWeek).length > 0; else noPrecHdrInline">
+                {{ preceptorsForWeek(selectedWeek).join(', ') }}
+              </ng-container>
+              <ng-template #noPrecHdrInline>—</ng-template>
+            </td>
+          </tr>
+          <tr>
+            <td class="label">Período do Rodízio:</td>
+            <td colspan="3">{{ student.rotationPeriod }}</td>
+          </tr>
+          <tr>
+            <td class="label">Semana:</td>
+            <td colspan="3">Semana {{ selectedWeekIndex + 1 }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-responsive mb-3">
+      <table class="table table-sm table-bordered align-middle report-table mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="min-width:90px">Dias da Semana</th>
+            <th style="min-width:100px">Data</th>
+            <th style="min-width:110px">Período</th>
+            <th style="min-width:140px">Local</th>
+            <th style="min-width:140px">Preceptor</th>
+            <!-- Coluna de assinatura removida -->
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let day of selectedWeek.days">
+            <tr *ngFor="let period of day.periods; index as pi">
+              <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length" class="fw-semibold">{{ day.weekday }}</td>
+              <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length">{{ day.date | date:'dd/MM/yyyy' }}</td>
+              <td>
+                <div class="fw-semibold">{{ period.shift }}</div>
+                <div class="text-muted small" *ngIf="period.intervals?.length">
+                  <span *ngFor="let it of period.intervals; let last = last">
+                    {{ it.start }}-{{ it.end }}<span *ngIf="!last">; </span>
+                  </span>
+                </div>
+              </td>
+                <td>
+                  <span *ngIf="period.locations?.length; else vazio">{{ period.locations.join(', ') }}</span>
+                  <ng-template #vazio><span class="text-muted">—</span></ng-template>
+                </td>
+              <td *ngIf="pi === 0" [attr.rowspan]="day.periods.length">
+                <span *ngIf="day.preceptors?.length; else noPrec">{{ day.preceptors.join(', ') }}</span>
+                <ng-template #noPrec><span class="text-muted">—</span></ng-template>
+              </td>
+              <!-- célula de assinatura removida -->
+            </tr>
+          </ng-container>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Card de Avaliação (agora separado da área de identificação/presenças) -->
+    <div class="evaluation-card mb-3">
+      <div class="d-flex align-items-center flex-wrap small gap-2">
+        <label class="form-label mb-0 me-1">Avaliação do(a) Preceptor(a) (0 a 10):</label>
+        <ng-container *ngIf="preceptorEvaluations?.length; else semAvaliacao">
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <ng-container *ngFor="let ev of preceptorEvaluations">
+              <div class="d-inline-flex align-items-center gap-2">
+                <strong>{{ ev.preceptorName || 'Preceptor' }}:</strong>
+                <span class="evaluation-inline-score">{{ ev.score | number:'1.0-1' }}</span>
+                <button *ngIf="shouldShowEvalDetailsButton()" type="button" class="eval-inline-details-btn" (click)="openEvaluationDetailsFor(ev)" title="Ver detalhes desta avaliação">!</button>
+              </div>
+            </ng-container>
+          </div>
+        </ng-container>
+        <ng-template #semAvaliacao>
+          <span class="text-muted fst-italic">(não enviada)</span>
+        </ng-template>
+      </div>
+      <!-- Avaliação Final do Coordenador -->
+      <div *ngIf="isCoordinator && alunoId && disciplineId" class="mt-3 p-3 border rounded bg-light">
+        <div class="d-flex flex-wrap align-items-center gap-3">
+          <div class="d-flex align-items-center gap-2">
+            <label class="form-label mb-0">Avaliação Final (Coordenador):</label>
+       <input type="number"
+                   class="form-control form-control-sm"
+                   style="width:100px"
+         min="0" max="10" step="1"
+         inputmode="numeric"
+                   (keydown)="preventInvalidNumberInput($event)"
+         (paste)="handleFinalScorePaste($event)"
+                   (input)="onFinalScoreInput($event)"
+                   (blur)="sanitizeFinalScore()"
+                   [(ngModel)]="finalEval.score"
+                   [disabled]="finalEval.saving">
+          </div>
+          <div class="flex-grow-1">
+            <input type="text" class="form-control form-control-sm" placeholder="Comentário (opcional)" [(ngModel)]="finalEval.comment" [disabled]="finalEval.saving">
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-primary" (click)="openFinalSaveConfirm()" [disabled]="finalEval.saving || !isFinalScoreValid() || (finalExists && !isFinalDirty())">
+              <span *ngIf="!finalEval.saving && !(finalExists && !isFinalDirty())">Enviar nota</span>
+              <span *ngIf="!finalEval.saving && (finalExists && !isFinalDirty())">Nota enviada</span>
+              <span *ngIf="finalEval.saving" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Enviando...</span>
+            </button>
+            <!-- Ação de exclusão quando já existe nota -->
+            <button *ngIf="finalExists" class="btn btn-sm btn-outline-danger" (click)="openFinalDeleteConfirm()">Excluir</button>
+          </div>
+        </div>
+        <!-- Dicas de validação/estado para evitar confusão de que o comentário é obrigatório -->
+        <div class="small text-muted mt-1">
+          <ng-container *ngIf="!isFinalScoreValid(); else finalStateOk">
+            Digite uma nota inteira entre 0 e 10.
+          </ng-container>
+          <ng-template #finalStateOk>
+            <span *ngIf="finalExists && !isFinalDirty()">Sem alterações para enviar.</span>
+          </ng-template>
+        </div>
+        <div class="small text-muted mt-2">
+          Ao enviar a nota final, a disciplina será finalizada. Você poderá editar ou excluir esta nota posteriormente.
+        </div>
+      </div>
+      <!-- (removido bloco de leitura do aluno daqui para exibir no rodapé da página) -->
+    </div>
+
+    <!-- Modal Detalhes Avaliação -->
+    <div class="eval-modal-backdrop" *ngIf="showEvalModal" (click)="closeEvaluationDetails()"></div>
+    <div class="eval-modal" *ngIf="showEvalModal">
+      <div class="modal-header">
+        <h3>Detalhes da Avaliação</h3>
+        <button class="close-btn" (click)="closeEvaluationDetails()">×</button>
+      </div>
+      <div class="modal-body" *ngIf="evaluationDetails as ev">
+        <!-- Legenda da escala -->
+        <div class="legend-scale mb-3 small d-flex flex-wrap align-items-center gap-3">
+          <div class="legend-title fw-semibold">Escala:</div>
+          <div class="legend-item" *ngFor="let f of faces; let idx = index">
+            <span class="legend-face">{{ f }}</span>
+            <span class="legend-label">{{ idx+1 }}</span>
+          </div>
+        </div>
+        <!-- Nota e comentário -->
+        <div class="summary-strip mb-3 p-2 p-sm-3">
+          <div class="row g-3 align-items-center">
+            <div class="col-12 col-md-auto d-flex align-items-center gap-2">
+              <strong>Nota Final:</strong>
+              <span class="eval-modal-score display-score">{{ ev.score | number:'1.0-1' }}</span>
+            </div>
+            <div class="col d-flex align-items-start gap-2" *ngIf="ev.comment">
+              <strong>Comentário:</strong>
+              <span class="eval-modal-comment flex-grow-1">{{ ev.comment }}</span>
+            </div>
+          </div>
+        </div>
+        <!-- Dimensões em cards -->
+        <div *ngIf="ev.details as det" class="dimensions-grid-wrapper">
+          <div *ngFor="let dim of det.dimensions" class="dimension-card mb-4">
+            <div class="dimension-card-header">{{ dimensionTitles[dim.id] || dim.id }}</div>
+            <div class="questions-grid">
+              <div *ngFor="let q of dim.questions" class="question-tile">
+                <div class="q-text">{{ fullQuestionText(dim.id, q.id) }}</div>
+                <div class="q-face" *ngIf="q.answer as ans" [attr.data-score]="ans" [title]="'Pontuação: ' + ans">{{ faces[ans-1] }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="close-secondary" (click)="closeEvaluationDetails()">Fechar</button>
+      </div>
+    </div>
+
+    <!-- Exibição (somente leitura) para o ALUNO - resumo no rodapé -->
+    <div *ngIf="isAlunoUser && finalEval.loaded && (finalEval.score != null || finalEval.comment)" class="mt-4 p-3 border rounded bg-light">
+      <div class="small">
+        <strong class="final-score-label">Nota Final:</strong><span class="evaluation-inline-score">{{ finalEval.score }}</span>
+      </div>
+      <div class="small mt-1" *ngIf="finalEval.comment">
+        <strong>Comentário:</strong> {{ finalEval.comment }}
+      </div>
+    </div>
+
+    <!-- Exibição (somente leitura) para PRECEPTOR/ADMIN visualizando aluno -->
+    <div *ngIf="!isAlunoUser && !isCoordinator && finalEval.loaded && (finalEval.score != null || finalEval.comment)" class="mt-4 p-3 border rounded bg-light">
+      <div class="small">
+        <strong class="final-score-label">Nota Final (Coord.):</strong><span class="evaluation-inline-score">{{ finalEval.score }}</span>
+      </div>
+      <div class="small mt-1" *ngIf="finalEval.comment">
+        <strong>Comentário do Coordenador:</strong> {{ finalEval.comment }}
+      </div>
+    </div>
+
+    <!-- Barra de ações inferior -->
+    <div class="d-flex flex-wrap justify-content-between gap-2 pt-3 border-top mt-3 action-bar">
+      <div class="d-flex align-items-center gap-2">
+        <!-- Botão só aparece para PRECEPTOR (admin não avalia) -->
+        <button *ngIf="isPreceptorViewingStudent()" type="button" class="btn btn-warning btn-sm text-white fw-semibold" (click)="goToEvaluation()">
+          Avaliar Interno
+        </button>
+        <!-- Excluir avaliação (reset) -->
+        <button *ngIf="isPreceptorViewingStudent() && hasGlobalEvaluation" type="button" class="btn btn-outline-danger btn-sm fw-semibold" (click)="openDeleteEvaluationConfirm()" [disabled]="!evaluationDetails">
+          Excluir Avaliação
+        </button>
+      </div>
+      <div class="d-flex align-items-center gap-2 ms-auto" *ngIf="isDisciplineFinalized()">
+        <button class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1" (click)="onGeneratePdf()" [disabled]="generatingPdf">
+          <span *ngIf="!generatingPdf"><i class="bi bi-filetype-pdf"></i> Gerar PDF</span>
+          <span *ngIf="generatingPdf" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Gerando...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal custom de confirmação de exclusão de avaliação -->
+<div class="modal-eval-delete-backdrop" *ngIf="showDeleteEvalConfirm" (click)="cancelDeleteEvaluation()"></div>
+<div class="modal-eval-delete" *ngIf="showDeleteEvalConfirm">
+  <div class="modal-header d-flex justify-content-between align-items-center">
+    <h5 class="m-0">Confirmar Exclusão</h5>
+    <button type="button" class="btn-close" aria-label="Fechar" (click)="cancelDeleteEvaluation()"></button>
+  </div>
+  <div class="modal-body">
+    <p class="mb-2">Deseja realmente excluir esta avaliação?</p>
+    <p class="small text-muted mb-0">Após excluir, o aluno poderá novamente editar/ajustar os planos desta rotação antes de nova avaliação.</p>
+  </div>
+  <div class="modal-footer d-flex justify-content-end gap-2">
+    <button class="btn btn-sm btn-outline-secondary" (click)="cancelDeleteEvaluation()" [disabled]="deletingEval">Cancelar</button>
+    <button class="btn btn-sm btn-danger" (click)="confirmDeleteEvaluation()" [disabled]="deletingEval">
+      <span *ngIf="!deletingEval">Excluir</span>
+      <span *ngIf="deletingEval" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Excluindo...</span>
+    </button>
+  </div>
+</div>
+
+<!-- Modal custom de confirmação de envio da avaliação final do coordenador -->
+<div class="modal-eval-delete-backdrop" *ngIf="showFinalSaveConfirm" (click)="cancelFinalSave()"></div>
+<div class="modal-eval-delete" *ngIf="showFinalSaveConfirm">
+  <div class="modal-header d-flex justify-content-between align-items-center">
+    <h5 class="m-0">Confirmar Envio</h5>
+    <button type="button" class="btn-close" aria-label="Fechar" (click)="cancelFinalSave()" [disabled]="finalEval.saving"></button>
+  </div>
+  <div class="modal-body">
+    <p class="mb-2">Deseja realmente enviar a nota final deste(a) aluno(a)?</p>
+    <p class="small text-muted">Ao enviar a nota, a disciplina será finalizada. Você poderá editar ou excluir esta nota posteriormente.</p>
+    <div class="border rounded p-2 small">
+      <div><strong>Nota Final:</strong> {{ finalEval.score != null ? finalEval.score : '—' }}</div>
+      <div *ngIf="finalEval.comment"><strong>Comentário:</strong> {{ finalEval.comment }}</div>
+    </div>
+  </div>
+  <div class="modal-footer d-flex justify-content-end gap-2">
+    <button class="btn btn-sm btn-outline-secondary" (click)="cancelFinalSave()" [disabled]="finalEval.saving">Cancelar</button>
+    <button class="btn btn-sm btn-primary" (click)="confirmFinalSave()" [disabled]="finalEval.saving">
+      <span *ngIf="!finalEval.saving">Enviar nota</span>
+      <span *ngIf="finalEval.saving" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Enviando...</span>
+    </button>
+  </div>
+</div>
+
+<!-- Modal custom de confirmação de exclusão da nota final do coordenador -->
+<div class="modal-eval-delete-backdrop" *ngIf="showFinalDeleteConfirm" (click)="cancelFinalDelete()"></div>
+<div class="modal-eval-delete" *ngIf="showFinalDeleteConfirm">
+  <div class="modal-header d-flex justify-content-between align-items-center">
+    <h5 class="m-0">Confirmar Exclusão</h5>
+    <button type="button" class="btn-close" aria-label="Fechar" (click)="cancelFinalDelete()" [disabled]="deletingFinal"></button>
+  </div>
+  <div class="modal-body">
+    <p class="mb-2">Deseja realmente excluir a nota final enviada?</p>
+    <p class="small text-muted mb-0">Ao excluir, a disciplina deixará de estar finalizada até que uma nova nota seja enviada.</p>
+  </div>
+  <div class="modal-footer d-flex justify-content-end gap-2">
+    <button class="btn btn-sm btn-outline-secondary" (click)="cancelFinalDelete()" [disabled]="deletingFinal">Cancelar</button>
+    <button class="btn btn-sm btn-danger" (click)="confirmFinalDelete()" [disabled]="deletingFinal">
+      <span *ngIf="!deletingFinal">Excluir</span>
+      <span *ngIf="deletingFinal" class="d-inline-flex align-items-center gap-1"><span class="spinner-border spinner-border-sm"></span> Excluindo...</span>
+    </button>
+  </div>
+  </div>

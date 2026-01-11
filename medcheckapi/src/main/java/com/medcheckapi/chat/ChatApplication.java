@@ -33,14 +33,18 @@ public class ChatApplication {
             boolean cpfMissing = userRepository.findByCpf("00000000000").isEmpty();
             boolean emailMissing = userRepository.findByInstitutionalEmailIgnoreCase("admin@medcheck.com").isEmpty();
             if (cpfMissing && emailMissing) {
+                String adminPassword = System.getenv("ADMIN_DEFAULT_PASSWORD");
+                if (adminPassword == null || adminPassword.isBlank()) {
+                    adminPassword = "changeme";
+                }
                 User adminUser = new User();
                 adminUser.setName("Admin");
                 adminUser.setCpf("00000000000");
-                adminUser.setPassword(passwordEncoder.encode("Senha123!"));
+                adminUser.setPassword(passwordEncoder.encode(adminPassword));
                 adminUser.setInstitutionalEmail("admin@medcheck.com");
                 adminUser.setRole(com.medcheckapi.user.model.Role.ADMIN);
                 userRepository.save(adminUser);
-                System.out.println("Created extra admin user (CPF 00000000000) with password Senha123!");
+                System.out.println("Created extra admin user (CPF 00000000000) - change password after first login!");
             } else {
                 System.out.println("Admin seed skipped (already exists)");
             }

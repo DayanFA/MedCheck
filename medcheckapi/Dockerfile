@@ -12,5 +12,5 @@ COPY --from=build /app/target/*.jar app.jar
 # A porta padrão do Spring Boot
 EXPOSE 8080
 
-# Comando para ligar a API
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Comando para ligar a API COM LIMITE DE MEMÓRIA (256MB)
+ENTRYPOINT ["java", "-Xms256m", "-Xmx256m", "-jar", "app.jar"]
